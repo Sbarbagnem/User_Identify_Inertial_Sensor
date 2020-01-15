@@ -98,9 +98,9 @@ class my_model( object ):
         self._YU            = tf.placeholder( dtype = tf.int32,     shape = [ None, self._dataset._train_user_num] )
 
         if self._framework == 1:
-            self._model = ParameterTuning.MTLMA_pretrain()
+            self._model = model.MTLMA_pretrain()
         elif self._framework == 2:
-            self._model = ParameterTuning.MTLMA_train()
+            self._model = model.MTLMA_train()
         else:
             print( 'model error!!!' )
             exit(0)
@@ -246,8 +246,8 @@ if __name__ == '__main__':
     args    = parser.parse_args()
     dataset = data_loader.UNIMIB()
 
-    model = my_model( args.version, args.gpu, args.fold, args.save_dir, dataset, args.model )
+    myModel = my_model( args.version, args.gpu, args.fold, args.save_dir, dataset, args.model )
 
-    model.load_data()
-    model.build_model()
-    model.run_model()
+    myModel.load_data()
+    myModel.build_model()
+    myModel.run_model()
