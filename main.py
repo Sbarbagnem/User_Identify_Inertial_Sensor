@@ -7,14 +7,14 @@ import time
 
 import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+#import tensorflow.contrib.slim as slim
 from scipy.fftpack import fft
 from sklearn import utils as skutils
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
 from sklearn.neighbors import KNeighborsClassifier
 
-import data_loader
-import model
+from util import data_loader
+from model import model
 
 
 class my_model( object ):
