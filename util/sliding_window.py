@@ -92,4 +92,5 @@ def sliding_window(a,ws,ss = None,flatten = True):
     dim = firstdim + (newshape[-meat:])
     # remove any dimensions with size 1
     dim = filter(lambda i : i != 1,dim)
-    return strided.reshape(dim)
+    dim_filter = tuple([el for el in dim]) # added to retirieve dimension after filter
+    return strided.reshape(dim_filter)

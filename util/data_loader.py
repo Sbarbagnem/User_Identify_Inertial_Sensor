@@ -12,7 +12,7 @@ from sklearn import utils as skutils
 class UNIMIB( object ):
 
     def __init__( self ):
-        self._path              = '/data/datasets/UNIMIBDataset/'
+        self._path              = 'data/datasets/UNIMIBDataset/'
         self._name              = 'unimib'
         self._channel           = 3
         self._winlen            = 100

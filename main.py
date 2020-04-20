@@ -16,6 +16,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from util import data_loader
 from model import model
 
+tf.compat.v1.disable_eager_execution()
 
 class my_model( object ):
 
@@ -62,6 +63,9 @@ class my_model( object ):
         train_size  = self._train_data.shape[0]
         scale       = self._data_pos+self._batch_size
         if scale > train_size:
+
+            #print("Read all dataset")
+
             a   = scale - train_size
 
             data1   = self._train_data[self._data_pos: ]
@@ -90,12 +94,12 @@ class my_model( object ):
             return data, self.one_hot( la, self._dataset._train_act_num ), self.one_hot( lu, self._dataset._train_user_num )
 
     def build_model( self ):
-        self._is_training   = tf.placeholder( dtype = tf.bool )
-        self._learning_rate = tf.placeholder( dtype = tf.float32 )
+        self._is_training   = tf.compat.v1.placeholder( dtype = tf.bool )
+        self._learning_rate = tf.compat.v1.placeholder( dtype = tf.float32 )
 
-        self._X             = tf.placeholder( dtype = tf.float32,   shape = self._dataset._data_shape )
-        self._YA            = tf.placeholder( dtype = tf.int32,     shape = [ None, self._dataset._train_act_num] )
-        self._YU            = tf.placeholder( dtype = tf.int32,     shape = [ None, self._dataset._train_user_num] )
+        self._X             = tf.compat.v1.placeholder( dtype = tf.float32,   shape = self._dataset._data_shape )
+        self._YA            = tf.compat.v1.placeholder( dtype = tf.int32,     shape = [ None, self._dataset._train_act_num] )
+        self._YU            = tf.compat.v1.placeholder( dtype = tf.int32,     shape = [ None, self._dataset._train_user_num] )
 
         if self._framework == 1:
             self._model = model.MTLMA_pretrain()
@@ -108,12 +112,12 @@ class my_model( object ):
         a_preds, a_loss, u_preds, u_loss = self._model( self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
                                         self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
 
-        a_train_step    = tf.train.AdamOptimizer( self._learning_rate ).minimize( a_loss, var_list=self._model.get_act_step_vars() )
-        u_train_step    = tf.train.AdamOptimizer( self._learning_rate ).minimize( u_loss, var_list=self._model.get_user_step_vars() )
+        a_train_step    = tf.compat.v1.train.AdamOptimizer( self._learning_rate ).minimize( a_loss, var_list=self._model.get_act_step_vars() )
+        u_train_step    = tf.compat.v1.train.AdamOptimizer( self._learning_rate ).minimize( u_loss, var_list=self._model.get_user_step_vars() )
 
-        tf.summary.scalar( "learning rate", self._learning_rate )
-        merged          = tf.summary.merge_all()
-        update_ops      = tf.get_collection( tf.GraphKeys.UPDATE_OPS )
+        tf.compat.v1.summary.scalar( "learning rate", self._learning_rate )
+        merged          = tf.compat.v1.summary.merge_all()
+        update_ops      = tf.compat.v1.get_collection( tf.compat.v1.GraphKeys.UPDATE_OPS )
 
         self._a_preds       = a_preds
         self._u_preds       = u_preds
@@ -154,23 +158,25 @@ class my_model( object ):
 
         # import pdb; pdb.set_trace()
         for i in range( 1, 4, 1 ):
-            TensorA = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES, scope='act_network/a_conv{}'.format(i) )
-            TensorU = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES, scope='user_network/u_conv{}'.format(i) )
+            TensorA = tf.compat.v1.get_collection( tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='act_network/a_conv{}'.format(i) )
+            TensorU = tf.compat.v1.get_collection( tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='user_network/u_conv{}'.format(i) )
             ParameterA, ParameterU = sess.run( [TensorA, TensorU] )
+            if not os.path.exists( "./data/parameters/" ):
+                os.mkdir( "./data/parameters/" )
             np.save( "./data/parameters/{}f{}a{}".format( self._dataset._name, self._fold, i), ParameterA[0] )
             np.save( "./data/parameters/{}f{}u{}".format( self._dataset._name, self._fold, i), ParameterU[0] )
 
     def run_model( self ):
 
         os.environ["CUDA_VISIBLE_DEVICES"] = str( self._gpu ) # gpu selection        
-        sess_config = tf.ConfigProto()  
+        sess_config = tf.compat.v1.ConfigProto()  
         sess_config.gpu_options.per_process_gpu_memory_fraction = 1  # 100% gpu
         sess_config.gpu_options.allow_growth = True      # dynamic growth
 
-        with tf.Session( config = sess_config ) as sess:
-            sess.run(tf.global_variables_initializer())
-            sess.run(tf.local_variables_initializer())
-            train_writer    = tf.summary.FileWriter( self._log_path + '/train', graph = tf.get_default_graph() )
+        with tf.compat.v1.Session( config = sess_config ) as sess:
+            sess.run(tf.compat.v1.global_variables_initializer())
+            sess.run(tf.compat.v1.local_variables_initializer())
+            train_writer    = tf.compat.v1.summary.FileWriter( self._log_path + '/train', graph = tf.compat.v1.get_default_graph() )
 
             # result_array    = np.empty( [0, 2, len( self._test_data )] )
             LARecord = np.empty( [0, 2, self._test_data.shape[0]] )
@@ -239,15 +245,26 @@ if __name__ == '__main__':
     
     parser.add_argument('-v', '--version',      type=str,       default = ""    )
     parser.add_argument('-g', '--gpu',          type=int,       default = 0     )
-    parser.add_argument('-f', '--fold',         type=int,       default = 0     )
+    parser.add_argument('-f', '--fold',         type=int,       default = 0     ) # fold for test
     parser.add_argument('-s', '--save_dir',     type=str.lower, default = 'test')
     parser.add_argument('-m', '--model',        type=int,       default = 1,        choices = [ 1, 2 ]  ) # 1: pretrain, 2: train
     
     args    = parser.parse_args()
     dataset = data_loader.UNIMIB()
 
+    # pretrain
     myModel = my_model( args.version, args.gpu, args.fold, args.save_dir, dataset, args.model )
 
     myModel.load_data()
     myModel.build_model()
     myModel.run_model()
+
+    # train and test
+    #myModel = my_model("", 0, 0, 'test', dataset, 2)
+    #myModel.load_data()
+    #myModel.build_model()
+    #myModel.run_model()
+
+
+
+    # TODO  automatize pretrain and 10-fold validation 
