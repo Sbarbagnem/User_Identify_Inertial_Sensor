@@ -24,7 +24,7 @@ class my_model( object ):
         
         self._dataset   = dataset
         self._gpu       = gpu
-        self._log_path  = dataset._path+'log/'+version+'/'
+        #self._log_path  = dataset._path+'log/'+version+'/'
         self._fold      = fold % 10
         self._save_path = dataset._path+'record/'+save_dir
         self._framework = framework
@@ -176,7 +176,7 @@ class my_model( object ):
         with tf.compat.v1.Session( config = sess_config ) as sess:
             sess.run(tf.compat.v1.global_variables_initializer())
             sess.run(tf.compat.v1.local_variables_initializer())
-            train_writer    = tf.compat.v1.summary.FileWriter( self._log_path + '/train', graph = tf.compat.v1.get_default_graph() )
+            #train_writer    = tf.compat.v1.summary.FileWriter( self._log_path + '/train', graph = tf.compat.v1.get_default_graph() )
 
             # result_array    = np.empty( [0, 2, len( self._test_data )] )
             LARecord = np.empty( [0, 2, self._test_data.shape[0]] )
@@ -205,7 +205,7 @@ class my_model( object ):
                     print( "model error" )
                     exit()
 
-                train_writer.add_summary( summary, i )
+                #train_writer.add_summary( summary, i )
 
                 if i % self._print_interval == 0:
 
@@ -240,31 +240,52 @@ class my_model( object ):
 
 
 if __name__ == '__main__':
-
+    '''
     parser  = argparse.ArgumentParser( description="deep MTL based activity and user recognition using wearable sensors" )
     
+    parser.add_argument('-d', '--dataset',      type=str,       default="", required=True)
+    parser.add_argument('-p', '--path',         type=str,       default="", required=True)
     parser.add_argument('-v', '--version',      type=str,       default = ""    )
     parser.add_argument('-g', '--gpu',          type=int,       default = 0     )
     parser.add_argument('-f', '--fold',         type=int,       default = 0     ) # fold for test
     parser.add_argument('-s', '--save_dir',     type=str.lower, default = 'test')
     parser.add_argument('-m', '--model',        type=int,       default = 1,        choices = [ 1, 2 ]  ) # 1: pretrain, 2: train
-    
+
     args    = parser.parse_args()
+    '''
+
+    '''
     dataset = data_loader.UNIMIB()
 
     # pretrain
-    myModel = my_model( args.version, args.gpu, args.fold, args.save_dir, dataset, args.model )
+    myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
 
     myModel.load_data()
     myModel.build_model()
     myModel.run_model()
 
     # train and test
-    #myModel = my_model("", 0, 0, 'test', dataset, 2)
-    #myModel.load_data()
-    #myModel.build_model()
-    #myModel.run_model()
+    for i in range(10):
+        myModel = my_model( version="", gpu=0, fold=i, save_dir='test', dataset=dataset, framework=1 )
+        myModel.load_data()
+        myModel.build_model()
+        myModel.run_model()
+    '''
 
+    dataset = data_loader.SBHAR()
 
+    # pretrain
+    myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
 
-    # TODO  automatize pretrain and 10-fold validation 
+    myModel.load_data()
+    myModel.build_model()
+    myModel.run_model()
+    
+    '''
+    # train and test
+    for i in range(10):
+        myModel = my_model( version="", gpu=0, fold=i, save_dir='test', dataset=dataset, framework=1 )
+        myModel.load_data()
+        myModel.build_model()
+        myModel.run_model()
+    '''
