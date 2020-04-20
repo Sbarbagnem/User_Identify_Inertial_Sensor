@@ -36,7 +36,7 @@ class my_model( object ):
         self._max_lr            = 0.0015
         self._decay_speed       = 10000
 
-        self._data_pos          = 0
+        self._data_pos          = 0     
 
     def load_data( self ):
 
@@ -156,6 +156,8 @@ class my_model( object ):
 
     def save_paremeters( self, sess ):
 
+        print('Save paramter after pre-train')
+
         # import pdb; pdb.set_trace()
         for i in range( 1, 4, 1 ):
             TensorA = tf.compat.v1.get_collection( tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='act_network/a_conv{}'.format(i) )
@@ -253,9 +255,16 @@ if __name__ == '__main__':
 
     args    = parser.parse_args()
     '''
+    ######################
+    ### UNIMIB DATASET ###
+    ######################
 
-    '''
-    dataset = data_loader.UNIMIB()
+    dataset = data_loader.Dataset(  path='data/datasets/UNIMIBDataset/',
+                                    name='unimib',
+                                    channel=3,
+                                    winlen=100,
+                                    user_num=30,
+                                    act_num=9)
 
     # pretrain
     myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
@@ -263,16 +272,25 @@ if __name__ == '__main__':
     myModel.load_data()
     myModel.build_model()
     myModel.run_model()
-
+    '''
     # train and test
     for i in range(10):
-        myModel = my_model( version="", gpu=0, fold=i, save_dir='test', dataset=dataset, framework=1 )
+        myModel = my_model( version="", gpu=0, fold=i, save_dir='test_unimib', dataset=dataset, framework=2 )
         myModel.load_data()
         myModel.build_model()
         myModel.run_model()
     '''
 
-    dataset = data_loader.SBHAR()
+    #####################
+    ### SBHAR DATASET ###
+    #####################
+    '''
+    dataset = data_loader.Dataset(  path='data/datasets/SBHAR_processed/',
+                                    name='sbhar',
+                                    channel=6,
+                                    winlen=100,
+                                    user_num=30,
+                                    act_num=12)
 
     # pretrain
     myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
@@ -281,11 +299,14 @@ if __name__ == '__main__':
     myModel.build_model()
     myModel.run_model()
     
-    '''
     # train and test
     for i in range(10):
-        myModel = my_model( version="", gpu=0, fold=i, save_dir='test', dataset=dataset, framework=1 )
+        myModel = my_model( version="", gpu=0, fold=i, save_dir='test_sbhar', dataset=dataset, framework=2 )
         myModel.load_data()
         myModel.build_model()
         myModel.run_model()
     '''
+
+    ########################
+    ### REALDISP DATASET ###
+    ########################
