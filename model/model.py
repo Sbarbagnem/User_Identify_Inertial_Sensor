@@ -173,8 +173,13 @@ class MTLMA_train( object ):
         # bi-lstm
         A_net       = tf.reshape( A_net,    [-1, A_net.get_shape()[1].value, A_net.get_shape()[2].value*A_net.get_shape()[3].value] )
         A_net       = tf.transpose( a=A_net,  perm=[1, 0, 2] )
-        A_lstm_unit = tf.compat.v1.keras.layers.CuDNNLSTM( num_layers=1, num_units=128, input_mode='auto_select', direction='bidirectional', dropout=0.1 )
-        A_net, _    = A_lstm_unit( inputs=A_net, scope='A_lstm' )
+        #A_lstm_unit = tf.compat.v1.keras.layers.CuDNNLSTM( num_layers=1, num_units=128, input_mode='auto_select', direction='bidirectional', dropout=0.1 )
+        A_lstm_unit = tf.keras.layers.Bidirectional(
+                        tf.keras.layers.LSTM( units=128, dropout=0.1, return_sequences=True ),
+                        merge_mode = 'concat'
+        )
+        #A_net, _    = A_lstm_unit( inputs=A_net, scope='A_lstm' )
+        A_net       = A_lstm_unit( inputs=A_net )
         A_net       = tf.transpose( a=A_net,  perm=[1, 0, 2] )     
 
         # CNN
@@ -185,8 +190,13 @@ class MTLMA_train( object ):
         # bi-lstm
         U_net       = tf.reshape( U_net,    [-1, U_net.get_shape()[1].value, U_net.get_shape()[2].value*U_net.get_shape()[3].value] )
         U_net       = tf.transpose( a=U_net,  perm=[1, 0, 2] )
-        u_lstm_unit = tf.compat.v1.keras.layers.CuDNNLSTM( num_layers=1, num_units=128, input_mode='auto_select', direction='bidirectional', dropout=0.1 )
-        U_net, _    = u_lstm_unit( inputs=U_net, scope='U_lstm' )
+        #u_lstm_unit = tf.compat.v1.keras.layers.CuDNNLSTM( num_layers=1, num_units=128, input_mode='auto_select', direction='bidirectional', dropout=0.1 )
+        u_lstm_unit = tf.keras.layers.Bidirectional(
+                        tf.keras.layers.LSTM( units=128, dropout=0.1, return_sequences=True ),
+                        merge_mode = 'concat'
+        )
+        #U_net, _    = u_lstm_unit( inputs=U_net, scope='U_lstm' )
+        U_net       = u_lstm_unit( inputs=U_net )
         U_net       = tf.transpose( a=U_net,  perm=[1, 0, 2] )        
 
         # attention for ARnet
