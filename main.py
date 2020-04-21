@@ -310,3 +310,25 @@ if __name__ == '__main__':
     ########################
     ### REALDISP DATASET ###
     ########################
+    '''
+    dataset = data_loader.Dataset(  path='data/datasets/REALDISP_processed/',
+                                    name='realdisp',
+                                    channel=6,
+                                    winlen=100,
+                                    user_num=17,
+                                    act_num=33)
+
+    # pretrain
+    myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
+
+    myModel.load_data()
+    myModel.build_model()
+    myModel.run_model()
+    
+    # train and test
+    for i in range(10):
+        myModel = my_model( version="", gpu=0, fold=i, save_dir='test_realdisp', dataset=dataset, framework=2 )
+        myModel.load_data()
+        myModel.build_model()
+        myModel.run_model()
+    '''

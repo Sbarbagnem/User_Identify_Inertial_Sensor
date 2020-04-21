@@ -10,14 +10,188 @@ from sklearn import utils as skutils
 
 from sliding_window import sliding_window
 
-def preprocessing(dataset, path, path_out):
+def preprocessing(dataset, path, path_out, positions):
+    
     if dataset == 'unimib':
         unimib_process(path, path_out)
     elif dataset == 'sbhar':
         sbhar_process(path, path_out)
-    else:
-        pass
-        # TODO add call to other datasets
+    elif dataset == 'realdisp':
+        realdisp_process(path, path_out, positions)
+
+def realdisp_process(path, path_out, positions='all'):
+    '''
+        positions:  list of positions sensor to consider in preprocessing.
+                    If "all" parameter is passed no filter to position will
+                    be apply.
+    '''
+
+    '''
+        structure of log file in dataset (120 columns):
+            1       -> trial's number
+            2       -> timestamp in microseconds
+            3:119   -> data from sensors
+                order positions -> RLA | RUA | BACK | LUA | LLA | RC | RT | LT | LC
+                    for every postion   -> acc:[x,y,z] gyr:[x,y,z] mag:[x,y,z] quat:[1,2,3,4]
+            120     -> id activity (0 if unknown)
+
+    '''
+
+    root_path       = path + 'REALDISP'
+    raw_data_path   = root_path + '/'
+    processed_path  = path_out + 'OuterPartition'
+
+    win_len         = 100
+    channel         = 3
+    ID_generater    = 1
+    number_sensor   = 2
+
+    data    = np.empty( [0, win_len, channel*number_sensor], dtype=np.float )
+    la      = np.empty( [0], dtype=np.int32 )
+    lu      = np.empty( [0], dtype=np.int32 )
+    ID      = np.empty( [0], dtype=np.int32 )
+
+    if not os.path.exists( path_out ):
+        os.mkdir( path_out ) 
+
+    for fl in os.listdir(raw_data_path):
+        if fl.startswith('subject'):
+            print("Leggo log file ", fl)
+            log_file    = np.loadtxt(fname=raw_data_path + fl)
+            id_user     = int(fl.split('_')[0].split('subject')[1])
+            print(id_user)
+            
+            # take only acc and gyro data
+            acc_gyro    = log_file[:,2:119]
+            activities  = log_file[:,-1].astype('int32')
+            activities  = activities.reshape(acc_gyro.shape[0], 1)
+            trials      = log_file[:,0].astype('int32')
+            trials      = trials.reshape(acc_gyro.shape[0], 1)
+
+            
+
+            offset  = 6
+            step    = 0
+
+            # delete mag and quat columns
+            for _ in range(9):
+                acc_gyro = np.delete(acc_gyro, np.arange((offset*step) + offset ,(offset*step) + offset + 7), axis=1)
+                step += 1
+
+            step = 0
+            
+            # filter positions based on parameter positions
+            if positions != 'all':
+                if 'RLA' not in positions:
+                    acc_gyro = acc_gyro[:,step*offset:]
+                else:
+                    step += 1
+                if 'RUA' not in positions:
+                    acc_gyro = acc_gyro[:,step*offset:]
+                else:
+                    step += 1
+                if 'BACK' not in positions:
+                    acc_gyro = acc_gyro[:,step*offset:]
+                else:
+                    step += 1
+                if 'LUA' not in positions:
+                    acc_gyro = acc_gyro[:,step*offset:]
+                else:
+                    step += 1
+                if 'LLA' not in positions:
+                    acc_gyro = acc_gyro[:,step*offset:]
+                else:
+                    step += 1
+                if 'RC' not in positions:
+                    acc_gyro = acc_gyro[:,step*offset:]
+                else:
+                    step += 1
+                if 'RT' not in positions:
+                    acc_gyro = acc_gyro[:,step*offset:]
+                else:
+                    step += 1
+                if 'LT' not in positions:
+                    acc_gyro = acc_gyro[:,step*offset:]
+                else:
+                    step += 1
+                if 'LC' not in positions:
+                    acc_gyro = acc_gyro[:,step*offset:]
+
+            step = 0
+
+            acc_gyro    = np.concatenate((trials, acc_gyro, activities), axis=1)
+
+            # delete record with unknown activity label
+            acc_gyro    = np.delete(acc_gyro, np.where(acc_gyro[:,-1]==0), axis=0)
+
+            # cycle on activity
+            for id_act in np.unique(acc_gyro[:,-1]):
+                #print(int(id_act))
+                step = 0
+
+                temp = acc_gyro[np.where(acc_gyro[:,-1]==int(id_act))]
+
+                # sliding window on every of 9 sensor
+                for _ in range(9):       
+
+                    acc     = temp[:,1+(offset*step):(step*offset)+4]
+                    gyro    = temp[:,4+(offset*step):(step*offset)+7]
+
+                    try:
+                        _data_windows_acc   = sliding_window( acc, ( win_len, channel ), ( int( win_len/2 ), 1 ) )
+                    except:
+                        print("Not enough data for sliding window")
+                    invalid_idx         = np.where( np.any( np.isnan( np.reshape( _data_windows_acc, [-1, win_len*channel] ) ), axis=1 ) )[0]
+                    _data_windows_acc   = np.delete( _data_windows_acc, invalid_idx, axis=0 )
+
+                    _data_windows_gyro  = sliding_window( gyro, ( win_len, channel ), ( int( win_len/2 ), 1 ) )
+                    invalid_idx         = np.where( np.any( np.isnan( np.reshape( _data_windows_gyro, [-1, win_len*channel] ) ), axis=1 ) )[0]
+                    _data_windows_gyro  = np.delete( _data_windows_gyro, invalid_idx, axis=0 )
+
+                    try:
+                        acc_gyro_concat    = np.concatenate((_data_windows_acc, _data_windows_gyro), axis=2)
+                    except:
+                        print("There is only one sliding window")
+                        acc_gyro_concat    = np.concatenate((_data_windows_acc, _data_windows_gyro), axis=1)  
+                        acc_gyro_concat    = acc_gyro_concat.reshape((1,acc_gyro_concat.shape[0],acc_gyro_concat.shape[1]))
+                    
+                    step += 1
+
+                    _id             = np.arange( ID_generater, ID_generater+len(acc_gyro_concat)) # id for every window
+                    data            = np.concatenate( (data, acc_gyro_concat), axis=0 ) # concat verticaly every window
+                    ID              = np.concatenate( (ID,   _id), axis=0 )
+                    ID_generater    = ID_generater + len( acc_gyro_concat ) + 10            
+
+                # update la
+                _la     = np.full( len(data)-len(la) , int(id_act) - 1, dtype=np.int32 ) # label activity for every window
+                la      = np.concatenate( (la, _la), axis=0 )
+
+            # update gloabl variabel lu
+            _lu     = np.full( len(data)-len(lu) , int(id_user) - 1, dtype=np.int32 ) # label user for every window
+            lu      = np.concatenate( (lu, _lu), axis=0 )         
+
+    # shuffle
+    data, la, lu, ID    = skutils.shuffle( data, la, lu, ID )
+    data, la, lu, ID    = skutils.shuffle( data, la, lu, ID )
+
+    if not os.path.exists( processed_path + '/'):
+        os.mkdir( processed_path + '/' )
+
+    # partition
+    for i in range( 10 ):
+
+        # clear dir
+        if os.path.exists( processed_path+'/fold{}'.format(i) ):
+            shutil.rmtree( processed_path+'/fold{}'.format(i) )
+        os.mkdir( processed_path+'/fold{}'.format(i) )
+
+        idx    = np.arange( int( len(data)*0.1*i ), int( len(data)*0.1*(i+1) ), 1 )
+        np.save( processed_path+'/fold{}/data'.format(i),       data[idx] )
+        np.save( processed_path+'/fold{}/user_label'.format(i), lu[idx] )
+        np.save( processed_path+'/fold{}/act_label'.format(i),  la[idx] )
+        np.save( processed_path+'/fold{}/id'.format(i),         ID[idx] )
+            
+
 
 def sbhar_process(path, path_out):
     print('Processing sbhar dataset')
@@ -210,5 +384,6 @@ if __name__ == '__main__':
 
     args    = parser.parse_args()
 
-    preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/")
-    preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/")
+    #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/")
+    #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/")
+    preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "all")
