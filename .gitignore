@@ -1,3 +1,5 @@
 .vscode
 *pycache*
 data
+!data/SBHAR_processed.7z
+!data/UNIMIBDataset.7z
