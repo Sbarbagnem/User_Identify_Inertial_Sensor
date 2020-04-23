@@ -1,9 +1,5 @@
 .vscode
 *pycache*
-data/datasets/REALDISP
-data/datasets/SBHAR
-data/datasets/unimib_dataset
-data/datasets/REALDISP_processed
-data/datasets/SBHAR_processed
-data/datasets/UNIMIBDataset
-data/datasets/REALDISP_processed.7z
+data
+!data/SBHAR_processed.7z
+!data/UNIMIBDataset.7z
