@@ -170,8 +170,8 @@ class my_model( object ):
 
     def run_model( self ):
 
-        os.environ["CUDA_VISIBLE_DEVICES"] = str( self._gpu ) # gpu selection        
-        sess_config = tf.compat.v1.ConfigProto()  
+        os.environ["CUDA_VISIBLE_DEVICES"] = str( self._gpu ) # gpu selection
+        sess_config = tf.compat.v1.ConfigProto()
         sess_config.gpu_options.per_process_gpu_memory_fraction = 1  # 100% gpu
         sess_config.gpu_options.allow_growth = True      # dynamic growth
 
@@ -244,7 +244,7 @@ class my_model( object ):
 if __name__ == '__main__':
     '''
     parser  = argparse.ArgumentParser( description="deep MTL based activity and user recognition using wearable sensors" )
-    
+
     parser.add_argument('-d', '--dataset',      type=str,       default="", required=True)
     parser.add_argument('-p', '--path',         type=str,       default="", required=True)
     parser.add_argument('-v', '--version',      type=str,       default = ""    )
@@ -259,6 +259,8 @@ if __name__ == '__main__':
     ### UNIMIB DATASET ###
     ######################
 
+    print('pretrain UNIMIB dataset')
+
     dataset = data_loader.Dataset(  path='data/datasets/UNIMIBDataset/',
                                     name='unimib',
                                     channel=3,
@@ -267,15 +269,16 @@ if __name__ == '__main__':
                                     act_num=9)
 
     # pretrain
-    myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
+    myModel = my_model( version="", gpu=1, fold=0, save_dir='', dataset=dataset, framework=1 )
 
     myModel.load_data()
     myModel.build_model()
     myModel.run_model()
+
     '''
     # train and test
     for i in range(10):
-        myModel = my_model( version="", gpu=0, fold=i, save_dir='test_unimib', dataset=dataset, framework=2 )
+        myModel = my_model( version="", gpu=1, fold=i, save_dir='test_unimib', dataset=dataset, framework=2 )
         myModel.load_data()
         myModel.build_model()
         myModel.run_model()
@@ -284,7 +287,9 @@ if __name__ == '__main__':
     #####################
     ### SBHAR DATASET ###
     #####################
-    '''
+
+    print('pretrain SBHAR dataset')
+
     dataset = data_loader.Dataset(  path='data/datasets/SBHAR_processed/',
                                     name='sbhar',
                                     channel=6,
@@ -293,15 +298,17 @@ if __name__ == '__main__':
                                     act_num=12)
 
     # pretrain
-    myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
+    myModel = my_model( version="", gpu=1, fold=0, save_dir='', dataset=dataset, framework=1 )
 
     myModel.load_data()
     myModel.build_model()
     myModel.run_model()
-    
+
+    '''
+
     # train and test
     for i in range(10):
-        myModel = my_model( version="", gpu=0, fold=i, save_dir='test_sbhar', dataset=dataset, framework=2 )
+        myModel = my_model( version="", gpu=1, fold=i, save_dir='test_sbhar', dataset=dataset, framework=2 )
         myModel.load_data()
         myModel.build_model()
         myModel.run_model()
@@ -310,7 +317,8 @@ if __name__ == '__main__':
     ########################
     ### REALDISP DATASET ###
     ########################
-    '''
+
+    print('pretrain REALDISP dataset')
     dataset = data_loader.Dataset(  path='data/datasets/REALDISP_processed/',
                                     name='realdisp',
                                     channel=6,
@@ -319,15 +327,16 @@ if __name__ == '__main__':
                                     act_num=33)
 
     # pretrain
-    myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
+    myModel = my_model( version="", gpu=1, fold=0, save_dir='', dataset=dataset, framework=1 )
 
     myModel.load_data()
     myModel.build_model()
     myModel.run_model()
-    
+
+    '''
     # train and test
     for i in range(10):
-        myModel = my_model( version="", gpu=0, fold=i, save_dir='test_realdisp', dataset=dataset, framework=2 )
+        myModel = my_model( version="", gpu=1, fold=i, save_dir='test_realdisp', dataset=dataset, framework=2 )
         myModel.load_data()
         myModel.build_model()
         myModel.run_model()
