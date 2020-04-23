@@ -287,9 +287,13 @@ if __name__ == '__main__':
     #####################
     ### SBHAR DATASET ###
     #####################
+<<<<<<< HEAD
 
     print('pretrain SBHAR dataset')
 
+=======
+    
+>>>>>>> b18a1a4ea3221556bf74aff46d0688ad220ddf9d
     dataset = data_loader.Dataset(  path='data/datasets/SBHAR_processed/',
                                     name='sbhar',
                                     channel=6,
@@ -303,9 +307,13 @@ if __name__ == '__main__':
     myModel.load_data()
     myModel.build_model()
     myModel.run_model()
+<<<<<<< HEAD
 
     '''
 
+=======
+    '''
+>>>>>>> b18a1a4ea3221556bf74aff46d0688ad220ddf9d
     # train and test
     for i in range(10):
         myModel = my_model( version="", gpu=1, fold=i, save_dir='test_sbhar', dataset=dataset, framework=2 )
@@ -317,8 +325,12 @@ if __name__ == '__main__':
     ########################
     ### REALDISP DATASET ###
     ########################
+<<<<<<< HEAD
 
     print('pretrain REALDISP dataset')
+=======
+    
+>>>>>>> b18a1a4ea3221556bf74aff46d0688ad220ddf9d
     dataset = data_loader.Dataset(  path='data/datasets/REALDISP_processed/',
                                     name='realdisp',
                                     channel=6,
@@ -332,7 +344,10 @@ if __name__ == '__main__':
     myModel.load_data()
     myModel.build_model()
     myModel.run_model()
+<<<<<<< HEAD
 
+=======
+>>>>>>> b18a1a4ea3221556bf74aff46d0688ad220ddf9d
     '''
     # train and test
     for i in range(10):
