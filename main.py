@@ -11,7 +11,7 @@ import tensorflow as tf
 from scipy.fftpack import fft
 from sklearn import utils as skutils
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
-from sklearn.neighbors import KNeighborsClassifier
+#from sklearn.neighbors import KNeighborsClassifier
 
 from util import data_loader
 from model import model
