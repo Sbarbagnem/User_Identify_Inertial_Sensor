@@ -35,7 +35,7 @@ def main():
             location += '/'
 
     _file = service.files().list(
-            q=f"name contains '{sys.argv[1]}'",
+            q=f"name contains {sys.argv[1]}",
             fields='files(id, name)').execute()
 
     total = len(_file['files'])
