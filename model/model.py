@@ -161,9 +161,9 @@ class MTLMA_train( object ):
     def __call__( self, inputs, a_labels, u_labels, act_num, user_num, win_len, dname, fold, is_training = True, drop_keep_prob = 0.9 ):
 
         # weights of CNN
-        w_conv1, _  = TensorProducer( np.stack( [ np.load("./data/parameters/{}f{}a1.npy".format( dname, fold)), np.load("./data/parameters/{}f{}u1.npy".format( dname, fold)) ], axis=4 ), 'Tucker', eps_or_k=0.1, return_true_var=True )
-        w_conv2, _  = TensorProducer( np.stack( [ np.load("./data/parameters/{}f{}a2.npy".format( dname, fold)), np.load("./data/parameters/{}f{}u2.npy".format( dname, fold)) ], axis=4 ), 'Tucker', eps_or_k=0.1, return_true_var=True )
-        w_conv3, _  = TensorProducer( np.stack( [ np.load("./data/parameters/{}f{}a3.npy".format( dname, fold)), np.load("./data/parameters/{}f{}u3.npy".format( dname, fold)) ], axis=4 ), 'Tucker', eps_or_k=0.1, return_true_var=True )
+        w_conv1, _  = TensorProducer( np.stack( [ np.load("./data/parameters/{}/f{}a1.npy".format( dname, fold)), np.load("./data/parameters/{}/f{}u1.npy".format( dname, fold)) ], axis=4 ), 'Tucker', eps_or_k=0.1, return_true_var=True )
+        w_conv2, _  = TensorProducer( np.stack( [ np.load("./data/parameters/{}/f{}a2.npy".format( dname, fold)), np.load("./data/parameters/{}/f{}u2.npy".format( dname, fold)) ], axis=4 ), 'Tucker', eps_or_k=0.1, return_true_var=True )
+        w_conv3, _  = TensorProducer( np.stack( [ np.load("./data/parameters/{}/f{}a3.npy".format( dname, fold)), np.load("./data/parameters/{}/f{}u3.npy".format( dname, fold)) ], axis=4 ), 'Tucker', eps_or_k=0.1, return_true_var=True )
 
         # CNN
         A_net       = conv_unit( inputs,    w_conv1[:,:,:,:,0], is_training )
@@ -171,7 +171,7 @@ class MTLMA_train( object ):
         A_net       = pool_unit( A_net,     [1, 2, 1, 1],       [1, 2, 1, 1] )
         A_net       = conv_unit( A_net,     w_conv3[:,:,:,:,0], is_training )
         # bi-lstm
-        A_net       = tf.reshape( A_net,    [-1, A_net.get_shape()[1].value, A_net.get_shape()[2].value*A_net.get_shape()[3].value] )
+        A_net       = tf.reshape( A_net,    [-1, A_net.get_shape()[1], A_net.get_shape()[2]*A_net.get_shape()[3]] )
         A_net       = tf.transpose( a=A_net,  perm=[1, 0, 2] )
         #A_lstm_unit = tf.compat.v1.keras.layers.CuDNNLSTM( num_layers=1, num_units=128, input_mode='auto_select', direction='bidirectional', dropout=0.1 )
         A_lstm_unit = tf.keras.layers.Bidirectional(
@@ -188,7 +188,7 @@ class MTLMA_train( object ):
         U_net       = pool_unit( U_net,     [1, 2, 1, 1],       [1, 2, 1, 1] )
         U_net       = conv_unit( U_net,     w_conv3[:,:,:,:,1], is_training )
         # bi-lstm
-        U_net       = tf.reshape( U_net,    [-1, U_net.get_shape()[1].value, U_net.get_shape()[2].value*U_net.get_shape()[3].value] )
+        U_net       = tf.reshape( U_net,    [-1, U_net.get_shape()[1], U_net.get_shape()[2]*U_net.get_shape()[3]] )
         U_net       = tf.transpose( a=U_net,  perm=[1, 0, 2] )
         #u_lstm_unit = tf.compat.v1.keras.layers.CuDNNLSTM( num_layers=1, num_units=128, input_mode='auto_select', direction='bidirectional', dropout=0.1 )
         u_lstm_unit = tf.keras.layers.Bidirectional(
@@ -200,24 +200,24 @@ class MTLMA_train( object ):
         U_net       = tf.transpose( a=U_net,  perm=[1, 0, 2] )        
 
         # attention for ARnet
-        A_ATT       = tf.reshape( U_net, [-1, U_net.get_shape()[1].value*U_net.get_shape()[2].value] )
-        A_ATT       = fc_unit( A_ATT,   [A_ATT.get_shape()[1].value,   128],   is_training, scope='A_att1' )
-        A_ATT       = fc_unit( A_ATT,   [128,   A_net.get_shape()[1].value],   is_training, scope='A_att2' ) # time axis
+        A_ATT       = tf.reshape( U_net, [-1, U_net.get_shape()[1]*U_net.get_shape()[2]] )
+        A_ATT       = fc_unit( A_ATT,   [A_ATT.get_shape()[1],   128],   is_training, scope='A_att1' )
+        A_ATT       = fc_unit( A_ATT,   [128,   A_net.get_shape()[1]],   is_training, scope='A_att2' ) # time axis
         A_ATT       = tf.expand_dims( tf.nn.softmax( A_ATT ), 2 )
 
         # attention for URnet
-        U_ATT       = tf.reshape( A_net, [-1, A_net.get_shape()[1].value*A_net.get_shape()[2].value] )
-        U_ATT       = fc_unit( U_ATT,   [U_ATT.get_shape()[1].value,   128],    is_training, scope='U_att1' )
-        U_ATT       = fc_unit( U_ATT,   [128,   U_net.get_shape()[1].value],    is_training, scope='U_att2' )
+        U_ATT       = tf.reshape( A_net, [-1, A_net.get_shape()[1]*A_net.get_shape()[2]] )
+        U_ATT       = fc_unit( U_ATT,   [U_ATT.get_shape()[1],   128],    is_training, scope='U_att1' )
+        U_ATT       = fc_unit( U_ATT,   [128,   U_net.get_shape()[1]],    is_training, scope='U_att2' )
         U_ATT       = tf.expand_dims( tf.nn.softmax( U_ATT ), 2 )
 
         # output layer of ARnet
         A_net       = tf.reduce_sum( input_tensor=tf.multiply( A_net, A_ATT ), axis=1 )
-        A_net       = fc_unit_without_activiation( A_net, [A_net.get_shape()[1].value, act_num], is_training, scope='A_otpt' )       
+        A_net       = fc_unit_without_activiation( A_net, [A_net.get_shape()[1], act_num], is_training, scope='A_otpt' )       
         
         # output layer of URnet
         U_net       = tf.reduce_sum( input_tensor=tf.multiply( U_net, U_ATT ), axis=1 )
-        U_net       = fc_unit_without_activiation( U_net, [U_net.get_shape()[1].value, user_num], is_training, scope='U_otpt' )
+        U_net       = fc_unit_without_activiation( U_net, [U_net.get_shape()[1], user_num], is_training, scope='U_otpt' )
 
 
         A_cross_entropy = tf.reduce_mean( input_tensor=tf.nn.softmax_cross_entropy_with_logits( labels = a_labels , logits = A_net ) )

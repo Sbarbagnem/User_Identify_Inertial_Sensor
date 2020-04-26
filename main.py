@@ -7,328 +7,321 @@ import time
 
 import numpy as np
 import tensorflow as tf
-#import tensorflow.contrib.slim as slim
 from scipy.fftpack import fft
 from sklearn import utils as skutils
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
-from sklearn.neighbors import KNeighborsClassifier
 
-from util import data_loader
 from model import model
+from util.data_loader import Dataset
+
+#import tensorflow.contrib.slim as slim
+#from sklearn.neighbors import KNeighborsClassifier
 
 tf.compat.v1.disable_eager_execution()
 
-class my_model( object ):
 
-    def __init__( self, version, gpu, fold, save_dir, dataset, framework):
-        
-        self._dataset   = dataset
-        self._gpu       = gpu
+class my_model(object):
+
+    def __init__(self, version, gpu, fold, save_dir, dataset, framework, epochs):
+
+        self._dataset = dataset
+        self._gpu = gpu
         #self._log_path  = dataset._path+'log/'+version+'/'
-        self._fold      = fold % 10
+        self._fold = fold % 10
         self._save_path = dataset._path+'record/'+save_dir
         self._framework = framework
 
-        self._iter_steps        = 50000
-        self._print_interval    = 100
-        self._batch_size        = 100
-        self._min_lr            = 0.0005
-        self._max_lr            = 0.0015
-        self._decay_speed       = 10000
+        #self._iter_steps        = 50000
+        #self._print_interval    = 100
+        #self._batch_size        = 100
+        self._epoch = epochs
+        self._batch_size = 128
+        self._min_lr = 0.0005
+        self._max_lr = 0.0015
+        self._decay_speed = 10000
+        self._data_pos = 0
 
-        self._data_pos          = 0     
+        if not os.path.exists(dataset._path+'record/'):
+            os.mkdir(dataset._path+'record/')
 
-    def load_data( self ):
+        if not os.path.exists(self._save_path):
+            os.mkdir(self._save_path)
 
-        print( "loading the data..." )
-        train_data, train_la, train_lu, test_data, test_la, test_lu = self._dataset.load_data( step=self._fold )
+    def load_data(self):
 
-        self._train_data, self._train_la, self._train_lu = skutils.shuffle( train_data, train_la, train_lu )
-        self._test_data     = test_data
-        self._test_la       = test_la
-        self._test_lu       = test_lu
+        print("loading the data...")
 
-        print( "finished data loading!" )
-        print(  "train data shape: {}\n".format( self._train_data.shape ) +\
-                "train la shape: {}\n".format( self._train_la.shape ) +\
-                "train lu shape: {}\n".format( self._train_lu.shape ) +\
-                "test data shape: {}\n".format( self._test_data.shape ) +\
-                "test la shape: {}\n".format( self._test_la.shape ) +\
-                "test lu shape: {}\n".format( self._test_lu.shape ) )
+        train_data, train_la, train_lu, test_data, test_la, test_lu = self._dataset.load_data(step=self._fold)
+        self._train_data, self._train_la, self._train_lu = skutils.shuffle(train_data, train_la, train_lu)
+        self._test_data = test_data
+        self._test_la = test_la
+        self._test_lu = test_lu
 
-    def one_hot( self, y, n_values ):
-        return np.eye( n_values )[ np.array( y, dtype = np.int32 ) ]
+        print("finished data loading!")
 
-    def next_batch( self ):
-        train_size  = self._train_data.shape[0]
-        scale       = self._data_pos+self._batch_size
+        print("train data shape: {}\n".format(self._train_data.shape) +
+              "train la shape: {}\n".format(self._train_la.shape) +
+              "train lu shape: {}\n".format(self._train_lu.shape) +
+              "test data shape: {}\n".format(self._test_data.shape) +
+              "test la shape: {}\n".format(self._test_la.shape) +
+              "test lu shape: {}\n".format(self._test_lu.shape))
+
+    def one_hot(self, y, n_values):
+
+        return np.eye(n_values)[np.array(y, dtype=np.int32)]
+
+    def next_batch(self):
+
+        train_size = self._train_data.shape[0]
+        scale = self._data_pos+self._batch_size
+
         if scale > train_size:
+            a = scale - train_size
 
-            #print("Read all dataset")
+            data1 = self._train_data[self._data_pos:]
+            la1 = self._train_la[self._data_pos:]
+            lu1 = self._train_lu[self._data_pos:]
 
-            a   = scale - train_size
-
-            data1   = self._train_data[self._data_pos: ]
-            la1     = self._train_la[self._data_pos: ]
-            lu1     = self._train_lu[self._data_pos: ]
-            
             # shuffle after one cycle
-            self._train_data, self._train_la, self._train_lu = skutils.shuffle( self._train_data, self._train_la, self._train_lu )
+            self._train_data, self._train_la, self._train_lu = skutils.shuffle(self._train_data, self._train_la, self._train_lu)
 
-            data2   = self._train_data[: a]
-            la2     = self._train_la[: a]
-            lu2     = self._train_lu[: a]
+            data2 = self._train_data[: a]
 
-            data    = np.concatenate( (data1, data2), axis=0 )
-            la      = np.concatenate( (la1, la2), axis=0 )
-            lu      = np.concatenate( (lu1, lu2), axis=0 )
-            
+            la2 = self._train_la[: a]
+            lu2 = self._train_lu[: a]
+
+            data = np.concatenate((data1, data2), axis=0)
+            la = np.concatenate((la1, la2), axis=0)
+            lu = np.concatenate((lu1, lu2), axis=0)
+
             self._data_pos = a
-            return data, self.one_hot( la, self._dataset._train_act_num ), self.one_hot( lu, self._dataset._train_user_num )
+            return data, self.one_hot(la, self._dataset._train_act_num), self.one_hot(lu, self._dataset._train_user_num)
         else:
-            data    = self._train_data[self._data_pos: scale]
-            la      = self._train_la[self._data_pos: scale]
-            lu      = self._train_lu[self._data_pos: scale]
-
+            data = self._train_data[self._data_pos: scale]
+            la = self._train_la[self._data_pos: scale]
+            lu = self._train_lu[self._data_pos: scale]
             self._data_pos = scale
-            return data, self.one_hot( la, self._dataset._train_act_num ), self.one_hot( lu, self._dataset._train_user_num )
+            return data, self.one_hot(la, self._dataset._train_act_num), self.one_hot(lu, self._dataset._train_user_num)
 
-    def build_model( self ):
-        self._is_training   = tf.compat.v1.placeholder( dtype = tf.bool )
-        self._learning_rate = tf.compat.v1.placeholder( dtype = tf.float32 )
+    def build_model(self):
 
-        self._X             = tf.compat.v1.placeholder( dtype = tf.float32,   shape = self._dataset._data_shape )
-        self._YA            = tf.compat.v1.placeholder( dtype = tf.int32,     shape = [ None, self._dataset._train_act_num] )
-        self._YU            = tf.compat.v1.placeholder( dtype = tf.int32,     shape = [ None, self._dataset._train_user_num] )
+        self._is_training = tf.compat.v1.placeholder(dtype=tf.bool)
+        self._learning_rate = tf.compat.v1.placeholder(dtype=tf.float32)
+        self._X = tf.compat.v1.placeholder(dtype=tf.float32, shape=self._dataset._data_shape)
+        self._YA = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, self._dataset._train_act_num])
+        self._YU = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, self._dataset._train_user_num])
 
         if self._framework == 1:
             self._model = model.MTLMA_pretrain()
         elif self._framework == 2:
             self._model = model.MTLMA_train()
         else:
-            print( 'model error!!!' )
+            print('model error!!!')
             exit(0)
 
-        a_preds, a_loss, u_preds, u_loss = self._model( self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
-                                        self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
+        a_preds, a_loss, u_preds, u_loss = self._model(self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
+                                                       self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
+        a_train_step = tf.compat.v1.train.AdamOptimizer(self._learning_rate).minimize(a_loss, var_list=self._model.get_act_step_vars())
+        u_train_step = tf.compat.v1.train.AdamOptimizer(self._learning_rate).minimize(u_loss, var_list=self._model.get_user_step_vars())
 
-        a_train_step    = tf.compat.v1.train.AdamOptimizer( self._learning_rate ).minimize( a_loss, var_list=self._model.get_act_step_vars() )
-        u_train_step    = tf.compat.v1.train.AdamOptimizer( self._learning_rate ).minimize( u_loss, var_list=self._model.get_user_step_vars() )
+        tf.compat.v1.summary.scalar("learning rate", self._learning_rate)
 
-        tf.compat.v1.summary.scalar( "learning rate", self._learning_rate )
-        merged          = tf.compat.v1.summary.merge_all()
-        update_ops      = tf.compat.v1.get_collection( tf.compat.v1.GraphKeys.UPDATE_OPS )
+        merged = tf.compat.v1.summary.merge_all()
 
-        self._a_preds       = a_preds
-        self._u_preds       = u_preds
-        self._a_train_step  = a_train_step
-        self._u_train_step  = u_train_step
-        self._merged        = merged
-        self._update_ops    = update_ops
-    
+        update_ops = tf.compat.v1.get_collection(
+            tf.compat.v1.GraphKeys.UPDATE_OPS)
 
-    def predict( self, sess ):
+        self._a_preds = a_preds
+        self._u_preds = u_preds
+        self._a_train_step = a_train_step
+        self._u_train_step = u_train_step
+        self._merged = merged
+        self._update_ops = update_ops
 
-        size        = self._test_data.shape[0]
-        batch_size  = self._batch_size
+    def predict(self, sess):
 
-        LAPreds     = np.empty( [0] )
-        LATruth     = np.empty( [0] )
-        LUPreds     = np.empty( [0] )
-        LUTruth     = np.empty( [0] )
+        size = self._test_data.shape[0]
+        batch_size = self._batch_size
+        LAPreds = np.empty([0])
+        LATruth = np.empty([0])
+        LUPreds = np.empty([0])
+        LUTruth = np.empty([0])
 
-        for start, end in zip(  range( 0,           size,               batch_size ),
-                                range( batch_size,  size + batch_size,  batch_size ) ):
+        for start, end in zip(range(0,           size,               batch_size),
+                              range(batch_size,  size + batch_size,  batch_size)):
+
             end = end if end < size else size
 
-            la_preds, lu_preds = sess.run( [self._a_preds, self._u_preds], feed_dict = {
-                    self._X:            self._test_data[start: end],
-                    self._is_training:  False
-                } )
+            la_preds, lu_preds = sess.run([self._a_preds, self._u_preds], feed_dict={
+                self._X:            self._test_data[start: end],
+                self._is_training:  False
+            })
 
-            LAPreds = np.concatenate( (LAPreds, np.argmax(la_preds, 1)) )
-            LATruth = np.concatenate( (LATruth, self._test_la[start: end]) )
-
-            LUPreds = np.concatenate( (LUPreds, np.argmax(lu_preds, 1)) )
-            LUTruth = np.concatenate( (LUTruth, self._test_lu[start: end]) )
+            LAPreds = np.concatenate((LAPreds, np.argmax(la_preds, 1)))
+            LATruth = np.concatenate((LATruth, self._test_la[start: end]))
+            LUPreds = np.concatenate((LUPreds, np.argmax(lu_preds, 1)))
+            LUTruth = np.concatenate((LUTruth, self._test_lu[start: end]))
 
         return LATruth, LAPreds, LUTruth, LUPreds
 
-    def save_paremeters( self, sess ):
+    def save_paremeters(self, sess):
 
         print('Save paramter after pre-train')
-
         # import pdb; pdb.set_trace()
-        for i in range( 1, 4, 1 ):
-            TensorA = tf.compat.v1.get_collection( tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='act_network/a_conv{}'.format(i) )
-            TensorU = tf.compat.v1.get_collection( tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='user_network/u_conv{}'.format(i) )
-            ParameterA, ParameterU = sess.run( [TensorA, TensorU] )
-            if not os.path.exists( "./data/parameters/" ):
-                os.mkdir( "./data/parameters/" )
-            np.save( "./data/parameters/{}f{}a{}".format( self._dataset._name, self._fold, i), ParameterA[0] )
-            np.save( "./data/parameters/{}f{}u{}".format( self._dataset._name, self._fold, i), ParameterU[0] )
+        for i in range(1, 4, 1):
 
-    def run_model( self ):
+            TensorA = tf.compat.v1.get_collection(
+                tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='act_network/a_conv{}'.format(i))
+            TensorU = tf.compat.v1.get_collection(
+                tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='user_network/u_conv{}'.format(i))
 
-        os.environ["CUDA_VISIBLE_DEVICES"] = str( self._gpu ) # gpu selection        
-        sess_config = tf.compat.v1.ConfigProto()  
+            ParameterA, ParameterU = sess.run([TensorA, TensorU])
+
+            # folder to save parameters for all datasets
+            if not os.path.exists("./data/parameters/"):
+                os.mkdir("./data/parameters/")
+            # folder to save parameters of dataset
+            if not os.path.exists("./data/parameters/{}".format(self._dataset._name)):
+                os.mkdir("./data/parameters/{}".format(self._dataset._name))
+
+            np.save("./data/parameters/{}/f{}a{}".format(self._dataset._name,self._fold, i), ParameterA[0])
+            np.save("./data/parameters/{}/f{}u{}".format(self._dataset._name,self._fold, i), ParameterU[0])
+
+    def run_model(self):
+
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(self._gpu)  # gpu selection
+        sess_config = tf.compat.v1.ConfigProto()
         sess_config.gpu_options.per_process_gpu_memory_fraction = 1  # 100% gpu
         sess_config.gpu_options.allow_growth = True      # dynamic growth
+        iter_steps = (self._train_data.shape[0] / self._batch_size) * self._epoch
+        epoch = 1
+        tot = 0
 
-        with tf.compat.v1.Session( config = sess_config ) as sess:
+        with tf.compat.v1.Session(config=sess_config) as sess:
+
             sess.run(tf.compat.v1.global_variables_initializer())
             sess.run(tf.compat.v1.local_variables_initializer())
             #train_writer    = tf.compat.v1.summary.FileWriter( self._log_path + '/train', graph = tf.compat.v1.get_default_graph() )
-
             # result_array    = np.empty( [0, 2, len( self._test_data )] )
-            LARecord = np.empty( [0, 2, self._test_data.shape[0]] )
-            LURecord = np.empty( [0, 2, self._test_data.shape[0]] )
+            LARecord = np.empty([0, 2, self._test_data.shape[0]])
+            LURecord = np.empty([0, 2, self._test_data.shape[0]])
 
-            for i in range( self._iter_steps ):
+            for i in range(int(iter_steps)):
 
-                data, la, lu    = self.next_batch()
-                lr              = self._min_lr + ( self._max_lr - self._min_lr ) * math.exp( -i / self._decay_speed )
+                data, la, lu = self.next_batch()
+                lr = self._min_lr + (self._max_lr - self._min_lr) * math.exp(-i / self._decay_speed)
+                tot += data.shape[0]
 
                 if self._framework == 1:
-                    summary, _, _, _ = sess.run( [self._merged, self._update_ops, self._a_train_step, self._u_train_step], feed_dict ={
+                    summary, _, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step, self._u_train_step], feed_dict={
                         self._X:                data,
                         self._YA:               la,
                         self._YU:               lu,
                         self._learning_rate:    lr,
-                        self._is_training:      True } )
+                        self._is_training:      True})
                 elif self._framework == 2:
-                    summary, _, _ = sess.run( [self._merged, self._update_ops, self._a_train_step], feed_dict ={
+                    summary, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step], feed_dict={
                         self._X:                data,
                         self._YA:               la,
                         self._YU:               lu,
                         self._learning_rate:    lr,
-                        self._is_training:      True } )
+                        self._is_training:      True})
                 else:
-                    print( "model error" )
+                    print("model error")
                     exit()
 
                 #train_writer.add_summary( summary, i )
 
-                if i % self._print_interval == 0:
+                if (tot/self._train_data.shape[0]) >= 1:
 
-                    LATruth, LAPreds, LUTruth, LUPreds = self.predict( sess )
+                    LATruth, LAPreds, LUTruth, LUPreds = self.predict(sess)
 
-                    LARecord    = np.append( LARecord, np.expand_dims( np.vstack((LATruth, LAPreds)), 0), axis=0 )
-                    LURecord    = np.append( LURecord, np.expand_dims( np.vstack((LUTruth, LUPreds)), 0), axis=0 )
+                    LARecord = np.append(LARecord, np.expand_dims(np.vstack((LATruth, LAPreds)), 0), axis=0)
+                    LURecord = np.append(LURecord, np.expand_dims(np.vstack((LUTruth, LUPreds)), 0), axis=0)
 
-                    AAccuracy   = accuracy_score( LATruth, LAPreds, range( self._dataset._act_num ) )
-                    Af1         = f1_score( LATruth, LAPreds, range( self._dataset._act_num ), average='macro' )
+                    AAccuracy = accuracy_score(LATruth, LAPreds, range(self._dataset._act_num))
+                    Af1 = f1_score(LATruth, LAPreds, range(self._dataset._act_num), average='macro')
 
-                    UAccuracy   = accuracy_score( LUTruth, LUPreds, range( self._dataset._user_num ) )
-                    Uf1         = f1_score( LUTruth, LUPreds, range( self._dataset._user_num ), average='macro' )
+                    UAccuracy = accuracy_score(LUTruth, LUPreds, range(self._dataset._user_num))
+                    Uf1 = f1_score(LUTruth, LUPreds, range(self._dataset._user_num), average='macro')
 
-                    print( "step: {},   AAccuracy: {},  Af1: {},  UAccuracy: {},  Uf1: {}".format( i, AAccuracy, Af1, UAccuracy, Uf1 ) )
+                    print("epoch: {}, step: {},   AAccuracy: {},  Af1: {},  UAccuracy: {},  Uf1: {}".format(
+                        epoch, i, AAccuracy, Af1, UAccuracy, Uf1))
 
-                    if self._framework == 1 and i >= 10000:
-                        self.save_paremeters( sess )
-                        exit()
+                    epoch += 1
+                    tot = 0
 
-            result_path = self._save_path + "/"
-            if not os.path.exists( result_path ):
-                os.mkdir( result_path )
-            
-            LARecordFile    = result_path + "AR_fold{}_".format( self._fold ) + time.strftime( '%Y%m%d%H%M%S', time.localtime(time.time()))
-            LURecordFile    = result_path + "UR_fold{}_".format( self._fold ) + time.strftime( '%Y%m%d%H%M%S', time.localtime(time.time()))
-            np.save( LARecordFile, LARecord )
-            np.save( LURecordFile, LURecord )
-        
-        print( "finish!" )
+            if self._framework == 1:
+                self.save_paremeters(sess)
+                print('finish pretrain')
+                    
+            if self._framework == 2:
+                result_path = self._save_path + "/"
+                if not os.path.exists(result_path):
+                    os.mkdir(result_path)
 
+                LARecordFile = result_path + \
+                    "AR_fold{}_".format(
+                        self._fold) + time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
+
+                LURecordFile = result_path + \
+                    "UR_fold{}_".format(
+                        self._fold) + time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
+
+                np.save(LARecordFile, LARecord)
+                np.save(LURecordFile, LURecord)
+                print("finish train")
 
 
 if __name__ == '__main__':
-    '''
+
     parser  = argparse.ArgumentParser( description="deep MTL based activity and user recognition using wearable sensors" )
-    
-    parser.add_argument('-d', '--dataset',      type=str,       default="", required=True)
-    parser.add_argument('-p', '--path',         type=str,       default="", required=True)
-    parser.add_argument('-v', '--version',      type=str,       default = ""    )
-    parser.add_argument('-g', '--gpu',          type=int,       default = 0     )
-    parser.add_argument('-f', '--fold',         type=int,       default = 0     ) # fold for test
-    parser.add_argument('-s', '--save_dir',     type=str.lower, default = 'test')
+
+    # fold using for test in pretrain e train, repeat pretrain for every fold in cross-validation
+    parser.add_argument('-f', '--fold',         type=int,       default = 0     ) 
+    parser.add_argument('-d', '--dataset',      type=str,       default="unimib")
     parser.add_argument('-m', '--model',        type=int,       default = 1,        choices = [ 1, 2 ]  ) # 1: pretrain, 2: train
 
     args    = parser.parse_args()
-    '''
-    ######################
-    ### UNIMIB DATASET ###
-    ######################
 
-    dataset = data_loader.Dataset(  path='data/datasets/UNIMIBDataset/',
-                                    name='unimib',
-                                    channel=3,
-                                    winlen=100,
-                                    user_num=30,
-                                    act_num=9)
-
-    # pretrain
-    myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
-
-    myModel.load_data()
-    myModel.build_model()
-    myModel.run_model()
-    '''
-    # train and test
-    for i in range(10):
-        myModel = my_model( version="", gpu=0, fold=i, save_dir='test_unimib', dataset=dataset, framework=2 )
-        myModel.load_data()
-        myModel.build_model()
-        myModel.run_model()
-    '''
-
-    #####################
-    ### SBHAR DATASET ###
-    #####################
     
-    dataset = data_loader.Dataset(  path='data/datasets/SBHAR_processed/',
-                                    name='sbhar',
-                                    channel=6,
-                                    winlen=100,
-                                    user_num=30,
-                                    act_num=12)
+    if args.dataset == "unimib":
+        print('using {} dataset'.format(args.dataset))
+        dataset = Dataset(  path='data/datasets/UNIMIBDataset/',
+                            name='unimib',
+                            channel=3,
+                            winlen=100,
+                            user_num=30,
+                            act_num=9)
+    elif args.dataset == "sbhar":
+        dataset = Dataset(  path='data/datasets/SBHAR_processed/',
+                            name='sbhar',
+                            channel=6,
+                            winlen=100,
+                            user_num=30,
+                            act_num=12) 
+    elif args.dataset == "realdisp":
+        dataset = Dataset(  path='data/datasets/REALDISP_processed/',
+                            name='realdisp',
+                            channel=6,
+                            winlen=100,
+                            user_num=17,
+                            act_num=33)
 
-    # pretrain
-    myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
 
-    myModel.load_data()
-    myModel.build_model()
-    myModel.run_model()
-    '''
-    # train and test
-    for i in range(10):
-        myModel = my_model( version="", gpu=0, fold=i, save_dir='test_sbhar', dataset=dataset, framework=2 )
-        myModel.load_data()
-        myModel.build_model()
-        myModel.run_model()
-    '''
 
-    ########################
-    ### REALDISP DATASET ###
-    ########################
+    if args.model == 1:
+        print('Pretrain with fold {} for test'.format(args.fold))
+        model_pretrain = my_model(  version="", gpu=0, fold=args.fold, save_dir='', 
+                                    dataset=dataset, framework=1, epochs=2)
+        model_pretrain.load_data()
+        model_pretrain.build_model()
+        model_pretrain.run_model()
+    elif args.model == 2:
+        print('train with fold {} for test'.format(args.fold))
+        model_pretrain = my_model(  version="", gpu=0, fold=args.fold, save_dir='', 
+                                    dataset=dataset, framework=1, epochs=2)
+        model_pretrain.load_data()
+        model_pretrain.build_model()
+        model_pretrain.run_model()     
     
-    dataset = data_loader.Dataset(  path='data/datasets/REALDISP_processed/',
-                                    name='realdisp',
-                                    channel=6,
-                                    winlen=100,
-                                    user_num=17,
-                                    act_num=33)
-
-    # pretrain
-    myModel = my_model( version="", gpu=0, fold=0, save_dir='', dataset=dataset, framework=1 )
-
-    myModel.load_data()
-    myModel.build_model()
-    myModel.run_model()
-    '''
-    # train and test
-    for i in range(10):
-        myModel = my_model( version="", gpu=0, fold=i, save_dir='test_realdisp', dataset=dataset, framework=2 )
-        myModel.load_data()
-        myModel.build_model()
-        myModel.run_model()
-    '''
