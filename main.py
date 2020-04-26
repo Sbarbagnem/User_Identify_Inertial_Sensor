@@ -213,14 +213,14 @@ class my_model(object):
                 tot += data.shape[0]
 
                 if self._framework == 1:
-                    summary, _, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step, self._u_train_step], feed_dict={
+                    _, _, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step, self._u_train_step], feed_dict={
                         self._X:                data,
                         self._YA:               la,
                         self._YU:               lu,
                         self._learning_rate:    lr,
                         self._is_training:      True})
                 elif self._framework == 2:
-                    summary, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step], feed_dict={
+                    _, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step], feed_dict={
                         self._X:                data,
                         self._YA:               la,
                         self._YU:               lu,
