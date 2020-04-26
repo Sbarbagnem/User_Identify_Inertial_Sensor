@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-for dataset in "unimib" "sbahr" "realdisp"
+for dataset in "unimib" "sbhar" "realdisp"
 do
     for i in {0..1}
     do

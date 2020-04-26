@@ -47,6 +47,10 @@ class my_model(object):
         if not os.path.exists(self._save_path):
             os.mkdir(self._save_path)
 
+        self._result_path = self._save_path + "/"
+        if not os.path.exists(self._result_path):
+            os.mkdir(self._result_path)
+
     def load_data(self):
 
         print("loading the data...")
@@ -189,13 +193,16 @@ class my_model(object):
 
     def run_model(self):
 
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(self._gpu)  # gpu selection
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # gpu selection
         sess_config = tf.compat.v1.ConfigProto()
         sess_config.gpu_options.per_process_gpu_memory_fraction = 1  # 100% gpu
         sess_config.gpu_options.allow_growth = True      # dynamic growth
+
         iter_steps = (self._train_data.shape[0] / self._batch_size) * self._epoch
         epoch = 1
         tot = 0
+        history = np.empty([0,5])
+
 
         with tf.compat.v1.Session(config=sess_config) as sess:
 
@@ -248,6 +255,9 @@ class my_model(object):
                     print("epoch: {}, step: {},   AAccuracy: {},  Af1: {},  UAccuracy: {},  Uf1: {}".format(
                         epoch, i, AAccuracy, Af1, UAccuracy, Uf1))
 
+                    if self._framework == 2:
+                        history = np.concatenate((history, np.array([[epoch,AAccuracy,Af1,UAccuracy,Uf1]])), axis=0)
+
                     epoch += 1
                     tot = 0
 
@@ -256,15 +266,19 @@ class my_model(object):
                 print('finish pretrain')
                     
             if self._framework == 2:
-                result_path = self._save_path + "/"
-                if not os.path.exists(result_path):
-                    os.mkdir(result_path)
 
-                LARecordFile = result_path + \
+                # save log of train to file
+                np.savetxt( self._result_path+'log_history_train.txt', 
+                            history,
+                            header='Epoch  AAaccuracy Af1 UAccuracy Uf1', 
+                            fmt='%d %1.4f %1.4f %1.4f %1.4f',
+                            delimiter='\t' )
+
+                LARecordFile = self._result_path + \
                     "AR_fold{}_".format(
                         self._fold) + time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
 
-                LURecordFile = result_path + \
+                LURecordFile = self._result_path + \
                     "UR_fold{}_".format(
                         self._fold) + time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
 
@@ -272,56 +286,60 @@ class my_model(object):
                 np.save(LURecordFile, LURecord)
                 print("finish train")
 
+        tf.keras.backend.clear_session()
+
 
 if __name__ == '__main__':
 
     parser  = argparse.ArgumentParser( description="deep MTL based activity and user recognition using wearable sensors" )
 
     # fold using for test in pretrain e train, repeat pretrain for every fold in cross-validation
-    parser.add_argument('-f', '--fold',         type=int,       default = 0     ) 
-    parser.add_argument('-d', '--dataset',      type=str,       default="unimib")
+    #parser.add_argument('-f', '--fold',         type=int,       default = 0     ) 
+    #parser.add_argument('-d', '--dataset',      type=str,       default="unimib")
     parser.add_argument('-m', '--model',        type=int,       default = 1,        choices = [ 1, 2 ]  ) # 1: pretrain, 2: train
 
     args    = parser.parse_args()
 
+    for d in ['unimib', 'sbhar', 'realdisp']:
+
+        print('using {} dataset'.format(d))
     
-    if args.dataset == "unimib":
-        print('using {} dataset'.format(args.dataset))
-        dataset = Dataset(  path='data/datasets/UNIMIBDataset/',
-                            name='unimib',
-                            channel=3,
-                            winlen=100,
-                            user_num=30,
-                            act_num=9)
-    elif args.dataset == "sbhar":
-        dataset = Dataset(  path='data/datasets/SBHAR_processed/',
-                            name='sbhar',
-                            channel=6,
-                            winlen=100,
-                            user_num=30,
-                            act_num=12) 
-    elif args.dataset == "realdisp":
-        dataset = Dataset(  path='data/datasets/REALDISP_processed/',
-                            name='realdisp',
-                            channel=6,
-                            winlen=100,
-                            user_num=17,
-                            act_num=33)
+        if d == "unimib":
+            dataset = Dataset(  path='data/datasets/UNIMIBDataset/',
+                                name='unimib',
+                                channel=3,
+                                winlen=100,
+                                user_num=30,
+                                act_num=9)
+        elif d == "sbhar":
+            dataset = Dataset(  path='data/datasets/SBHAR_processed/',
+                                name='sbhar',
+                                channel=6,
+                                winlen=100,
+                                user_num=30,
+                                act_num=12) 
+        elif d == "realdisp":
+            dataset = Dataset(  path='data/datasets/REALDISP_processed/',
+                                name='realdisp',
+                                channel=6,
+                                winlen=100,
+                                user_num=17,
+                                act_num=33)
 
 
-
-    if args.model == 1:
-        print('Pretrain with fold {} for test'.format(args.fold))
-        model_pretrain = my_model(  version="", gpu=0, fold=args.fold, save_dir='', 
-                                    dataset=dataset, framework=1, epochs=2)
-        model_pretrain.load_data()
-        model_pretrain.build_model()
-        model_pretrain.run_model()
-    elif args.model == 2:
-        print('train with fold {} for test'.format(args.fold))
-        model_pretrain = my_model(  version="", gpu=0, fold=args.fold, save_dir='', 
-                                    dataset=dataset, framework=1, epochs=2)
-        model_pretrain.load_data()
-        model_pretrain.build_model()
-        model_pretrain.run_model()     
+        for i in range(1):
+            if args.model == 1:
+                print('Pretrain with fold {} for test'.format(i))
+                model_pretrain = my_model(  version="", gpu=-1, fold=i, save_dir='', 
+                                            dataset=dataset, framework=1, epochs=1)
+                model_pretrain.load_data()
+                model_pretrain.build_model()
+                model_pretrain.run_model()
+            elif args.model == 2:
+                print('train with fold {} for test'.format(i))
+                model_pretrain = my_model(  version="", gpu=-1, fold=args.fold, save_dir='', 
+                                            dataset=dataset, framework=1, epochs=1)
+                model_pretrain.load_data()
+                model_pretrain.build_model()
+                model_pretrain.run_model()     
     
