@@ -1,6 +1,6 @@
 .vscode
 *pycache*
-data
+data/*/*/*
 *.pyc
 !data/datasets/REALDISP_processed/plot
 !data/datasets/SBHAR_processed/plot
