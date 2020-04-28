@@ -7,6 +7,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
+import tensorflow.contrib.slim as slim
 from scipy.fftpack import fft
 from sklearn import utils as skutils
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
@@ -17,37 +18,41 @@ from util.data_loader import Dataset
 #import tensorflow.contrib.slim as slim
 #from sklearn.neighbors import KNeighborsClassifier
 
-tf.compat.v1.disable_eager_execution()
-
-
 class my_model(object):
 
     def __init__(self, version, gpu, fold, save_dir, dataset, framework, epochs):
 
-        self._dataset = dataset
-        self._gpu = gpu
-        #self._log_path  = dataset._path+'log/'+version+'/'
-        self._fold = fold % 10
+        self._dataset   = dataset
+        self._gpu       = gpu
+        self._log_path  = dataset._path+'log/'+version+'/'
+        #self._fold = fold % 10
+        self._fold      = fold
         self._save_path = dataset._path+'record/'+save_dir
+        self._result_path = self._save_path + "/"
         self._framework = framework
 
         #self._iter_steps        = 50000
         #self._print_interval    = 100
         #self._batch_size        = 100
-        self._epoch = epochs
-        self._batch_size = 128
-        self._min_lr = 0.0005
-        self._max_lr = 0.0015
-        self._decay_speed = 10000
-        self._data_pos = 0
+        self._epoch         = epochs
+        self._batch_size    = 256
+        self._min_lr        = 0.0005
+        self._max_lr        = 0.0015
+        self._decay_speed   = 10000
+        self._data_pos      = 0
 
         if not os.path.exists(dataset._path+'record/'):
             os.mkdir(dataset._path+'record/')
 
+        if not os.path.exists(dataset._path+'log/'):
+            os.mkdir(dataset._path+'log/')          
+
+        if not os.path.exists(self._log_path):
+            os.mkdir(self._log_path)
+
         if not os.path.exists(self._save_path):
             os.mkdir(self._save_path)
 
-        self._result_path = self._save_path + "/"
         if not os.path.exists(self._result_path):
             os.mkdir(self._result_path)
 
@@ -109,11 +114,11 @@ class my_model(object):
 
     def build_model(self):
 
-        self._is_training = tf.compat.v1.placeholder(dtype=tf.bool)
-        self._learning_rate = tf.compat.v1.placeholder(dtype=tf.float32)
-        self._X = tf.compat.v1.placeholder(dtype=tf.float32, shape=self._dataset._data_shape)
-        self._YA = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, self._dataset._train_act_num])
-        self._YU = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, self._dataset._train_user_num])
+        self._is_training = tf.placeholder(dtype=tf.bool)
+        self._learning_rate = tf.placeholder(dtype=tf.float32)
+        self._X = tf.placeholder(dtype=tf.float32, shape=self._dataset._data_shape)
+        self._YA = tf.placeholder(dtype=tf.int32, shape=[None, self._dataset._train_act_num])
+        self._YU = tf.placeholder(dtype=tf.int32, shape=[None, self._dataset._train_user_num])
 
         if self._framework == 1:
             self._model = model.MTLMA_pretrain()
@@ -125,15 +130,17 @@ class my_model(object):
 
         a_preds, a_loss, u_preds, u_loss = self._model(self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
                                                        self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
-        a_train_step = tf.compat.v1.train.AdamOptimizer(self._learning_rate).minimize(a_loss, var_list=self._model.get_act_step_vars())
-        u_train_step = tf.compat.v1.train.AdamOptimizer(self._learning_rate).minimize(u_loss, var_list=self._model.get_user_step_vars())
+        a_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(a_loss, var_list=self._model.get_act_step_vars())
+        u_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(u_loss, var_list=self._model.get_user_step_vars())
 
-        tf.compat.v1.summary.scalar("learning rate", self._learning_rate)
+        tf.summary.scalar("learning rate", self._learning_rate)
+        tf.summary.scalar("a_loss", a_loss)
+        tf.summary.scalar("u_loss", u_loss)
 
-        merged = tf.compat.v1.summary.merge_all()
+        merged = tf.summary.merge_all()
 
-        update_ops = tf.compat.v1.get_collection(
-            tf.compat.v1.GraphKeys.UPDATE_OPS)
+        update_ops = tf.get_collection(
+            tf.GraphKeys.UPDATE_OPS)
 
         self._a_preds = a_preds
         self._u_preds = u_preds
@@ -174,10 +181,10 @@ class my_model(object):
         # import pdb; pdb.set_trace()
         for i in range(1, 4, 1):
 
-            TensorA = tf.compat.v1.get_collection(
-                tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='act_network/a_conv{}'.format(i))
-            TensorU = tf.compat.v1.get_collection(
-                tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='user_network/u_conv{}'.format(i))
+            TensorA = tf.get_collection(
+                tf.GraphKeys.TRAINABLE_VARIABLES, scope='act_network/a_conv{}'.format(i))
+            TensorU = tf.get_collection(
+                tf.GraphKeys.TRAINABLE_VARIABLES, scope='user_network/u_conv{}'.format(i))
 
             ParameterA, ParameterU = sess.run([TensorA, TensorU])
 
@@ -194,7 +201,7 @@ class my_model(object):
     def run_model(self):
 
         os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # gpu selection
-        sess_config = tf.compat.v1.ConfigProto()
+        sess_config = tf.ConfigProto()
         sess_config.gpu_options.per_process_gpu_memory_fraction = 1  # 100% gpu
         sess_config.gpu_options.allow_growth = True      # dynamic growth
 
@@ -204,11 +211,13 @@ class my_model(object):
         history = np.empty([0,5])
 
 
-        with tf.compat.v1.Session(config=sess_config) as sess:
+        with tf.Session(config=sess_config) as sess:
 
-            sess.run(tf.compat.v1.global_variables_initializer())
-            sess.run(tf.compat.v1.local_variables_initializer())
-            #train_writer    = tf.compat.v1.summary.FileWriter( self._log_path + '/train', graph = tf.compat.v1.get_default_graph() )
+            sess.run(tf.global_variables_initializer())
+            sess.run(tf.local_variables_initializer())
+            #train_writer    = tf.summary.FileWriter( self._log_path + '/train', graph = tf.get_default_graph() )
+            train_writer    = tf.summary.FileWriter( self._log_path, graph = tf.get_default_graph() )
+            
             # result_array    = np.empty( [0, 2, len( self._test_data )] )
             LARecord = np.empty([0, 2, self._test_data.shape[0]])
             LURecord = np.empty([0, 2, self._test_data.shape[0]])
@@ -220,14 +229,14 @@ class my_model(object):
                 tot += data.shape[0]
 
                 if self._framework == 1:
-                    _, _, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step, self._u_train_step], feed_dict={
+                    summary, _, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step, self._u_train_step], feed_dict={
                         self._X:                data,
                         self._YA:               la,
                         self._YU:               lu,
                         self._learning_rate:    lr,
                         self._is_training:      True})
                 elif self._framework == 2:
-                    _, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step], feed_dict={
+                    summary, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step], feed_dict={
                         self._X:                data,
                         self._YA:               la,
                         self._YU:               lu,
@@ -252,6 +261,10 @@ class my_model(object):
                     UAccuracy = accuracy_score(LUTruth, LUPreds, range(self._dataset._user_num))
                     Uf1 = f1_score(LUTruth, LUPreds, range(self._dataset._user_num), average='macro')
 
+                    train_writer.add_summary( summary, epoch)
+                    #train_writer.add_summary( summary, AAccuracy)
+                    #train_writer.add_summary( summary, UAccuracy)
+
                     print("epoch: {}, step: {},   AAccuracy: {},  Af1: {},  UAccuracy: {},  Uf1: {}".format(
                         epoch, i, AAccuracy, Af1, UAccuracy, Uf1))
 
@@ -268,7 +281,7 @@ class my_model(object):
             if self._framework == 2:
 
                 # save log of train to file
-                np.savetxt( self._result_path+'log_history_train.txt', 
+                np.savetxt( self._result_path+'log_history_train_{}.txt'.format(self._fold), 
                             history,
                             header='Epoch  AAaccuracy Af1 UAccuracy Uf1', 
                             fmt='%d %1.4f %1.4f %1.4f %1.4f',
@@ -300,7 +313,8 @@ if __name__ == '__main__':
 
     args    = parser.parse_args()
 
-    for d in ['unimib', 'sbhar', 'realdisp']:
+    #for d in ['unimib', 'sbhar', 'realdisp']:
+    for d in ['realdisp']:
 
         print('using {} dataset'.format(d))
     
@@ -327,18 +341,18 @@ if __name__ == '__main__':
                                 act_num=33)
 
 
-        for i in range(1):
+        for i in range(7,10):
             if args.model == 1:
                 print('Pretrain with fold {} for test'.format(i))
-                model_pretrain = my_model(  version="", gpu=-1, fold=i, save_dir='', 
-                                            dataset=dataset, framework=1, epochs=1)
+                model_pretrain = my_model(  version="pre_train", gpu=0, fold=i, save_dir='', 
+                                            dataset=dataset, framework=1, epochs=30)
                 model_pretrain.load_data()
                 model_pretrain.build_model()
                 model_pretrain.run_model()
             elif args.model == 2:
                 print('train with fold {} for test'.format(i))
-                model_pretrain = my_model(  version="", gpu=-1, fold=args.fold, save_dir='', 
-                                            dataset=dataset, framework=1, epochs=1)
+                model_pretrain = my_model(  version="train", gpu=0, fold=i, save_dir='', 
+                                            dataset=dataset, framework=2, epochs=100)
                 model_pretrain.load_data()
                 model_pretrain.build_model()
                 model_pretrain.run_model()     

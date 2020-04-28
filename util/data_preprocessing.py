@@ -10,7 +10,7 @@ from sklearn import utils as skutils
 
 from sliding_window import sliding_window
 
-def preprocessing(dataset, path, path_out, positions):
+def preprocessing(dataset, path, path_out, positions='all'):
     
     if dataset == 'unimib':
         unimib_process(path, path_out)
@@ -37,6 +37,8 @@ def realdisp_process(path, path_out, positions='all'):
 
     '''
 
+    print('Processing realdisp dataset')
+
     root_path       = path + 'REALDISP'
     raw_data_path   = root_path + '/'
     processed_path  = path_out + 'OuterPartition'
@@ -56,10 +58,10 @@ def realdisp_process(path, path_out, positions='all'):
 
     for fl in os.listdir(raw_data_path):
         if fl.startswith('subject'):
-            print("Leggo log file ", fl)
+            #print("Leggo log file ", fl)
             log_file    = np.loadtxt(fname=raw_data_path + fl)
             id_user     = int(fl.split('_')[0].split('subject')[1])
-            print(id_user)
+            #print(id_user)
             
             # take only acc and gyro data
             acc_gyro    = log_file[:,2:119]
@@ -309,7 +311,7 @@ def unimib_process(path, path_out):
     print('Processing unimib dataset')
 
     root_path       = path + 'unimib_dataset'
-    raw_data_path   = root_path + '/raw/'
+    raw_data_path   = root_path + '/data/'
     processed_path  = path_out + 'OuterPartition'
 
     win_len         = 100   # 50 Hz * 2 seconds
@@ -384,6 +386,6 @@ if __name__ == '__main__':
 
     args    = parser.parse_args()
 
-    #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/")
-    #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/")
+    preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/")
+    preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/")
     preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "all")
