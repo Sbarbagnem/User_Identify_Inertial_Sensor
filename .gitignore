@@ -3,6 +3,10 @@
 data/*/*/*
 *.pyc
 *.yml
+*.npy
 !data/datasets/REALDISP_processed/plot
 !data/datasets/SBHAR_processed/plot
 !data/datasets/UNIMIBDataset/plot
+!data/datasets/UNIMIBDataset/record
+!data/datasets/REALDISP_processed/record
+!data/datasets/SBHAR_processed/record
