@@ -2,6 +2,7 @@
 *pycache*
 data/*/*/*
 *.pyc
+*.yml
 !data/datasets/REALDISP_processed/plot
 !data/datasets/SBHAR_processed/plot
 !data/datasets/UNIMIBDataset/plot
