@@ -1,0 +1,40 @@
+Mean accuracy on fold 0 
+	 Activity accuracy 0.8870434343434344 
+	 User accuracy 0.8767737373737374 
+
+Mean accuracy on fold 1 
+	 Activity accuracy 0.8861111111111111 
+	 User accuracy 0.877348484848485 
+
+Mean accuracy on fold 2 
+	 Activity accuracy 0.8888444444444444 
+	 User accuracy 0.8814313131313132 
+
+Mean accuracy on fold 3 
+	 Activity accuracy 0.8863989898989898 
+	 User accuracy 0.8770555555555556 
+
+Mean accuracy on fold 4 
+	 Activity accuracy 0.8860636363636362 
+	 User accuracy 0.8778181818181816 
+
+Mean accuracy on fold 5 
+	 Activity accuracy 0.8874747474747474 
+	 User accuracy 0.8789757575757575 
+
+Mean accuracy on fold 6 
+	 Activity accuracy 0.8895585858585859 
+	 User accuracy 0.8772414141414142 
+
+Mean accuracy on fold 7 
+	 Activity accuracy 0.8877707070707072 
+	 User accuracy 0.8808757575757574 
+
+Mean accuracy on fold 8 
+	 Activity accuracy 0.8881323232323233 
+	 User accuracy 0.8781101010101009 
+
+Mean accuracy on fold 9 
+	 Activity accuracy 0.8875939393939394 
+	 User accuracy 0.8782555555555553 
+
