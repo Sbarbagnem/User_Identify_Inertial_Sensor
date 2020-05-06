@@ -1,11 +1,10 @@
 .vscode
 *pycache*
-data/*/*/*
+#data/*
 *.pyc
-*.npy
-!data/datasets/REALDISP_processed/plot
-!data/datasets/SBHAR_processed/plot
-!data/datasets/UNIMIBDataset/plot
-!data/datasets/UNIMIBDataset/record
-!data/datasets/REALDISP_processed/record
-!data/datasets/SBHAR_processed/record
+
+# no original datasets
+data/datasets/REALDISP
+data/datasets/SBHAR
+data/datasets/REALDISP_processed
+data/datasets/SBHAR_processed

@@ -20,26 +20,28 @@ from util.data_loader import Dataset
 
 class my_model(object):
 
-    def __init__(self, version, gpu, fold, save_dir, dataset, framework, epochs):
+    def __init__(self, version, gpu, fold, save_dir, dataset, framework, iter_steps=50000):
 
         self._dataset   = dataset
         self._gpu       = gpu
-        self._log_path  = dataset._path+'log/'+version+'/'
+        self._log_path  = dataset._path+'log/'+"{}/".format(version)+"/fold{}/".format(fold)
         #self._fold = fold % 10
         self._fold      = fold
         self._save_path = dataset._path+'record/'+save_dir
         self._result_path = self._save_path + "/"
         self._framework = framework
 
-        #self._iter_steps        = 50000
-        #self._print_interval    = 100
-        #self._batch_size        = 100
-        self._epoch         = epochs
-        self._batch_size    = 256
-        self._min_lr        = 0.0005
-        self._max_lr        = 0.0015
-        self._decay_speed   = 10000
-        self._data_pos      = 0
+        self._iter_steps        = iter_steps
+        self._print_interval    = 100
+        self._batch_size        = 100
+        #self._epoch         = epochs
+        #self._batch_size    = 256
+        self._min_lr            = 0.0005
+        #self._max_lr            = 0.0015
+        self._max_lr            = 0.003
+        #self._decay_speed       = 10000
+        self._decay_speed       = 2000
+        self._data_pos          = 0
 
         if not os.path.exists(dataset._path+'record/'):
             os.mkdir(dataset._path+'record/')
@@ -48,7 +50,8 @@ class my_model(object):
             os.mkdir(dataset._path+'log/')          
 
         if not os.path.exists(self._log_path):
-            os.mkdir(self._log_path)
+            #os.mkdirs(self._log_path)
+            os.makedirs(self._log_path, exist_ok=True)
 
         if not os.path.exists(self._save_path):
             os.mkdir(self._save_path)
@@ -129,13 +132,17 @@ class my_model(object):
             exit(0)
 
         a_preds, a_loss, u_preds, u_loss = self._model(self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
-                                                       self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
+                                                                                self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
         a_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(a_loss, var_list=self._model.get_act_step_vars())
         u_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(u_loss, var_list=self._model.get_user_step_vars())
 
         tf.summary.scalar("learning rate", self._learning_rate)
         tf.summary.scalar("a_loss", a_loss)
         tf.summary.scalar("u_loss", u_loss)
+
+        # aggiunto 
+        #tf.summary.scalar('a_accuracy', A_accuracy)
+        #tf.summary.scalar('u_accuracy', U_accuracy)
 
         merged = tf.summary.merge_all()
 
@@ -205,8 +212,8 @@ class my_model(object):
         sess_config.gpu_options.per_process_gpu_memory_fraction = 1  # 100% gpu
         sess_config.gpu_options.allow_growth = True      # dynamic growth
 
-        iter_steps = (self._train_data.shape[0] / self._batch_size) * self._epoch
-        epoch = 1
+        #iter_steps = (self._train_data.shape[0] / self._batch_size) * self._epoch
+        #epoch = 1
         tot = 0
         history = np.empty([0,5])
 
@@ -215,14 +222,14 @@ class my_model(object):
 
             sess.run(tf.global_variables_initializer())
             sess.run(tf.local_variables_initializer())
-            #train_writer    = tf.summary.FileWriter( self._log_path + '/train', graph = tf.get_default_graph() )
             train_writer    = tf.summary.FileWriter( self._log_path, graph = tf.get_default_graph() )
             
             # result_array    = np.empty( [0, 2, len( self._test_data )] )
             LARecord = np.empty([0, 2, self._test_data.shape[0]])
             LURecord = np.empty([0, 2, self._test_data.shape[0]])
 
-            for i in range(int(iter_steps)):
+            #for i in range(int(iter_steps)):
+            for i in range(self._iter_steps):
 
                 data, la, lu = self.next_batch()
                 lr = self._min_lr + (self._max_lr - self._min_lr) * math.exp(-i / self._decay_speed)
@@ -246,9 +253,10 @@ class my_model(object):
                     print("model error")
                     exit()
 
-                #train_writer.add_summary( summary, i )
+                train_writer.add_summary( summary, i )
 
-                if (tot/self._train_data.shape[0]) >= 1:
+                #if (tot/self._train_data.shape[0]) >= 1:
+                if i % self._print_interval == 0:
 
                     LATruth, LAPreds, LUTruth, LUPreds = self.predict(sess)
 
@@ -261,21 +269,27 @@ class my_model(object):
                     UAccuracy = accuracy_score(LUTruth, LUPreds, range(self._dataset._user_num))
                     Uf1 = f1_score(LUTruth, LUPreds, range(self._dataset._user_num), average='macro')
 
-                    train_writer.add_summary( summary, epoch)
-                    #train_writer.add_summary( summary, AAccuracy)
-                    #train_writer.add_summary( summary, UAccuracy)
+                    #train_writer.add_summary( summary, epoch)
 
-                    print("epoch: {}, step: {},   AAccuracy: {},  Af1: {},  UAccuracy: {},  Uf1: {}".format(
-                        epoch, i, AAccuracy, Af1, UAccuracy, Uf1))
+                    #print("epoch: {}, step: {},   AAccuracy: {},  Af1: {},  UAccuracy: {},  Uf1: {}".format(
+                    #    epoch, i, AAccuracy, Af1, UAccuracy, Uf1))
 
-                    if self._framework == 2:
-                        history = np.concatenate((history, np.array([[epoch,AAccuracy,Af1,UAccuracy,Uf1]])), axis=0)
+                    print("step: {},   AAccuracy: {},  Af1: {},  UAccuracy: {},  Uf1: {}".format(
+                            i, AAccuracy, Af1, UAccuracy, Uf1))                   
 
-                    epoch += 1
-                    tot = 0
+                    #if self._framework == 2:
+                    history = np.concatenate((history, np.array([[i,AAccuracy,Af1,UAccuracy,Uf1]])), axis=0)
+
+                    #epoch += 1
+                    #tot = 0
 
             if self._framework == 1:
                 self.save_paremeters(sess)
+                np.savetxt( self._result_path+'log_history_pre_train_{}.txt'.format(self._fold), 
+                            history,
+                            header='Step  AAaccuracy Af1 UAccuracy Uf1', 
+                            fmt='%d %1.4f %1.4f %1.4f %1.4f',
+                            delimiter='\t' )
                 print('finish pretrain')
                     
             if self._framework == 2:
@@ -283,7 +297,7 @@ class my_model(object):
                 # save log of train to file
                 np.savetxt( self._result_path+'log_history_train_{}.txt'.format(self._fold), 
                             history,
-                            header='Epoch  AAaccuracy Af1 UAccuracy Uf1', 
+                            header='Step  AAaccuracy Af1 UAccuracy Uf1', 
                             fmt='%d %1.4f %1.4f %1.4f %1.4f',
                             delimiter='\t' )
 
@@ -314,7 +328,7 @@ if __name__ == '__main__':
     args    = parser.parse_args()
 
     #for d in ['unimib', 'sbhar', 'realdisp']:
-    for d in ['realdisp']:
+    for d in ['unimib']:
 
         print('using {} dataset'.format(d))
     
@@ -341,18 +355,18 @@ if __name__ == '__main__':
                                 act_num=33)
 
 
-        for i in range(7,10):
+        for i in range(10):
             if args.model == 1:
                 print('Pretrain with fold {} for test'.format(i))
                 model_pretrain = my_model(  version="pre_train", gpu=0, fold=i, save_dir='', 
-                                            dataset=dataset, framework=1, epochs=30)
+                                            dataset=dataset, framework=1, iter_steps=10000)
                 model_pretrain.load_data()
                 model_pretrain.build_model()
                 model_pretrain.run_model()
             elif args.model == 2:
                 print('train with fold {} for test'.format(i))
                 model_pretrain = my_model(  version="train", gpu=0, fold=i, save_dir='', 
-                                            dataset=dataset, framework=2, epochs=100)
+                                            dataset=dataset, framework=2, iter_steps=50000)
                 model_pretrain.load_data()
                 model_pretrain.build_model()
                 model_pretrain.run_model()     
