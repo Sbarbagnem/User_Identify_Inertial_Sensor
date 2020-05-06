@@ -1,17 +1,15 @@
 import numpy as np
 from util.utils import mean_cross_performance
+from config import CONFIG
 
-log_file_unimib = './data/datasets/UNIMIBDataset/record/'
-path_to_save_unimib = './data/datasets/UNIMIBDataset/plot/'
+for dataset in ['unimib', 'sbhar', 'realdisp']:
 
-log_file_sbhar = './data/datasets/SBHAR_processed/record/'
-path_to_save_sbhar = './data/datasets/SBHAR_processed/plot/'
-
-log_file_realdisp = './data/datasets/REALDISP_processed/record/'
-path_to_save_realdisp = './data/datasets/REALDISP_processed/plot/'
-
-for dataset in ['unimib', 'sbhar', 'realdisp']
-for fold in range(10):
-    history = np.loadtxt(fname=path_log_file+'log_history_train_{}.txt'.format(fold))
-    aaccuracy, uaccuracy = mean_cross_performance(history)
-    print('Mean accuracy on fold {} \n Activity accuracy {} \n User accuracy {}'.format(fold,aaccuracy,uaccuracy))
+    path_log_file = './' + CONFIG[dataset]['log_file']
+    path_to_save = path_log_file + 'summary_mean.txt'
+    
+    with open(path_to_save, 'w+') as f:
+        for fold in range(10):
+            history = np.loadtxt(fname=path_log_file+'log_history_train_{}.txt'.format(fold))
+            aaccuracy, uaccuracy = mean_cross_performance(history)
+            #print('Mean accuracy on fold {} \n Activity accuracy {} \n User accuracy {}'.format(fold,aaccuracy,uaccuracy))
+            f.write('Mean accuracy on fold {} \n\t Activity accuracy {} \n\t User accuracy {} \n\n'.format(fold,aaccuracy,uaccuracy))
