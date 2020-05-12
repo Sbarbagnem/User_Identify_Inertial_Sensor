@@ -203,9 +203,11 @@ class MTLMA_train( object ):
         A_cross_entropy = tf.reduce_mean( tf.nn.softmax_cross_entropy_with_logits( labels = a_labels , logits = A_net ) )
         U_cross_entropy = tf.reduce_mean( tf.nn.softmax_cross_entropy_with_logits( labels = u_labels , logits = U_net ) )
         penality 	    = sum( tf.nn.l2_loss(tf_var) for tf_var in tf.trainable_variables() )
-        loss            = A_cross_entropy + U_cross_entropy + 0.0003*penality
+        # loss           = A_cross_entropy + U_cross_entropy + 0.0003*penality
+        loss_global     = A_cross_entropy + U_cross_entropy + 0.0003*penality
 
-        return A_net, loss, U_net, loss
+        # return A_net, loss, U_net, loss
+        return A_net, A_cross_entropy, U_net, U_cross_entropy, loss_global
 
     def get_act_step_vars( self ):
         return  tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES )

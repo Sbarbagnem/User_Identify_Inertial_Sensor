@@ -8,6 +8,8 @@ import time
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+from tensorboard import summary as summary_lib
+from tensorboard.plugins.custom_scalar import layout_pb2
 from scipy.fftpack import fft
 from sklearn import utils as skutils
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
@@ -35,7 +37,6 @@ class my_model(object):
         self._print_interval    = 100
         self._batch_size        = 100
         #self._epoch         = epochs
-        #self._batch_size    = 256
         self._min_lr            = 0.0005
         #self._max_lr            = 0.0015
         self._max_lr            = 0.003
@@ -50,7 +51,6 @@ class my_model(object):
             os.mkdir(dataset._path+'log/')          
 
         if not os.path.exists(self._log_path):
-            #os.mkdirs(self._log_path)
             os.makedirs(self._log_path, exist_ok=True)
 
         if not os.path.exists(self._save_path):
@@ -123,6 +123,9 @@ class my_model(object):
         self._YA = tf.placeholder(dtype=tf.int32, shape=[None, self._dataset._train_act_num])
         self._YU = tf.placeholder(dtype=tf.int32, shape=[None, self._dataset._train_user_num])
 
+        self._a_loss_mean = tf.placeholder(dtype=tf.float32, shape=())
+        self._u_loss_mean = tf.placeholder(dtype=tf.float32, shape=())
+
         if self._framework == 1:
             self._model = model.MTLMA_pretrain()
         elif self._framework == 2:
@@ -131,32 +134,81 @@ class my_model(object):
             print('model error!!!')
             exit(0)
 
-        a_preds, a_loss, u_preds, u_loss = self._model(self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
-                                                                                self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
-        a_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(a_loss, var_list=self._model.get_act_step_vars())
-        u_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(u_loss, var_list=self._model.get_user_step_vars())
+        if self._framework == 1:
+            a_preds, a_loss, u_preds, u_loss = self._model( self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
+                                                            self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
+            a_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(a_loss, var_list=self._model.get_act_step_vars())
+            u_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(u_loss, var_list=self._model.get_user_step_vars())
+        elif self._framework == 2:
+            a_preds, a_loss, u_preds, u_loss, loss_global = self._model( self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
+                                                            self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
+            a_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(loss_global, var_list=self._model.get_act_step_vars())
+            u_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(u_loss, var_list=self._model.get_user_step_vars())          
 
-        tf.summary.scalar("learning rate", self._learning_rate)
-        tf.summary.scalar("a_loss", a_loss)
-        tf.summary.scalar("u_loss", u_loss)
+        # added train accuracy
+        with tf.name_scope('train'):
+            train_a_accuracy, train_a_accuracy_op = tf.metrics.accuracy(    labels=tf.argmax(self._YA,1), 
+                                                                            predictions=tf.argmax(a_preds,1)
+            )
+            train_u_accuracy, train_u_accuracy_op = tf.metrics.accuracy(    labels=tf.argmax(self._YU,1), 
+                                                                            predictions=tf.argmax(u_preds,1)
+            )
+
+        # added val accuracy
+        with tf.name_scope('val'):
+            val_a_accuracy, val_a_accuracy_op = tf.metrics.accuracy(    labels=tf.argmax(self._YA,1), 
+                                                                        predictions=tf.argmax(a_preds,1)
+            )
+            val_u_accuracy, val_u_accuracy_op = tf.metrics.accuracy(    labels=tf.argmax(self._YU,1), 
+                                                                        predictions=tf.argmax(u_preds,1)
+            )
+
+
+        #tf.summary.scalar("learning rate", self._learning_rate)
 
         # aggiunto 
-        #tf.summary.scalar('a_accuracy', A_accuracy)
-        #tf.summary.scalar('u_accuracy', U_accuracy)
+        with tf.name_scope('train'):
+            train_activity_accuracy = summary_lib.scalar('a_accuracy', train_a_accuracy)
+            train_user_accuracy = summary_lib.scalar('u_accuracy', train_u_accuracy)
+            train_activity_loss = summary_lib.scalar('a_loss', a_loss)
+            train_user_loss = summary_lib.scalar('u_loss', u_loss)
 
-        merged = tf.summary.merge_all()
+        with tf.name_scope('val'):
+            val_activity_accuracy   = summary_lib.scalar('a_accuracy', val_a_accuracy)
+            val_user_accuracy   = summary_lib.scalar('u_accuracy', val_u_accuracy)
+            val_activity_loss    = summary_lib.scalar('a_loss', self._a_loss_mean)
+            val_user_loss       = summary_lib.scalar('u_loss', self._u_loss_mean)
+
+        #merged = tf.summary.merge_all()
 
         update_ops = tf.get_collection(
             tf.GraphKeys.UPDATE_OPS)
 
-        self._a_preds = a_preds
-        self._u_preds = u_preds
-        self._a_train_step = a_train_step
-        self._u_train_step = u_train_step
-        self._merged = merged
-        self._update_ops = update_ops
+        self._a_preds       = a_preds
+        self._u_preds       = u_preds
+        self._a_loss        = a_loss
+        self._u_loss        = u_loss
+        self._a_train_step  = a_train_step
+        self._u_train_step  = u_train_step
+        #self._merged        = merged
+        self._update_ops    = update_ops
 
-    def predict(self, sess):
+        self._a_loss_train  = train_activity_loss
+        self._u_loss_train  = train_user_loss
+        self._a_loss_val    = val_activity_loss
+        self._u_loss_val    = val_user_loss
+
+        self._a_accuracy_op_train = train_a_accuracy_op
+        self._u_accuracy_op_train = train_u_accuracy_op
+        self._a_accuracy_op_val = val_a_accuracy_op
+        self._u_accuracy_op_val = val_u_accuracy_op
+
+        self._a_accuracy_train = train_activity_accuracy
+        self._a_accuracy_val = val_activity_accuracy
+        self._u_accuracy_train = train_user_accuracy
+        self._u_accuracy_val = val_user_accuracy
+
+    def predict(self, sess, lr):
 
         size = self._test_data.shape[0]
         batch_size = self._batch_size
@@ -164,23 +216,42 @@ class my_model(object):
         LATruth = np.empty([0])
         LUPreds = np.empty([0])
         LUTruth = np.empty([0])
+        a_loss_val = []
+        u_loss_val = []
 
         for start, end in zip(range(0,           size,               batch_size),
                               range(batch_size,  size + batch_size,  batch_size)):
 
             end = end if end < size else size
-
-            la_preds, lu_preds = sess.run([self._a_preds, self._u_preds], feed_dict={
+            '''
+            la_preds, lu_preds, = sess.run([self._a_preds, self._u_preds], feed_dict={
                 self._X:            self._test_data[start: end],
                 self._is_training:  False
             })
+
+            '''
+            la_preds, lu_preds, _, _, a_loss, u_loss = sess.run([self._a_preds, self._u_preds, self._a_accuracy_op_val, self._u_accuracy_op_val, self._a_loss, self._u_loss], feed_dict={
+                self._X:            self._test_data[start: end],
+                self._is_training:  False,
+                self._YA:           self.one_hot(self._test_la[start : end], self._dataset._train_act_num),
+                self._YU:           self.one_hot(self._test_lu[start : end], self._dataset._train_user_num),
+                self._learning_rate: lr
+            })     
 
             LAPreds = np.concatenate((LAPreds, np.argmax(la_preds, 1)))
             LATruth = np.concatenate((LATruth, self._test_la[start: end]))
             LUPreds = np.concatenate((LUPreds, np.argmax(lu_preds, 1)))
             LUTruth = np.concatenate((LUTruth, self._test_lu[start: end]))
+            a_loss_val.append(a_loss)
+            u_loss_val.append(u_loss)
 
-        return LATruth, LAPreds, LUTruth, LUPreds
+        a_acc_val, u_acc_val = sess.run([self._a_accuracy_val, self._u_accuracy_val])
+        a_loss, u_loss = sess.run([self._a_loss_val, self._u_loss_val], feed_dict={
+            self._a_loss_mean: np.mean(a_loss_val),
+            self._u_loss_mean: np.mean(u_loss_val)
+        })
+
+        return a_acc_val, u_acc_val, a_loss, u_loss, LATruth, LAPreds, LUTruth, LUPreds
 
     def save_paremeters(self, sess):
 
@@ -222,28 +293,68 @@ class my_model(object):
 
             sess.run(tf.global_variables_initializer())
             sess.run(tf.local_variables_initializer())
-            train_writer    = tf.summary.FileWriter( self._log_path, graph = tf.get_default_graph() )
-            
+            train_writer    = tf.summary.FileWriter( self._log_path + '/train', graph = sess.graph )
+            test_write      = tf.summary.FileWriter( self._log_path + '/test',  graph = sess.graph )
+
+            custom_layout= summary_lib.custom_scalar_pb(
+                layout_pb2.Layout(category=[
+                    layout_pb2.Category(
+                        title='Accuracies',
+                        chart=[
+                            layout_pb2.Chart(
+                                title='Activity',
+                                multiline=layout_pb2.MultilineChartContent(tag=[
+                                    r'train_1/a_accuracy', 
+                                    r'val_1/a_accuracy'
+                                ])),
+                            layout_pb2.Chart(
+                                title='User',
+                                multiline=layout_pb2.MultilineChartContent(tag=[
+                                    r'train_1/u_accuracy', 
+                                    r'val_1/u_accuracy'
+                                ])),
+                        ]
+                    ),
+                    layout_pb2.Category(
+                        title='Losses',
+                        chart=[
+                            layout_pb2.Chart(
+                                title='Activity',
+                                multiline=layout_pb2.MultilineChartContent(tag=[
+                                    r'train_1/a_loss',
+                                    r'val_1/a_loss'
+                                ])),
+                            layout_pb2.Chart(
+                                title='User',
+                                multiline=layout_pb2.MultilineChartContent(tag=[
+                                    r'train_1/u_loss',
+                                    r'val_1/u_loss'
+                                ])),
+                        ])
+                ])
+            )
+
+            train_writer.add_summary(custom_layout)
+                        
             # result_array    = np.empty( [0, 2, len( self._test_data )] )
             LARecord = np.empty([0, 2, self._test_data.shape[0]])
             LURecord = np.empty([0, 2, self._test_data.shape[0]])
 
-            #for i in range(int(iter_steps)):
             for i in range(self._iter_steps):
 
                 data, la, lu = self.next_batch()
                 lr = self._min_lr + (self._max_lr - self._min_lr) * math.exp(-i / self._decay_speed)
                 tot += data.shape[0]
-
+                '''
                 if self._framework == 1:
-                    summary, _, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step, self._u_train_step], feed_dict={
+                    summary, _, _, _, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step, self._u_train_step, self._a_accuracy_op, self._u_accuracy_op], feed_dict={
                         self._X:                data,
                         self._YA:               la,
                         self._YU:               lu,
                         self._learning_rate:    lr,
                         self._is_training:      True})
                 elif self._framework == 2:
-                    summary, _, _ = sess.run([self._merged, self._update_ops, self._a_train_step], feed_dict={
+                    summary, _, _, = sess.run([self._merged, self._update_ops, self._a_train_step], feed_dict={
                         self._X:                data,
                         self._YA:               la,
                         self._YU:               lu,
@@ -252,13 +363,46 @@ class my_model(object):
                 else:
                     print("model error")
                     exit()
+                '''
+                if self._framework == 1:
+                    _, _, _, a_acc_train, u_acc_train, _, _, a_loss, u_loss = sess.run([    self._update_ops, self._a_train_step, self._u_train_step, self._a_accuracy_train, self._u_accuracy_train,
+                                                                                            self._a_accuracy_op_train, self._u_accuracy_op_train, self._a_loss_train, self._u_loss_train], 
+                                                                                            feed_dict={
+                                                                                                self._X:                data,
+                                                                                                self._YA:               la,
+                                                                                                self._YU:               lu,
+                                                                                                self._learning_rate:    lr,
+                                                                                                self._is_training:      True
+                                                                                            }
+                    )
+                elif self._framework == 2:
+                    _, _, a_acc_train, u_acc_train, _, _, a_loss, u_loss = sess.run([    self._update_ops, self._a_train_step, self._a_accuracy_train, self._u_accuracy_train,
+                                                                                            self._a_accuracy_op_train, self._u_accuracy_op_train, self._a_loss_train, self._u_loss_train], 
+                                                                                            feed_dict={
+                                                                                                self._X:                data,
+                                                                                                self._YA:               la,
+                                                                                                self._YU:               lu,
+                                                                                                self._learning_rate:    lr,
+                                                                                                self._is_training:      True
+                                                                                            }
+                    )
+                else:
+                    print("model error")
+                    exit()
 
-                train_writer.add_summary( summary, i )
+                train_writer.add_summary( a_acc_train, i )
+                train_writer.add_summary( u_acc_train, i )
+                train_writer.add_summary( a_loss, i)
+                train_writer.add_summary( u_loss, i)
+                #train_writer.add_summary( lr, i)
 
-                #if (tot/self._train_data.shape[0]) >= 1:
-                if i % self._print_interval == 0:
+                if i % self._print_interval == 0:      
 
-                    LATruth, LAPreds, LUTruth, LUPreds = self.predict(sess)
+                    # added reset for validation metrics
+                    stream_vars_valid = [v for v in tf.local_variables() if 'val/' in v.name]
+                    sess.run(tf.variables_initializer(stream_vars_valid))             
+
+                    a_acc_val, u_acc_val, a_loss, u_loss, LATruth, LAPreds, LUTruth, LUPreds = self.predict(sess, lr)
 
                     LARecord = np.append(LARecord, np.expand_dims(np.vstack((LATruth, LAPreds)), 0), axis=0)
                     LURecord = np.append(LURecord, np.expand_dims(np.vstack((LUTruth, LUPreds)), 0), axis=0)
@@ -269,19 +413,14 @@ class my_model(object):
                     UAccuracy = accuracy_score(LUTruth, LUPreds, range(self._dataset._user_num))
                     Uf1 = f1_score(LUTruth, LUPreds, range(self._dataset._user_num), average='macro')
 
-                    #train_writer.add_summary( summary, epoch)
-
-                    #print("epoch: {}, step: {},   AAccuracy: {},  Af1: {},  UAccuracy: {},  Uf1: {}".format(
-                    #    epoch, i, AAccuracy, Af1, UAccuracy, Uf1))
-
+                    test_write.add_summary(a_acc_val, i)
+                    test_write.add_summary(u_acc_val, i)
+                    test_write.add_summary(a_loss, i)
+                    test_write.add_summary(u_loss,i)
                     print("step: {},   AAccuracy: {},  Af1: {},  UAccuracy: {},  Uf1: {}".format(
                             i, AAccuracy, Af1, UAccuracy, Uf1))                   
 
-                    #if self._framework == 2:
                     history = np.concatenate((history, np.array([[i,AAccuracy,Af1,UAccuracy,Uf1]])), axis=0)
-
-                    #epoch += 1
-                    #tot = 0
 
             if self._framework == 1:
                 self.save_paremeters(sess)
@@ -323,7 +462,7 @@ if __name__ == '__main__':
     # fold using for test in pretrain e train, repeat pretrain for every fold in cross-validation
     #parser.add_argument('-f', '--fold',         type=int,       default = 0     ) 
     #parser.add_argument('-d', '--dataset',      type=str,       default="unimib")
-    parser.add_argument('-m', '--model',        type=int,       default = 1,        choices = [ 1, 2 ]  ) # 1: pretrain, 2: train
+    parser.add_argument('-m', '--model',        type=int,       default = 2,        choices = [ 1, 2 ]  ) # 1: pretrain, 2: train
 
     args    = parser.parse_args()
 
@@ -355,19 +494,19 @@ if __name__ == '__main__':
                                 act_num=33)
 
 
-        for i in range(10):
+        for i in range(1):
             if args.model == 1:
                 print('Pretrain with fold {} for test'.format(i))
                 model_pretrain = my_model(  version="pre_train", gpu=0, fold=i, save_dir='', 
-                                            dataset=dataset, framework=1, iter_steps=10000)
+                                            dataset=dataset, framework=1, iter_steps=5000)
                 model_pretrain.load_data()
                 model_pretrain.build_model()
                 model_pretrain.run_model()
             elif args.model == 2:
                 print('train with fold {} for test'.format(i))
-                model_pretrain = my_model(  version="train", gpu=0, fold=i, save_dir='', 
-                                            dataset=dataset, framework=2, iter_steps=50000)
-                model_pretrain.load_data()
-                model_pretrain.build_model()
-                model_pretrain.run_model()     
+                model_train = my_model(  version="train", gpu=0, fold=i, save_dir='', 
+                                            dataset=dataset, framework=2, iter_steps=5000)
+                model_train.load_data()
+                model_train.build_model()
+                model_train.run_model()     
     
