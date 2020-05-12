@@ -32,6 +32,7 @@ class my_model(object):
         self._save_path = dataset._path+'record/'+save_dir
         self._result_path = self._save_path + "/"
         self._framework = framework
+        self._save_dir  = save_dir
 
         self._iter_steps        = iter_steps
         self._print_interval    = 100
@@ -54,10 +55,19 @@ class my_model(object):
             os.makedirs(self._log_path, exist_ok=True)
 
         if not os.path.exists(self._save_path):
-            os.mkdir(self._save_path)
+            os.makedirs(self._save_path, exist_ok=True)
 
         if not os.path.exists(self._result_path):
             os.mkdir(self._result_path)
+
+        # folder to save parameters for all datasets
+        if not os.path.exists("./data/parameters/"):
+            os.mkdir("./data/parameters/")
+        # folder to save parameters of dataset
+        if not os.path.exists("./data/parameters/{}".format(self._dataset._name)):
+            os.mkdir("./data/parameters/{}".format(self._dataset._name))
+        if not os.path.exists("./data/parameters/{}/{}".format(self._dataset._name,save_dir)):
+            os.mkdir("./data/parameters/{}/{}".format(self._dataset._name,save_dir))
 
     def load_data(self):
 
@@ -136,12 +146,12 @@ class my_model(object):
 
         if self._framework == 1:
             a_preds, a_loss, u_preds, u_loss = self._model( self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
-                                                            self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
+                                                            self._dataset._winlen, self._dataset._name, self._save_dir, self._fold, self._is_training)
             a_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(a_loss, var_list=self._model.get_act_step_vars())
             u_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(u_loss, var_list=self._model.get_user_step_vars())
         elif self._framework == 2:
             a_preds, a_loss, u_preds, u_loss, loss_global = self._model( self._X, self._YA, self._YU, self._dataset._train_act_num, self._dataset._train_user_num,
-                                                            self._dataset._winlen, self._dataset._name, self._fold, self._is_training)
+                                                            self._dataset._winlen, self._dataset._name, self._save_dir,self._fold, self._is_training)
             a_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(loss_global, var_list=self._model.get_act_step_vars())
             u_train_step = tf.train.AdamOptimizer(self._learning_rate).minimize(u_loss, var_list=self._model.get_user_step_vars())          
 
@@ -164,7 +174,7 @@ class my_model(object):
             )
 
 
-        #tf.summary.scalar("learning rate", self._learning_rate)
+        learning_rate = tf.summary.scalar("learning rate", self._learning_rate)
 
         # aggiunto 
         with tf.name_scope('train'):
@@ -192,6 +202,7 @@ class my_model(object):
         self._u_train_step  = u_train_step
         #self._merged        = merged
         self._update_ops    = update_ops
+        self._lr            = learning_rate
 
         self._a_loss_train  = train_activity_loss
         self._u_loss_train  = train_user_loss
@@ -266,15 +277,8 @@ class my_model(object):
 
             ParameterA, ParameterU = sess.run([TensorA, TensorU])
 
-            # folder to save parameters for all datasets
-            if not os.path.exists("./data/parameters/"):
-                os.mkdir("./data/parameters/")
-            # folder to save parameters of dataset
-            if not os.path.exists("./data/parameters/{}".format(self._dataset._name)):
-                os.mkdir("./data/parameters/{}".format(self._dataset._name))
-
-            np.save("./data/parameters/{}/f{}a{}".format(self._dataset._name,self._fold, i), ParameterA[0])
-            np.save("./data/parameters/{}/f{}u{}".format(self._dataset._name,self._fold, i), ParameterU[0])
+            np.save("./data/parameters/{}/{}/f{}a{}".format(self._dataset._name,self._save_dir,self._fold, i), ParameterA[0])
+            np.save("./data/parameters/{}/{}/f{}u{}".format(self._dataset._name,self._save_dir,self._fold, i), ParameterU[0])
 
     def run_model(self):
 
@@ -365,8 +369,8 @@ class my_model(object):
                     exit()
                 '''
                 if self._framework == 1:
-                    _, _, _, a_acc_train, u_acc_train, _, _, a_loss, u_loss = sess.run([    self._update_ops, self._a_train_step, self._u_train_step, self._a_accuracy_train, self._u_accuracy_train,
-                                                                                            self._a_accuracy_op_train, self._u_accuracy_op_train, self._a_loss_train, self._u_loss_train], 
+                    _, _, _, a_acc_train, u_acc_train, _, _, a_loss, u_loss, _lr = sess.run([    self._update_ops, self._a_train_step, self._u_train_step, self._a_accuracy_train, self._u_accuracy_train,
+                                                                                            self._a_accuracy_op_train, self._u_accuracy_op_train, self._a_loss_train, self._u_loss_train, self._lr], 
                                                                                             feed_dict={
                                                                                                 self._X:                data,
                                                                                                 self._YA:               la,
@@ -376,8 +380,8 @@ class my_model(object):
                                                                                             }
                     )
                 elif self._framework == 2:
-                    _, _, a_acc_train, u_acc_train, _, _, a_loss, u_loss = sess.run([    self._update_ops, self._a_train_step, self._a_accuracy_train, self._u_accuracy_train,
-                                                                                            self._a_accuracy_op_train, self._u_accuracy_op_train, self._a_loss_train, self._u_loss_train], 
+                    _, _, a_acc_train, u_acc_train, _, _, a_loss, u_loss, _lr = sess.run([    self._update_ops, self._a_train_step, self._a_accuracy_train, self._u_accuracy_train,
+                                                                                            self._a_accuracy_op_train, self._u_accuracy_op_train, self._a_loss_train, self._u_loss_train, self._lr], 
                                                                                             feed_dict={
                                                                                                 self._X:                data,
                                                                                                 self._YA:               la,
@@ -394,7 +398,7 @@ class my_model(object):
                 train_writer.add_summary( u_acc_train, i )
                 train_writer.add_summary( a_loss, i)
                 train_writer.add_summary( u_loss, i)
-                #train_writer.add_summary( lr, i)
+                train_writer.add_summary( _lr, i)
 
                 if i % self._print_interval == 0:      
 
@@ -497,15 +501,15 @@ if __name__ == '__main__':
         for i in range(1):
             if args.model == 1:
                 print('Pretrain with fold {} for test'.format(i))
-                model_pretrain = my_model(  version="pre_train", gpu=0, fold=i, save_dir='', 
-                                            dataset=dataset, framework=1, iter_steps=5000)
+                model_pretrain = my_model(  version="pre_train_min_lr", gpu=0, fold=i, save_dir='min_lr', 
+                                            dataset=dataset, framework=1, iter_steps=500)
                 model_pretrain.load_data()
                 model_pretrain.build_model()
                 model_pretrain.run_model()
             elif args.model == 2:
                 print('train with fold {} for test'.format(i))
-                model_train = my_model(  version="train", gpu=0, fold=i, save_dir='', 
-                                            dataset=dataset, framework=2, iter_steps=5000)
+                model_train = my_model(  version="train_min_lr", gpu=0, fold=i, save_dir='min_lr', 
+                                            dataset=dataset, framework=2, iter_steps=1000)
                 model_train.load_data()
                 model_train.build_model()
                 model_train.run_model()     

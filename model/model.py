@@ -61,7 +61,7 @@ class MTLMA_pretrain( object ):
     def __init__( self ):
         print( 'MTLMA_pretrain' )
 
-    def __call__( self, inputs, a_labels, u_labels, act_num, user_num, win_len, dname, fold, is_training = True, drop_keep_prob = 0.9 ):
+    def __call__( self, inputs, a_labels, u_labels, act_num, user_num, win_len, dname, save_dir, fold, is_training = True, drop_keep_prob = 0.9 ):
 
         with tf.variable_scope( 'act_network' ):
             # weights of CNN
@@ -148,12 +148,20 @@ class MTLMA_train( object ):
     def __init__( self ):
         print( 'MTLMA_train' )
 
-    def __call__( self, inputs, a_labels, u_labels, act_num, user_num, win_len, dname, fold, is_training = True, drop_keep_prob = 0.9 ):
+    def __call__( self, inputs, a_labels, u_labels, act_num, user_num, win_len, dname, save_dir, fold, is_training = True, drop_keep_prob = 0.9 ):
 
         # weights of CNN
-        w_conv1, _  = TensorProducer( np.stack( [ np.load("./data/parameters/{}/f{}a1.npy".format( dname, fold)), np.load("./data/parameters/{}/f{}u1.npy".format( dname, fold)) ], axis=4 ), 'Tucker', eps_or_k=0.1, return_true_var=True )
-        w_conv2, _  = TensorProducer( np.stack( [ np.load("./data/parameters/{}/f{}a2.npy".format( dname, fold)), np.load("./data/parameters/{}/f{}u2.npy".format( dname, fold)) ], axis=4 ), 'Tucker', eps_or_k=0.1, return_true_var=True )
-        w_conv3, _  = TensorProducer( np.stack( [ np.load("./data/parameters/{}/f{}a3.npy".format( dname, fold)), np.load("./data/parameters/{}/f{}u3.npy".format( dname, fold)) ], axis=4 ), 'Tucker', eps_or_k=0.1, return_true_var=True )
+        w_conv1, _  = TensorProducer(   np.stack( [ np.load("./data/parameters/{}/{}/f{}a1.npy".format( dname, save_dir, fold)),
+                                                    np.load("./data/parameters/{}/{}/f{}u1.npy".format( dname, save_dir, fold)) ], axis=4 ), 
+                                        'Tucker', eps_or_k=0.1, return_true_var=True )
+
+        w_conv2, _  = TensorProducer(   np.stack( [ np.load("./data/parameters/{}/{}/f{}a2.npy".format( dname, save_dir, fold)), 
+                                                    np.load("./data/parameters/{}/{}/f{}u2.npy".format( dname, save_dir, fold)) ], axis=4 ), 
+                                        'Tucker', eps_or_k=0.1, return_true_var=True )
+                                        
+        w_conv3, _  = TensorProducer(   np.stack( [ np.load("./data/parameters/{}/{}/f{}a3.npy".format( dname, save_dir, fold)), 
+                                                    np.load("./data/parameters/{}/{}/f{}u3.npy".format( dname, save_dir, fold)) ], axis=4 ), 
+                                        'Tucker', eps_or_k=0.1, return_true_var=True )
 
         # CNN
         A_net       = conv_unit( inputs,    w_conv1[:,:,:,:,0], is_training )
