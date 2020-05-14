@@ -471,7 +471,7 @@ if __name__ == '__main__':
     args    = parser.parse_args()
 
     #for d in ['unimib', 'sbhar', 'realdisp']:
-    for d in ['unimib']:
+    for d in ['realdisp']:
 
         print('using {} dataset'.format(d))
     
@@ -492,24 +492,25 @@ if __name__ == '__main__':
         elif d == "realdisp":
             dataset = Dataset(  path='data/datasets/REALDISP_processed/',
                                 name='realdisp',
-                                channel=6,
+                                channel=9,
                                 winlen=100,
                                 user_num=17,
-                                act_num=33)
+                                act_num=33,
+                                save_dir='acc_gyro_magn/')
 
 
         for i in range(1):
             if args.model == 1:
                 print('Pretrain with fold {} for test'.format(i))
-                model_pretrain = my_model(  version="pre_train_min_lr", gpu=0, fold=i, save_dir='min_lr', 
-                                            dataset=dataset, framework=1, iter_steps=500)
+                model_pretrain = my_model(  version="pre_train_acc_gyro_magn", gpu=0, fold=i, save_dir='acc_gyro_magn', 
+                                            dataset=dataset, framework=1, iter_steps=10000)
                 model_pretrain.load_data()
                 model_pretrain.build_model()
                 model_pretrain.run_model()
             elif args.model == 2:
                 print('train with fold {} for test'.format(i))
-                model_train = my_model(  version="train_min_lr", gpu=0, fold=i, save_dir='min_lr', 
-                                            dataset=dataset, framework=2, iter_steps=1000)
+                model_train = my_model(  version="train_acc_gyro_magn", gpu=0, fold=i, save_dir='acc_gyro_magn', 
+                                            dataset=dataset, framework=2, iter_steps=50000)
                 model_train.load_data()
                 model_train.build_model()
                 model_train.run_model()     

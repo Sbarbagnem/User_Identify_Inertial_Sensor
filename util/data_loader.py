@@ -11,7 +11,7 @@ from sklearn import utils as skutils
 
 class Dataset( object ):
 
-    def __init__( self, path, name, channel, winlen, user_num, act_num, save_dir ):
+    def __init__( self, path, name, channel, winlen, user_num, act_num, save_dir= ""):
         self._path              = path 
         self._name              = name 
         self._channel           = channel 
@@ -36,10 +36,10 @@ class Dataset( object ):
         TestID     = np.empty( [0], dtype=np.int32 )
 
         for i in range(10):
-            Data    = np.load( self._path + self._save_dir + 'OuterPartition/fold{}/data.npy'.format(i) )
-            LA      = np.load( self._path + self._save_dir + 'OuterPartition/fold{}/act_label.npy'.format(i) )
-            LU      = np.load( self._path + self._save_dir + 'OuterPartition/fold{}/user_label.npy'.format(i) )
-            ID      = np.load( self._path + self._save_dir + 'OuterPartition/fold{}/id.npy'.format(i) )
+            Data    = np.load( self._path + 'OuterPartition/' + self._save_dir + 'fold{}/data.npy'.format(i) )
+            LA      = np.load( self._path + 'OuterPartition/' + self._save_dir + 'fold{}/act_label.npy'.format(i) )
+            LU      = np.load( self._path + 'OuterPartition/' + self._save_dir + 'fold{}/user_label.npy'.format(i) )
+            ID      = np.load( self._path + 'OuterPartition/' + self._save_dir + 'fold{}/id.npy'.format(i) )
 
             if step == i:
                 TestData   = np.concatenate( (TestData, Data), axis=0 )

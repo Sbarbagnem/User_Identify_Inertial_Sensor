@@ -7,5 +7,6 @@
 data/datasets/REALDISP
 data/datasets/SBHAR
 data/datasets/unimib_dataset
-data/datasets/REALDISP_processed
-data/datasets/SBHAR_processed
+data/datasets/REALDISP_processed/OuterPartition
+data/datasets/SBHAR_processed/OuterPartition
+data/datasets/UNIMIBDataset/OuterPartition
