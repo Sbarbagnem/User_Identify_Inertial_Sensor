@@ -10,16 +10,16 @@ from sklearn import utils as skutils
 
 from sliding_window import sliding_window
 
-def preprocessing(dataset, path, path_out, positions='all'):
+def preprocessing(dataset, path, path_out, save_dir, sensors_type='all', positions='all'):
     
     if dataset == 'unimib':
         unimib_process(path, path_out)
     elif dataset == 'sbhar':
         sbhar_process(path, path_out)
     elif dataset == 'realdisp':
-        realdisp_process(path, path_out, positions)
+        realdisp_process(path, path_out, save_dir, sensors_type, positions)
 
-def realdisp_process(path, path_out, positions='all'):
+def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='all'):
     '''
         positions:  list of positions sensor to consider in preprocessing.
                     If "all" parameter is passed no filter to position will
@@ -41,20 +41,23 @@ def realdisp_process(path, path_out, positions='all'):
 
     root_path       = path + 'REALDISP'
     raw_data_path   = root_path + '/'
-    processed_path  = path_out + 'OuterPartition'
+    processed_path  = path_out + 'OuterPartition/' + save_dir
 
     win_len         = 100
     channel         = 3
     ID_generater    = 1
-    number_sensor   = 2
+    if sensors_type == 'acc_gyro_magn':
+        number_sensor   = 3
+    else:
+        number_sensor   = 2
 
     data    = np.empty( [0, win_len, channel*number_sensor], dtype=np.float )
     la      = np.empty( [0], dtype=np.int32 )
     lu      = np.empty( [0], dtype=np.int32 )
     ID      = np.empty( [0], dtype=np.int32 )
 
-    if not os.path.exists( path_out ):
-        os.mkdir( path_out ) 
+    if not os.path.exists( processed_path ):
+        os.makedirs( processed_path ) 
 
     for fl in os.listdir(raw_data_path):
         if fl.startswith('subject'):
@@ -64,20 +67,24 @@ def realdisp_process(path, path_out, positions='all'):
             #print(id_user)
             
             # take only acc and gyro data
-            acc_gyro    = log_file[:,2:119]
+            sensors     = log_file[:,2:119]
             activities  = log_file[:,-1].astype('int32')
-            activities  = activities.reshape(acc_gyro.shape[0], 1)
+            activities  = activities.reshape(sensors.shape[0], 1)
             trials      = log_file[:,0].astype('int32')
-            trials      = trials.reshape(acc_gyro.shape[0], 1)
+            trials      = trials.reshape(sensors.shape[0], 1)
 
-            
+            step = 0
 
-            offset  = 6
-            step    = 0
+            # take accelerometer, gyroscope
+            if sensors_type == 'acc_gyro':
+                offset  = 6
+                to_del  = 7
+            elif sensors_type=='acc_gyro_magn':
+                offset  = 9
+                to_del  = 4
 
-            # delete mag and quat columns
             for _ in range(9):
-                acc_gyro = np.delete(acc_gyro, np.arange((offset*step) + offset ,(offset*step) + offset + 7), axis=1)
+                sensors = np.delete(sensors, np.arange((offset*step) + offset ,(offset*step) + offset + to_del), axis=1)
                 step += 1
 
             step = 0
@@ -119,25 +126,26 @@ def realdisp_process(path, path_out, positions='all'):
                 if 'LC' not in positions:
                     acc_gyro = acc_gyro[:,step*offset:]
 
-            step = 0
-
-            acc_gyro    = np.concatenate((trials, acc_gyro, activities), axis=1)
+            sensors    = np.concatenate((trials, sensors, activities), axis=1)
 
             # delete record with unknown activity label
-            acc_gyro    = np.delete(acc_gyro, np.where(acc_gyro[:,-1]==0), axis=0)
+            sensors    = np.delete(sensors, np.where(sensors[:,-1]==0), axis=0)
 
             # cycle on activity
-            for id_act in np.unique(acc_gyro[:,-1]):
+            for id_act in np.unique(sensors[:,-1]):
                 #print(int(id_act))
                 step = 0
 
-                temp = acc_gyro[np.where(acc_gyro[:,-1]==int(id_act))]
+                temp = sensors[np.where(sensors[:,-1]==int(id_act))]
 
                 # sliding window on every of 9 sensor
                 for _ in range(9):       
 
                     acc     = temp[:,1+(offset*step):(step*offset)+4]
                     gyro    = temp[:,4+(offset*step):(step*offset)+7]
+
+                    if sensors_type == 'acc_gyro_magn':
+                        magn = temp[:,7+(offset*step):(step*offset)+10]
 
                     try:
                         _data_windows_acc   = sliding_window( acc, ( win_len, channel ), ( int( win_len/2 ), 1 ) )
@@ -150,19 +158,29 @@ def realdisp_process(path, path_out, positions='all'):
                     invalid_idx         = np.where( np.any( np.isnan( np.reshape( _data_windows_gyro, [-1, win_len*channel] ) ), axis=1 ) )[0]
                     _data_windows_gyro  = np.delete( _data_windows_gyro, invalid_idx, axis=0 )
 
+                    if sensors_type == 'acc_gyro_magn':
+                        _data_windows_magn  = sliding_window( magn, ( win_len, channel ), ( int( win_len/2 ), 1 ) )
+                        invalid_idx         = np.where( np.any( np.isnan( np.reshape( _data_windows_magn, [-1, win_len*channel] ) ), axis=1 ) )[0]
+                        _data_windows_magn  = np.delete( _data_windows_magn, invalid_idx, axis=0 )           
+
                     try:
-                        acc_gyro_concat    = np.concatenate((_data_windows_acc, _data_windows_gyro), axis=2)
+                        if sensors_type == 'all':
+                            temp_sensor = np.concatenate((_data_windows_acc, _data_windows_gyro), axis=2)
+                        temp_sensor = np.concatenate((_data_windows_acc, _data_windows_gyro, _data_windows_magn), axis=2)
                     except:
                         print("There is only one sliding window")
-                        acc_gyro_concat    = np.concatenate((_data_windows_acc, _data_windows_gyro), axis=1)  
-                        acc_gyro_concat    = acc_gyro_concat.reshape((1,acc_gyro_concat.shape[0],acc_gyro_concat.shape[1]))
+                        if sensors_type == 'all':
+                            temp_sensor = np.concatenate((_data_windows_acc, _data_windows_gyro), axis=1)  
+                        else:
+                            temp_sensor = np.concatenate((_data_windows_acc, _data_windows_gyro, _data_windows_magn), axis=1)
+                        temp_sensor    = temp_sensor.reshape((1,temp_sensor.shape[0],temp_sensor.shape[1]))
                     
                     step += 1
 
-                    _id             = np.arange( ID_generater, ID_generater+len(acc_gyro_concat)) # id for every window
-                    data            = np.concatenate( (data, acc_gyro_concat), axis=0 ) # concat verticaly every window
+                    _id             = np.arange( ID_generater, ID_generater+len(temp_sensor)) # id for every window
+                    data            = np.concatenate( (data, temp_sensor), axis=0 ) # concat verticaly every window
                     ID              = np.concatenate( (ID,   _id), axis=0 )
-                    ID_generater    = ID_generater + len( acc_gyro_concat ) + 10            
+                    ID_generater    = ID_generater + len( temp_sensor ) + 10            
 
                 # update la
                 _la     = np.full( len(data)-len(la) , int(id_act) - 1, dtype=np.int32 ) # label activity for every window
@@ -175,9 +193,6 @@ def realdisp_process(path, path_out, positions='all'):
     # shuffle
     data, la, lu, ID    = skutils.shuffle( data, la, lu, ID )
     data, la, lu, ID    = skutils.shuffle( data, la, lu, ID )
-
-    if not os.path.exists( processed_path + '/'):
-        os.mkdir( processed_path + '/' )
 
     # partition
     for i in range( 10 ):
@@ -386,6 +401,6 @@ if __name__ == '__main__':
 
     args    = parser.parse_args()
 
-    preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/")
-    preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/")
-    preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "all")
+    #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", "")
+    #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", "")
+    preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "acc_gyro_magn", 'acc_gyro_magn', "all")
