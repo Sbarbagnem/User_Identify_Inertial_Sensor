@@ -2,6 +2,7 @@
 *pycache*
 #data/*
 *.pyc
+*.npy
 
 # no original datasets
 data/datasets/REALDISP
@@ -10,3 +11,4 @@ data/datasets/unimib_dataset
 data/datasets/REALDISP_processed/OuterPartition
 data/datasets/SBHAR_processed/OuterPartition
 data/datasets/UNIMIBDataset/OuterPartition
+data/parameters/
