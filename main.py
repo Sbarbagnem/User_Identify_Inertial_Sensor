@@ -499,7 +499,7 @@ if __name__ == '__main__':
                                 save_dir='acc_gyro_magn/')
 
 
-        for i in range(1):
+        for i in range(1,10):
             if args.model == 1:
                 print('Pretrain with fold {} for test'.format(i))
                 model_pretrain = my_model(  version="pre_train_acc_gyro_magn", gpu=0, fold=i, save_dir='acc_gyro_magn', 
