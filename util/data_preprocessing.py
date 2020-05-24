@@ -402,5 +402,5 @@ if __name__ == '__main__':
     args    = parser.parse_args()
 
     #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", "")
-    #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", "")
-    preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "acc_gyro_magn", 'acc_gyro_magn', "all")
+    preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", "")
+    #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "acc_gyro_magn", 'acc_gyro_magn', "all")
