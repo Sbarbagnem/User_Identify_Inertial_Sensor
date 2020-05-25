@@ -20,6 +20,11 @@ def print_model_summary(network, dataset, tran):
         network.build(input_shape=(None, samples, axes, channels))
     network.summary()
 
+def decay_lr(initAlpha=0.01, factor=0.25, dropEvery=10, epoch=0):
+    exp = np.floor((1 + epoch) / dropEvery)
+    alpha = initAlpha * (factor ** exp)
+    return float(alpha)
+
 
 if __name__ == '__main__':
 
@@ -241,9 +246,18 @@ if __name__ == '__main__':
             valid_accuracy_activity.reset_states()
             valid_accuracy_user.reset_states()
 
+            new_lr = decay_lr(epoch=epoch)
+            optimizer.learning_rate.assign(new_lr)
+            with train_writer.as_default():
+                tf.summary.scalar("learning_rate", new_lr, step=epoch)
+
         else:
             for batch, _, label_user in train_data:
                 train_step(batch, None, label_user, MULTI_TASK)
+
+            if epoch == 3:
+                optimizer.learning_rate.assign(0.00000001)
+                print(optimizer.learning_rate)
 
             print("TRAIN: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}".format(epoch,
                                                                                     configuration.EPOCHS,
@@ -269,6 +283,11 @@ if __name__ == '__main__':
                 tf.summary.scalar('accuracy_user', valid_accuracy_user.result(), step=epoch)
             valid_loss_user.reset_states()
             valid_accuracy_activity.reset_states()
+
+            new_lr = decay_lr(epoch=epoch)
+            optimizer.learning_rate.assign(new_lr)
+            with train_writer.as_default():
+                tf.summary.scalar("learning_rate", new_lr, step=epoch)  
 
         print("####################################################################################")
     

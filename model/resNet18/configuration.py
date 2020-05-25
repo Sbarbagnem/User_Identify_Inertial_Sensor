@@ -1,5 +1,5 @@
 # global training parameters
-EPOCHS = 5
+EPOCHS = 50
 BATCH_SIZE = 100
 
 # parameters based on dataset
