@@ -17,9 +17,17 @@ config = {
         'WINDOW_AXES'           : 6,  # number of sample for window
         'WINDOW_SAMPLES'        : 100,    # number of axes' sensor
         'CHANNELS'              : 1       
+    },
+    'realdisp': {
+        'NUM_CLASSES_ACTIVITY'  : 33,
+        'NUM_CLASSES_USER'      : 17,
+        'WINDOW_AXES'           : 9,  # number of sample for window
+        'WINDOW_SAMPLES'        : 100,    # number of axes' sensor
+        'CHANNELS'              : 1       
     }
 }
 
+'''
 save_model_dir = "saved_model/"
 save_every_n_epoch = 10
 test_image_dir = ""
@@ -34,3 +42,4 @@ test_tfrecord = dataset_dir + "test.tfrecord"
 # VALID_SET_RATIO = 1 - TRAIN_SET_RATIO - TEST_SET_RATIO
 TRAIN_SET_RATIO = 0.6
 TEST_SET_RATIO = 0.2
+'''

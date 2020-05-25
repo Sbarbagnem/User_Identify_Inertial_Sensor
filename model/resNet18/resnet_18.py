@@ -8,8 +8,10 @@ from model.resNet18.residual_block import make_basic_block_layer
 
 
 class ResNetTypeI(tf.keras.Model):
-    def __init__(self, layer_params, dataset):
+    def __init__(self, layer_params, dataset, multi_task):
         super(ResNetTypeI, self).__init__()
+
+        self.multi_task = multi_task
 
         self.conv1 = tf.keras.layers.Conv2D(filters=64,
                                             kernel_size=(7, 7),
@@ -38,10 +40,11 @@ class ResNetTypeI(tf.keras.Model):
 
         self.avgpool = tf.keras.layers.GlobalAveragePooling2D()
 
-        # activity classification
-        self.fc_activity = tf.keras.layers.Dense(units=config[dataset]['NUM_CLASSES_ACTIVITY'], 
-                                                 activation=tf.keras.activations.softmax, 
-                                                 name='fc_act')
+        if multi_task:
+            # activity classification
+            self.fc_activity = tf.keras.layers.Dense(units=config[dataset]['NUM_CLASSES_ACTIVITY'], 
+                                                    activation=tf.keras.activations.softmax, 
+                                                    name='fc_act')
 
         # user classification
         self.fc_user = tf.keras.layers.Dense(units=config[dataset]['NUM_CLASSES_USER'], 
@@ -61,14 +64,14 @@ class ResNetTypeI(tf.keras.Model):
         x = self.layer4(x, training=training)
 
         x = self.avgpool(x)
-        
-        # activity
-        output_activity = self.fc_activity(x)
 
-        # user
-        output_user = self.fc_user(x)
+        if self.multi_task:       
+            output_activity = self.fc_activity(x)
+            output_user = self.fc_user(x)
+            return output_activity, output_user
+        else:
+            output_user = self.fc_user(x)
+            return output_user           
 
-        return output_activity, output_user
-
-def resnet_18(dataset):
-    return ResNetTypeI(layer_params=[2, 2, 2, 2], dataset=dataset)
+def resnet_18(dataset, multi_task):
+    return ResNetTypeI(layer_params=[2, 2, 2, 2], dataset=dataset, multi_task=multi_task)
