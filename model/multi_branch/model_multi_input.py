@@ -63,7 +63,10 @@ class ModelMultiBranch(tf.keras.Model):
             merge_branch.append(x)
 
         # merge output
-        merge = tf.concat(merge_branch, axis=1) # [batch_size, k_sensor, flatten_conv]
+        if len(merge_branch) > 1:
+            merge = tf.concat(merge_branch, axis=1) # [batch_size, k_sensor, flatten_conv]
+        else:
+            merge = merge_branch[0]
 
         merge = self.conv1_merge(merge, training=training)
         merge = self.bn1_merge(merge, training=training)
