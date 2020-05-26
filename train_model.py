@@ -5,8 +5,9 @@ from sklearn import utils as skutils
 import math
 import datetime
 
-from model.resNet18 import configuration
-from model.resNet18.resnet_18 import resnet_18
+from model import configuration
+from model.resNet18.resnet_18 import resnet18
+from model.multi_branch.model_multi_input import model_multi_branch
 from util.data_loader import Dataset
 
 
@@ -20,6 +21,7 @@ def print_model_summary(network, dataset, tran):
         network.build(input_shape=(None, samples, axes, channels))
     network.summary()
 
+
 def decay_lr(initAlpha=0.01, factor=0.25, dropEvery=10, epoch=0):
     exp = np.floor((1 + epoch) / dropEvery)
     alpha = initAlpha * (factor ** exp)
@@ -28,13 +30,15 @@ def decay_lr(initAlpha=0.01, factor=0.25, dropEvery=10, epoch=0):
 
 if __name__ == '__main__':
 
-    DATASET = 'unimib'
+    DATASET = 'sbhar'
     NUM_ACT = configuration.config[DATASET]['NUM_CLASSES_ACTIVITY']
     NUM_USER = configuration.config[DATASET]['NUM_CLASSES_USER']
     BATCH_SIZE = configuration.BATCH_SIZE
     MULTI_TASK = True
     LR = 'static'
-    tran = False
+    tran = True
+    MODEL = 'multi_branch'
+    EPOCHS = configuration.EPOCHS
 
     if DATASET == 'unimib':
         dataset = Dataset(path='data/datasets/UNIMIBDataset/',
@@ -98,8 +102,11 @@ if __name__ == '__main__':
         buffer_size=test_shape[0], reshuffle_each_iteration=False)
 
     # create model
-    model = resnet_18(DATASET, MULTI_TASK)
-    print_model_summary(network=model, dataset=DATASET, tran=True)
+    if MODEL == 'resnet_18':
+        model = resnet18(DATASET, MULTI_TASK, NUM_ACT, NUM_USER)
+    if MODEL == 'multi_branch':
+        model = model_multi_branch(configuration.config[DATASET]['SENSOR_DICT'], multi_task=MULTI_TASK, num_act=NUM_ACT, num_user=NUM_USER)
+    print_model_summary(network=model, dataset=DATASET, tran=tran)
 
     # define loss and optimizer
     loss_act = tf.keras.losses.SparseCategoricalCrossentropy()
@@ -131,7 +138,7 @@ if __name__ == '__main__':
                     y_true=label_activity,
                     y_pred=predictions_act)
                 loss_u = loss_user(
-                    y_true=label_user, 
+                    y_true=label_user,
                     y_pred=predictions_user)
                 loss_global = loss_a + loss_u
             else:
@@ -178,28 +185,31 @@ if __name__ == '__main__':
 
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
+    train_log_dir   = "{}/{}/{}/batch_{}/lr_{}/{}/{}/{}/train".format(  MODEL,
+                                                                        DATASET,
+                                                                        experiment['task'],
+                                                                        experiment['batch_size'],
+                                                                        experiment['lr'],
+                                                                        experiment['filter'],
+                                                                        experiment['tran'],
+                                                                        current_time)
+    val_log_dir     =   "{}/{}/{}/batch_{}/lr_{}/{}/{}/{}/val".format(  MODEL,
+                                                                        DATASET,
+                                                                        experiment['task'],
+                                                                        experiment['batch_size'],
+                                                                        experiment['lr'],
+                                                                        experiment['filter'],
+                                                                        experiment['tran'],
+                                                                        current_time)
+
     # tensorboard config
-    train_writer = tf.summary.create_file_writer(
-        "resnet_18_board/{}/{}/batch_{}/lr_{}/{}/{}/{}/train".format(
-            DATASET,
-            experiment['task'],
-            experiment['batch_size'],
-            experiment['lr'],
-            experiment['filter'],
-            experiment['tran'],
-            current_time))
-    val_writer = tf.summary.create_file_writer(
-        "resnet_18_board/{}/{}/batch_{}/lr_{}/{}/{}/{}/val".format(
-            DATASET,
-            experiment['task'],
-            experiment['batch_size'],
-            experiment['lr'],
-            experiment['filter'],
-            experiment['tran'],
-            current_time))
-    
+    train_writer = tf.summary.create_file_writer(train_log_dir)
+    val_writer = tf.summary.create_file_writer(val_log_dir)
+
+    tf.summary.trace_on(graph=True, profiler=True)
+
     # start training
-    for epoch in range(1, configuration.EPOCHS + 1):
+    for epoch in range(1, EPOCHS + 1):
 
         if MULTI_TASK:
 
@@ -210,16 +220,20 @@ if __name__ == '__main__':
                 "TRAIN: epoch: {}/{}, loss_act: {:.5f}, loss_user: {:.5f}, "
                 "acc_act: {:.5f}, acc_user: {:.5f}".format(
                     epoch,
-                    configuration.EPOCHS,
+                    EPOCHS,
                     train_loss_activity.result().numpy(),
                     train_loss_user.result().numpy(),
                     train_accuracy_activity.result().numpy(),
                     train_accuracy_user.result().numpy()))
             with train_writer.as_default():
-                tf.summary.scalar('loss_activity', train_loss_activity.result(), step=epoch)
-                tf.summary.scalar('accuracy_activity', train_accuracy_activity.result(), step=epoch)
-                tf.summary.scalar('loss_user', train_loss_user.result(), step=epoch)
-                tf.summary.scalar('accuracy_user', train_accuracy_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'loss_activity', train_loss_activity.result(), step=epoch)
+                tf.summary.scalar('accuracy_activity',
+                                  train_accuracy_activity.result(), step=epoch)
+                tf.summary.scalar(
+                    'loss_user', train_loss_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'accuracy_user', train_accuracy_user.result(), step=epoch)
             train_loss_activity.reset_states()
             train_loss_user.reset_states()
             train_accuracy_activity.reset_states()
@@ -228,15 +242,19 @@ if __name__ == '__main__':
             for batch, label_act, label_user in test_data:
                 valid_step(batch, label_act, label_user, MULTI_TASK)
             with val_writer.as_default():
-                tf.summary.scalar('loss_activity', valid_loss_activity.result(), step=epoch)
-                tf.summary.scalar('accuracy_activity', valid_accuracy_activity.result(), step=epoch)
-                tf.summary.scalar('loss_user', valid_loss_user.result(), step=epoch)
-                tf.summary.scalar('accuracy_user', valid_accuracy_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'loss_activity', valid_loss_activity.result(), step=epoch)
+                tf.summary.scalar('accuracy_activity',
+                                  valid_accuracy_activity.result(), step=epoch)
+                tf.summary.scalar(
+                    'loss_user', valid_loss_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'accuracy_user', valid_accuracy_user.result(), step=epoch)
             print(
                 "VALIDATION: epoch: {}/{}, loss_act: {:.5f}, loss_user: {:.5f}, "
                 "acc_act: {:.5f}, acc_user: {:.5f}".format(
                     epoch,
-                    configuration.EPOCHS,
+                    EPOCHS,
                     valid_loss_activity.result().numpy(),
                     valid_loss_user.result().numpy(),
                     valid_accuracy_activity.result().numpy(),
@@ -245,11 +263,13 @@ if __name__ == '__main__':
             valid_loss_user.reset_states()
             valid_accuracy_activity.reset_states()
             valid_accuracy_user.reset_states()
-
-            new_lr = decay_lr(epoch=epoch)
-            optimizer.learning_rate.assign(new_lr)
-            with train_writer.as_default():
-                tf.summary.scalar("learning_rate", new_lr, step=epoch)
+            '''
+            if LR == 'dynamic':
+                new_lr = decay_lr(epoch=epoch)
+                optimizer.learning_rate.assign(new_lr)
+                with train_writer.as_default():
+                    tf.summary.scalar("learning_rate", new_lr, step=epoch)
+            '''
 
         else:
             for batch, _, label_user in train_data:
@@ -260,12 +280,14 @@ if __name__ == '__main__':
                 print(optimizer.learning_rate)
 
             print("TRAIN: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}".format(epoch,
-                                                                                    configuration.EPOCHS,
+                                                                                    EPOCHS,
                                                                                     train_loss_user.result().numpy(),
                                                                                     train_accuracy_user.result().numpy()))
             with train_writer.as_default():
-                tf.summary.scalar('loss_user', train_loss_user.result(), step=epoch)
-                tf.summary.scalar('accuracy_user', train_accuracy_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'loss_user', train_loss_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'accuracy_user', train_accuracy_user.result(), step=epoch)
             train_loss_user.reset_states()
             train_accuracy_user.reset_states()
 
@@ -275,22 +297,26 @@ if __name__ == '__main__':
             print(
                 "VALIDATION: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}".format(
                     epoch,
-                    configuration.EPOCHS,
+                    EPOCHS,
                     valid_loss_user.result().numpy(),
                     valid_accuracy_user.result().numpy()))
             with val_writer.as_default():
-                tf.summary.scalar('loss_user', valid_loss_user.result(), step=epoch)
-                tf.summary.scalar('accuracy_user', valid_accuracy_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'loss_user', valid_loss_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'accuracy_user', valid_accuracy_user.result(), step=epoch)
             valid_loss_user.reset_states()
             valid_accuracy_activity.reset_states()
 
-            new_lr = decay_lr(epoch=epoch)
-            optimizer.learning_rate.assign(new_lr)
-            with train_writer.as_default():
-                tf.summary.scalar("learning_rate", new_lr, step=epoch)  
-
+            '''
+            if LR == 'dynamic':
+                new_lr = decay_lr(epoch=epoch)
+                optimizer.learning_rate.assign(new_lr)
+                with train_writer.as_default():
+                    tf.summary.scalar("learning_rate", new_lr, step=epoch)
+            '''
         print("####################################################################################")
-    
+
     '''
         if epoch % save_every_n_epoch == 0:
             model.save_weights(filepath=save_model_dir+"epoch-{}".format(epoch), save_format='tf')
