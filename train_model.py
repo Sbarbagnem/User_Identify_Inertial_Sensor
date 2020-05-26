@@ -8,6 +8,7 @@ import datetime
 from model import configuration
 from model.resNet18.resnet_18 import resnet18
 from model.multi_branch.model_multi_input import model_multi_branch
+from model.multi_branch_lstm.model_multi_input_lstm import model_multi_branch_lstm
 from util.data_loader import Dataset
 
 
@@ -37,7 +38,7 @@ if __name__ == '__main__':
     MULTI_TASK = True
     LR = 'static'
     tran = True
-    MODEL = 'multi_branch'
+    MODEL = 'multi_branch_lstm'
     EPOCHS = configuration.EPOCHS
 
     if DATASET == 'unimib':
@@ -68,6 +69,7 @@ if __name__ == '__main__':
     if gpus:
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
+    
 
     # gat data [examples, window_samples, axes, channel]
     TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU = dataset.load_data(
@@ -106,6 +108,8 @@ if __name__ == '__main__':
         model = resnet18(DATASET, MULTI_TASK, NUM_ACT, NUM_USER)
     if MODEL == 'multi_branch':
         model = model_multi_branch(configuration.config[DATASET]['SENSOR_DICT'], multi_task=MULTI_TASK, num_act=NUM_ACT, num_user=NUM_USER)
+    if MODEL == 'multi_branch_lstm':
+        model = model_multi_branch_lstm(configuration.config[DATASET]['SENSOR_DICT'], multi_task=MULTI_TASK, num_act=NUM_ACT, num_user=NUM_USER)
     print_model_summary(network=model, dataset=DATASET, tran=tran)
 
     # define loss and optimizer

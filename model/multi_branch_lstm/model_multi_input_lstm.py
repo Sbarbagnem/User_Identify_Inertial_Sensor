@@ -37,7 +37,9 @@ class ModelMultiBranchLSTM(tf.keras.Model):
                                         name='conv3_merge_branch')
         self.bn3_merge = tf.keras.layers.BatchNormalization(name='bn3_merge')
 
-        self.avg_pool = tf.keras.layers.GlobalAveragePooling2D()
+        # self.avg_pool = tf.keras.layers.GlobalAveragePooling2D()
+
+        self.lstm = tf.keras.layers.LSTM(units=32,activation='tanh', dropout=0.0, recurrent_dropout=0.0, name='lstm', return_sequences=False)
 
         if multi_task:
             self.fc_activity = tf.keras.layers.Dense(units=num_act,
@@ -78,9 +80,11 @@ class ModelMultiBranchLSTM(tf.keras.Model):
         merge = self.bn3_merge(merge, training=training)
         merge = tf.nn.relu(merge)
 
-        merge = self.avg_pool(merge)
+        # merge = tf.nn.avg_pool2d(input=merge, ksize=[1,1,3,3], strides=[2,2], padding='VALID')
 
-        print(merge.shape)
+        merge = tf.reshape(merge, shape=[-1,merge.shape[1]*merge.shape[2],merge.shape[3]])
+
+        merge = self.lstm(merge, training=training)
 
         if self.multi_task:
             output_activity = self.fc_activity(merge)
@@ -144,5 +148,5 @@ def make_basic_branch(name_sensor, sensor_axes):
     basic_branch.add(BasicBranch(name_sensor, sensor_axes))
     return basic_branch
 
-def model_multi_branch(sensor_dict, multi_task, num_act, num_user):
+def model_multi_branch_lstm(sensor_dict, multi_task, num_act, num_user):
     return ModelMultiBranchLSTM(sensor_dict=sensor_dict, multi_task=multi_task, num_act=num_act, num_user=num_user)
