@@ -23,7 +23,7 @@ def print_model_summary(network, dataset, tran):
     network.summary()
 
 
-def decay_lr(initAlpha=0.01, factor=0.25, dropEvery=10, epoch=0):
+def decay_lr(initAlpha=0.01, factor=0.25, dropEvery=15, epoch=0):
     exp = np.floor((1 + epoch) / dropEvery)
     alpha = initAlpha * (factor ** exp)
     return float(alpha)
@@ -36,9 +36,9 @@ if __name__ == '__main__':
     NUM_USER = configuration.config[DATASET]['NUM_CLASSES_USER']
     BATCH_SIZE = configuration.BATCH_SIZE
     MULTI_TASK = True
-    LR = 'static'
-    tran = True
-    MODEL = 'multi_branch_lstm'
+    LR = 'dynamic'
+    tran = False
+    MODEL = 'resnet_18'
     EPOCHS = configuration.EPOCHS
 
     if DATASET == 'unimib':
@@ -77,31 +77,28 @@ if __name__ == '__main__':
 
     train_shape = TrainData.shape
     test_shape = TestData.shape
+    print(train_shape)
+    print(test_shape)
 
     # reshape [examples, axes, window_samples, channel]
     if tran:
         TrainData = np.transpose(TrainData, (0, 2, 1, 3))
         TestData = np.transpose(TestData, (0, 2, 1, 3))
 
-    TrainData = tf.data.Dataset.from_tensor_slices(
-        TrainData).batch(BATCH_SIZE, drop_remainder=True)
-    TrainLA = tf.data.Dataset.from_tensor_slices(
-        TrainLA).batch(BATCH_SIZE, drop_remainder=True)
-    TrainLU = tf.data.Dataset.from_tensor_slices(
-        TrainLU).batch(BATCH_SIZE, drop_remainder=True)
+    TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
+    TrainLA = tf.data.Dataset.from_tensor_slices(TrainLA)
+    TrainLU = tf.data.Dataset.from_tensor_slices(TrainLU)
 
-    TestData = tf.data.Dataset.from_tensor_slices(
-        TestData).batch(BATCH_SIZE, drop_remainder=True)
-    TestLA = tf.data.Dataset.from_tensor_slices(
-        TestLA).batch(BATCH_SIZE, drop_remainder=True)
-    TestLU = tf.data.Dataset.from_tensor_slices(
-        TestLU).batch(BATCH_SIZE, drop_remainder=True)
+    TestData = tf.data.Dataset.from_tensor_slices(TestData)
+    TestLA = tf.data.Dataset.from_tensor_slices(TestLA)
+    TestLU = tf.data.Dataset.from_tensor_slices(TestLU)
 
-    train_data = tf.data.Dataset.zip(
-        (TrainData, TrainLA, TrainLU)).shuffle(
-        buffer_size=train_shape[0], reshuffle_each_iteration=True)
-    test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU)).shuffle(
-        buffer_size=test_shape[0], reshuffle_each_iteration=False)
+    train_data = tf.data.Dataset.zip((TrainData, TrainLA, TrainLU))
+    train_data = train_data.batch(BATCH_SIZE, drop_remainder=True)
+    train_data = train_data.shuffle(buffer_size=train_shape[0], reshuffle_each_iteration=True)
+
+    test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
+    test_data = test_data.batch(BATCH_SIZE, drop_remainder=True)
 
     # create model
     if MODEL == 'resnet_18':
@@ -144,11 +141,13 @@ if __name__ == '__main__':
                 loss_u = loss_user(
                     y_true=label_user,
                     y_pred=predictions_user)
-                loss_global = loss_a + loss_u
+                penality = sum( tf.nn.l2_loss(tf_var) for tf_var in model.trainable_variables)
+                loss_global = loss_a + loss_u + 0.0003*penality
             else:
                 predictions_user = model(batch, training=True)
                 loss_u = loss_user(y_true=label_user, y_pred=predictions_user)
-                loss_global = loss_u
+                penality = sum( tf.nn.l2_loss(tf_var) for tf_var in model.trainable_variables)
+                loss_global = loss_u + 0.0003*penality
 
         gradients = tape.gradient(loss_global, model.trainable_variables)
         optimizer.apply_gradients(
@@ -267,21 +266,16 @@ if __name__ == '__main__':
             valid_loss_user.reset_states()
             valid_accuracy_activity.reset_states()
             valid_accuracy_user.reset_states()
-            '''
+
             if LR == 'dynamic':
                 new_lr = decay_lr(epoch=epoch)
                 optimizer.learning_rate.assign(new_lr)
                 with train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
-            '''
 
         else:
             for batch, _, label_user in train_data:
                 train_step(batch, None, label_user, MULTI_TASK)
-
-            if epoch == 3:
-                optimizer.learning_rate.assign(0.00000001)
-                print(optimizer.learning_rate)
 
             print("TRAIN: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}".format(epoch,
                                                                                     EPOCHS,
@@ -312,13 +306,12 @@ if __name__ == '__main__':
             valid_loss_user.reset_states()
             valid_accuracy_activity.reset_states()
 
-            '''
             if LR == 'dynamic':
                 new_lr = decay_lr(epoch=epoch)
                 optimizer.learning_rate.assign(new_lr)
                 with train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
-            '''
+            
         print("####################################################################################")
 
     '''

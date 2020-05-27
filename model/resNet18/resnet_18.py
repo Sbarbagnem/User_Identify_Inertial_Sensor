@@ -14,14 +14,21 @@ class ResNet18SingleBranch(tf.keras.Model):
             self.num_act = num_act
         self.num_user = num_user
 
+        # features about single axis sensor (parameters from metier)
+
         self.conv1 = tf.keras.layers.Conv2D(filters=64,
-                                            kernel_size=(7, 7),
-                                            strides=2,
-                                            padding="same")
+                                            #kernel_size=(7, 7),
+                                            kernel_size=(5,1),
+                                            #strides=2,
+                                            strides=(1,1),
+                                            padding="valid")
         self.bn1 = tf.keras.layers.BatchNormalization()
-        self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(3, 3),
-                                               strides=2,
-                                               padding="same")
+        self.pool1 = tf.keras.layers.MaxPool2D(#pool_size=(3, 3),
+                                               pool_size=(2,1),
+                                               strides=(2,1),
+                                               padding="valid")
+
+        # features about interaction between sensor
 
         self.layer1 = make_basic_block_layer(filter_num=64,
                                              blocks=layer_params[0],
@@ -54,17 +61,25 @@ class ResNet18SingleBranch(tf.keras.Model):
 
     def call(self, inputs, training=None):
 
+        # print('shape input: {}'.format(inputs.shape))
         x = self.conv1(inputs)
+        # print('shape conv1: {}'.format(x.shape))
         x = self.bn1(x, training=training)
         x = tf.nn.relu(x)
         x = self.pool1(x)
+        # print('shape pool1: {}'.format(x.shape))
 
         x = self.layer1(x, training=training)
+        # print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
+        # print('shape res_2: {}'.format(x.shape))
         x = self.layer3(x, training=training)
+        # print('shape res_3: {}'.format(x.shape))
         x = self.layer4(x, training=training)
+        # print('shape res_4: {}'.format(x.shape))
 
         x = self.avgpool(x)
+        # print('shape avg_pool: {}'.format(x.shape))
 
         if self.multi_task:
             output_activity = self.fc_activity(x)
@@ -80,12 +95,14 @@ class BasicBlock(tf.keras.layers.Layer):
     def __init__(self, filter_num, stride=1):
         super(BasicBlock, self).__init__()
         self.conv1 = tf.keras.layers.Conv2D(filters=filter_num,
-                                            kernel_size=(3, 3),
+                                            #kernel_size=(3, 3),
+                                            kernel_size=(1,3),
                                             strides=stride,
-                                            padding="same")
+                                            padding='same')
         self.bn1 = tf.keras.layers.BatchNormalization()
         self.conv2 = tf.keras.layers.Conv2D(filters=filter_num,
-                                            kernel_size=(3, 3),
+                                            #kernel_size=(3, 3),
+                                            kernel_size=(1,3),
                                             strides=1,
                                             padding="same")
         self.bn2 = tf.keras.layers.BatchNormalization()

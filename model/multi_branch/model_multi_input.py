@@ -4,7 +4,7 @@ class ModelMultiBranch(tf.keras.Model):
     def __init__(self, sensor_dict, multi_task, num_act, num_user):
         super(ModelMultiBranch, self).__init__()
 
-        self.senor_name = list(sensor_dict.keys())
+        self.sensor_name = list(sensor_dict.keys())
         self.sensor_axes = list(sensor_dict.values())
         self.multi_task = multi_task
         if multi_task:
@@ -13,7 +13,7 @@ class ModelMultiBranch(tf.keras.Model):
 
         self.branches = []
 
-        for sensor_name, sensor_axes in zip(self.senor_name, self.sensor_axes):
+        for sensor_name, sensor_axes in zip(self.sensor_name, self.sensor_axes):
             self.branches.append(make_basic_branch(sensor_name, sensor_axes))    
 
         self.conv1_merge = tf.keras.layers.Conv2D(filters=64,
@@ -52,15 +52,19 @@ class ModelMultiBranch(tf.keras.Model):
         '''
             input [batch_size, axes, samples, channel]
         '''
-
-        sensor_split = tf.split(inputs, num_or_size_splits=self.sensor_axes, axis=1)
-
         merge_branch = []
 
-        for input_sensor, branch in zip(sensor_split, self.branches):
-            x = branch(input_sensor, training=training)
+        if len(self.sensor_name)>1:
+            sensor_split = tf.split(inputs, num_or_size_splits=self.sensor_axes, axis=1)
+            for input_sensor, branch in zip(sensor_split, self.branches):
+                x = branch(input_sensor, training=training)
+                x = tf.reshape(x, shape=[-1, 1, x.shape[1]*x.shape[2]*x.shape[3], 1]) # flatten
+                merge_branch.append(x)
+        else:
+            x = self.branches[0](inputs, training=training)
             x = tf.reshape(x, shape=[-1, 1, x.shape[1]*x.shape[2]*x.shape[3], 1]) # flatten
             merge_branch.append(x)
+
 
         # merge output
         if len(merge_branch) > 1:
