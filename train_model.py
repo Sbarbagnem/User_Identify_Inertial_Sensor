@@ -12,18 +12,15 @@ from model.multi_branch_lstm.model_multi_input_lstm import model_multi_branch_ls
 from util.data_loader import Dataset
 
 
-def print_model_summary(network, dataset, tran):
+def print_model_summary(network, dataset):
     axes = configuration.config[dataset]['WINDOW_AXES']
     samples = configuration.config[dataset]['WINDOW_SAMPLES']
     channels = configuration.config[dataset]['CHANNELS']
-    if tran:
-        network.build(input_shape=(None, axes, samples, channels))
-    else:
-        network.build(input_shape=(None, samples, axes, channels))
+    network.build(input_shape=(None, axes, samples, channels))
     network.summary()
 
 
-def decay_lr(initAlpha=0.01, factor=0.25, dropEvery=15, epoch=0):
+def decay_lr(initAlpha=0.001, factor=0.25, dropEvery=15, epoch=0):
     exp = np.floor((1 + epoch) / dropEvery)
     alpha = initAlpha * (factor ** exp)
     return float(alpha)
@@ -37,8 +34,7 @@ if __name__ == '__main__':
     BATCH_SIZE = configuration.BATCH_SIZE
     MULTI_TASK = True
     LR = 'dynamic'
-    tran = False
-    MODEL = 'resnet_18'
+    MODEL = 'multi_branch'
     EPOCHS = configuration.EPOCHS
 
     if DATASET == 'unimib':
@@ -73,17 +69,14 @@ if __name__ == '__main__':
 
     # gat data [examples, window_samples, axes, channel]
     TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU = dataset.load_data(
-        step=0)
+        step=1)
 
     train_shape = TrainData.shape
     test_shape = TestData.shape
-    print(train_shape)
-    print(test_shape)
 
     # reshape [examples, axes, window_samples, channel]
-    if tran:
-        TrainData = np.transpose(TrainData, (0, 2, 1, 3))
-        TestData = np.transpose(TestData, (0, 2, 1, 3))
+    TrainData = np.transpose(TrainData, (0, 2, 1, 3))
+    TestData = np.transpose(TestData, (0, 2, 1, 3))
 
     TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
     TrainLA = tf.data.Dataset.from_tensor_slices(TrainLA)
@@ -105,9 +98,11 @@ if __name__ == '__main__':
         model = resnet18(DATASET, MULTI_TASK, NUM_ACT, NUM_USER)
     if MODEL == 'multi_branch':
         model = model_multi_branch(configuration.config[DATASET]['SENSOR_DICT'], multi_task=MULTI_TASK, num_act=NUM_ACT, num_user=NUM_USER)
+    '''
     if MODEL == 'multi_branch_lstm':
         model = model_multi_branch_lstm(configuration.config[DATASET]['SENSOR_DICT'], multi_task=MULTI_TASK, num_act=NUM_ACT, num_user=NUM_USER)
-    print_model_summary(network=model, dataset=DATASET, tran=tran)
+    '''
+    print_model_summary(network=model, dataset=DATASET)
 
     # define loss and optimizer
     loss_act = tf.keras.losses.SparseCategoricalCrossentropy()
@@ -182,28 +177,22 @@ if __name__ == '__main__':
         'task': 'multitask' if MULTI_TASK else 'single_task',
         'batch_size': BATCH_SIZE,
         'lr': 'static' if LR == 'static' else 'dynamic',
-        'tran': 'tran' if tran == True else 'no_tran',
-        'filter': 'original'
     }
 
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    train_log_dir   = "{}/{}/{}/batch_{}/lr_{}/{}/{}/{}/train".format(  MODEL,
-                                                                        DATASET,
-                                                                        experiment['task'],
-                                                                        experiment['batch_size'],
-                                                                        experiment['lr'],
-                                                                        experiment['filter'],
-                                                                        experiment['tran'],
-                                                                        current_time)
-    val_log_dir     =   "{}/{}/{}/batch_{}/lr_{}/{}/{}/{}/val".format(  MODEL,
-                                                                        DATASET,
-                                                                        experiment['task'],
-                                                                        experiment['batch_size'],
-                                                                        experiment['lr'],
-                                                                        experiment['filter'],
-                                                                        experiment['tran'],
-                                                                        current_time)
+    train_log_dir   = "{}/{}/{}/batch_{}/lr_{}/{}/train".format(MODEL,
+                                                                DATASET,
+                                                                experiment['task'],
+                                                                experiment['batch_size'],
+                                                                experiment['lr'],
+                                                                current_time)
+    val_log_dir     =   "{}/{}/{}/batch_{}/lr_{}/{}/val".format(MODEL,
+                                                                DATASET,
+                                                                experiment['task'],
+                                                                experiment['batch_size'],
+                                                                experiment['lr'],
+                                                                current_time)
 
     # tensorboard config
     train_writer = tf.summary.create_file_writer(train_log_dir)
