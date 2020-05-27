@@ -7,6 +7,7 @@ import datetime
 
 from model import configuration
 from model.resNet18.resnet_18 import resnet18
+from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
 from model.multi_branch.model_multi_input import model_multi_branch
 from model.multi_branch_lstm.model_multi_input_lstm import model_multi_branch_lstm
 from util.data_loader import Dataset
@@ -28,13 +29,13 @@ def decay_lr(initAlpha=0.001, factor=0.25, dropEvery=15, epoch=0):
 
 if __name__ == '__main__':
 
-    DATASET = 'sbhar'
+    DATASET = 'unimib'
     NUM_ACT = configuration.config[DATASET]['NUM_CLASSES_ACTIVITY']
     NUM_USER = configuration.config[DATASET]['NUM_CLASSES_USER']
     BATCH_SIZE = configuration.BATCH_SIZE
-    MULTI_TASK = True
+    MULTI_TASK = False
     LR = 'dynamic'
-    MODEL = 'multi_branch'
+    MODEL = 'resnet18_multi_branch'
     EPOCHS = configuration.EPOCHS
 
     if DATASET == 'unimib':
@@ -94,16 +95,20 @@ if __name__ == '__main__':
     test_data = test_data.batch(BATCH_SIZE, drop_remainder=True)
 
     # create model
-    if MODEL == 'resnet_18':
+    if MODEL == 'resnet18':
         model = resnet18(DATASET, MULTI_TASK, NUM_ACT, NUM_USER)
+    '''
     if MODEL == 'multi_branch':
         model = model_multi_branch(configuration.config[DATASET]['SENSOR_DICT'], multi_task=MULTI_TASK, num_act=NUM_ACT, num_user=NUM_USER)
+    '''
+    if MODEL == 'resnet18_multi_branch':
+        model = resnet18MultiBranch(configuration.config[DATASET]['SENSOR_DICT'], multi_task=MULTI_TASK, num_act=NUM_ACT, num_user=NUM_USER)
     '''
     if MODEL == 'multi_branch_lstm':
         model = model_multi_branch_lstm(configuration.config[DATASET]['SENSOR_DICT'], multi_task=MULTI_TASK, num_act=NUM_ACT, num_user=NUM_USER)
     '''
     print_model_summary(network=model, dataset=DATASET)
-
+    
     # define loss and optimizer
     loss_act = tf.keras.losses.SparseCategoricalCrossentropy()
     loss_user = tf.keras.losses.SparseCategoricalCrossentropy()
@@ -137,12 +142,12 @@ if __name__ == '__main__':
                     y_true=label_user,
                     y_pred=predictions_user)
                 penality = sum( tf.nn.l2_loss(tf_var) for tf_var in model.trainable_variables)
-                loss_global = loss_a + loss_u + 0.0003*penality
+                loss_global = loss_a + loss_u + 0.003*penality
             else:
                 predictions_user = model(batch, training=True)
                 loss_u = loss_user(y_true=label_user, y_pred=predictions_user)
                 penality = sum( tf.nn.l2_loss(tf_var) for tf_var in model.trainable_variables)
-                loss_global = loss_u + 0.0003*penality
+                loss_global = loss_u + 0.003*penality
 
         gradients = tape.gradient(loss_global, model.trainable_variables)
         optimizer.apply_gradients(
