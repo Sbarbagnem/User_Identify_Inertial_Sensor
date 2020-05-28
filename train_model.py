@@ -29,5 +29,5 @@ if __name__ == '__main__':
                     model.loss_opt_metric()
                     if task == 'multi_task':
                         model.train_multi_task()
-                     else:
+                    else:
                         model.train_single_task()
