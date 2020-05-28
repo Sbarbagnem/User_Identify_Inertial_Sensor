@@ -20,18 +20,12 @@ class Resnet18MultiBranch(tf.keras.Model):
             self.branches.append(resnet18BlockNoClass(sensor_name))    
 
         self.conv1_merge = tf.keras.layers.Conv2D(filters=64,
-                                        kernel_size=(1,3),
-                                        strides=1,
+                                        kernel_size=(3,3),
+                                        strides=2,
                                         padding="same",
                                         name='conv1_merge_branch')
         self.bn1_merge = tf.keras.layers.BatchNormalization(name='bn1_merge')
 
-        self.conv2_merge = tf.keras.layers.Conv2D(filters=128,
-                                        kernel_size=(1,3),
-                                        strides=1,
-                                        padding="same",
-                                        name='conv2_merge_branch')
-        self.bn2_merge = tf.keras.layers.BatchNormalization(name='bn2_merge')
         self.avg_pool = tf.keras.layers.GlobalAveragePooling2D()
 
         if multi_task:
@@ -68,21 +62,15 @@ class Resnet18MultiBranch(tf.keras.Model):
         else:
             merge = merge_branch[0]
 
-        #print(merge.shape)
+        print(merge.shape)
 
         merge = self.conv1_merge(merge, training=training)
         merge = self.bn1_merge(merge, training=training)
         merge = tf.nn.relu(merge)
-        #print(merge.shape)
-        merge = self.conv2_merge(merge, training=training)
-        merge = self.bn2_merge(merge, training=training)
-        merge = tf.nn.relu(merge)
-        #print(merge.shape)
 
         merge = self.avg_pool(merge)
 
         #print(merge.shape)
-
 
         if self.multi_task:
             output_activity = self.fc_activity(merge)
@@ -127,7 +115,6 @@ class Resnet18BlockNoClass(tf.keras.layers.Layer):
         x = self.layer1(x, training=training)
         #print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
-        #x = self.avgpool(x)
         #print('shape avg_pool: {}'.format(x.shape))
 
         return x

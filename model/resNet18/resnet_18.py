@@ -6,7 +6,7 @@ import tensorflow as tf
 
 
 class ResNet18SingleBranch(tf.keras.Model):
-    def __init__(self, layer_params, dataset, multi_task, num_act, num_user):
+    def __init__(self, layer_params, multi_task, num_act, num_user):
         super(ResNet18SingleBranch, self).__init__()
 
         self.multi_task = multi_task
@@ -81,10 +81,6 @@ class ResNet18SingleBranch(tf.keras.Model):
         #print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
         #print('shape res_2: {}'.format(x.shape))
-        #x = self.layer3(x, training=training)
-        #print('shape res_3: {}'.format(x.shape))
-        #x = self.layer4(x, training=training)
-        #print('shape res_4: {}'.format(x.shape))
 
         x = self.avgpool(x)
         #print('shape avg_pool: {}'.format(x.shape))
@@ -148,5 +144,5 @@ def make_basic_block_layer(filter_num, blocks, name, stride=1):
     return res_block
 
 
-def resnet18(dataset, multi_task, num_act, num_user):
-    return ResNet18SingleBranch(layer_params=[2, 2, 2, 2], dataset=dataset, multi_task=multi_task, num_act=num_act, num_user=num_user)
+def resnet18(multi_task, num_act, num_user):
+    return ResNet18SingleBranch(layer_params=[2, 2, 2, 2], multi_task=multi_task, num_act=num_act, num_user=num_user)

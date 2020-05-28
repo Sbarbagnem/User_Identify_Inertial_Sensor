@@ -14,7 +14,7 @@ from scipy.fftpack import fft
 from sklearn import utils as skutils
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
 
-from model import model
+from model.metier import metier
 from util.data_loader import Dataset
 
 #import tensorflow.contrib.slim as slim
