@@ -27,4 +27,7 @@ if __name__ == '__main__':
                     model.build_model()
                     model.print_model_summary()
                     model.loss_opt_metric()
-                    model.train_multi_task()
+                    if task == 'multi_task':
+                        model.train_multi_task()
+                     else:
+                        model.train_single_task()
