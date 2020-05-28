@@ -26,14 +26,14 @@ class Model():
         self.model_type     = model_type
         self.sensor_dict    = configuration_file.config[dataset_name]['SENSOR_DICT']
         self.fold           = fold
-        self.train_log_dir  = "{}/{}/{}/batch_{}/lr_{}/fold_{}/{}/train".format(self.model_type,
+        self.train_log_dir  = "log/{}/{}/{}/batch_{}/lr_{}/fold_{}/{}/train".format(self.model_type,
                                                                         self.dataset_name,
                                                                         'mutli_task' if self.multi_task else 'single_task',
                                                                         self.batch_size,
                                                                         self.lr,
                                                                         self.fold,
                                                                         datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-        self.val_log_dir    = "{}/{}/{}/batch_{}/lr_{}/fold_{}/{}/val".format(self.model_type,
+        self.val_log_dir    = "log/{}/{}/{}/batch_{}/lr_{}/fold_{}/{}/val".format(self.model_type,
                                                                       self.dataset_name,
                                                                       'mutli_task' if self.multi_task else 'single_task',
                                                                       self.batch_size,
