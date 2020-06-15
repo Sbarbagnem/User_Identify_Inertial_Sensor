@@ -40,3 +40,4 @@ if __name__ == '__main__':
                             model.print_model_summary()
                             model.loss_opt_metric()
                             model.train()
+
