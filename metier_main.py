@@ -137,9 +137,9 @@ class my_model(object):
         self._u_loss_mean = tf.placeholder(dtype=tf.float32, shape=())
 
         if self._framework == 1:
-            self._model = model.MTLMA_pretrain()
+            self._model = metier.MTLMA_pretrain()
         elif self._framework == 2:
-            self._model = model.MTLMA_train()
+            self._model = metier.MTLMA_train()
         else:
             print('model error!!!')
             exit(0)
@@ -471,7 +471,7 @@ if __name__ == '__main__':
     args    = parser.parse_args()
 
     #for d in ['unimib', 'sbhar', 'realdisp']:
-    for d in ['realdisp']:
+    for d in ['sbhar']:
 
         print('using {} dataset'.format(d))
     
@@ -499,14 +499,14 @@ if __name__ == '__main__':
                                 save_dir='acc_gyro_magn/')
 
 
-        for i in range(1,10):
+        for i in range(1):
             if args.model == 1:
                 print('Pretrain with fold {} for test'.format(i))
-                model_pretrain = my_model(  version="pre_train_acc_gyro_magn", gpu=0, fold=i, save_dir='acc_gyro_magn', 
+                model_pretrain = my_model(  version="pre_train_acc_gyro_magn", gpu=0, fold=i, save_dir='cosseeeeeee', 
                                             dataset=dataset, framework=1, iter_steps=10000)
                 model_pretrain.load_data()
                 model_pretrain.build_model()
-                model_pretrain.run_model()
+                #model_pretrain.run_model()
             elif args.model == 2:
                 print('train with fold {} for test'.format(i))
                 model_train = my_model(  version="train_acc_gyro_magn", gpu=0, fold=i, save_dir='acc_gyro_magn', 

@@ -5,9 +5,9 @@ import tensorflow as tf
 '''
 
 
-class ResNet18SingleBranch(tf.keras.Model):
+class ResNet18SingleBranchLSTM(tf.keras.Model):
     def __init__(self, layer_params, multi_task, num_act, num_user, axes):
-        super(ResNet18SingleBranch, self).__init__()
+        super(ResNet18SingleBranchLSTM, self).__init__()
 
         self.multi_task = multi_task
         if multi_task:
@@ -19,7 +19,7 @@ class ResNet18SingleBranch(tf.keras.Model):
 
         self.conv1 = tf.keras.layers.Conv2D(filters=32,
                                             kernel_size=(1,5),
-                                            strides=(1,1),
+                                            strides=(1,2),
                                             padding="valid")
         self.bn1 = tf.keras.layers.BatchNormalization()
         
@@ -32,11 +32,9 @@ class ResNet18SingleBranch(tf.keras.Model):
                                              blocks=2,
                                              name='residual_block_1',
                                              kernel=(1, 3))
-        '''
         self.pool2 = tf.keras.layers.MaxPool2D(pool_size=(1,2),
                                                strides=(1,2),
-                                               padding="valid")   
-        '''  
+                                               padding="valid")                                           
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
                                              name='residual_block_2',
@@ -52,6 +50,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         self.RNN = tf.keras.layers.RNN(cell=[LSTM_1, LSTM_2], return_sequences=True, time_major=False)
         self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
         '''
+
         if multi_task:
             # activity classification
             self.fc_activity = tf.keras.layers.Dense(units=num_act,
@@ -76,8 +75,8 @@ class ResNet18SingleBranch(tf.keras.Model):
         print('shape pool1: {}'.format(x.shape))
         x = self.layer1(x, training=training)
         print('shape res_1: {}'.format(x.shape))
-        #x = self.pool2(x)
-        #print('shape pool2: {}'.format(x.shape))
+        x = self.pool2(x)
+        print('shape pool2: {}'.format(x.shape))
         x = self.layer2(x, training=training)
         print('shape res_2: {}'.format(x.shape))
         out_cnn = self.avgpool_2d(x)
@@ -94,6 +93,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         merge = tf.concat([out_cnn,out_lstm], axis=1)
         print('shape merge: {}'.format(merge.shape))
         '''
+
         merge = out_cnn
 
         if self.multi_task:
@@ -120,7 +120,7 @@ class BasicBlock(tf.keras.layers.Layer):
                                             padding="same")
         self.bn2 = tf.keras.layers.BatchNormalization()
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
-        if stride != 1 or kernel[0]!=1:
+        if stride != 1 or kernel==(4,1):
             self.downsample = tf.keras.Sequential()
             self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
                                                        kernel_size=(1, 1),
@@ -155,5 +155,5 @@ def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1):
     return res_block
 
 
-def resnet18(multi_task, num_act, num_user, axes):
-    return ResNet18SingleBranch(layer_params=[2, 2, 2, 2], multi_task=multi_task, num_act=num_act, num_user=num_user, axes=axes)
+def resnet18_lstm(multi_task, num_act, num_user, axes):
+    return ResNet18SingleBranchLSTM(layer_params=[2, 2, 2, 2], multi_task=multi_task, num_act=num_act, num_user=num_user, axes=axes)

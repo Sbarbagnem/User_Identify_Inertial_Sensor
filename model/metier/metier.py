@@ -1,7 +1,9 @@
 import numpy as np
+import logging
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from util.tensor_toolbox_yyang import TensorProducer
+logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
 
 def weight_variable_with_scope(shape, scope):
     with tf.variable_scope( scope ):
@@ -63,6 +65,8 @@ class MTLMA_pretrain( object ):
 
     def __call__( self, inputs, a_labels, u_labels, act_num, user_num, win_len, dname, save_dir, fold, is_training = True, drop_keep_prob = 0.9 ):
 
+        number_variables = []
+
         with tf.variable_scope( 'act_network' ):
             # weights of CNN
             A_W_conv1   = weight_variable_with_scope( shape=[5,  1,  1,  32], scope='a_conv1' )
@@ -76,11 +80,21 @@ class MTLMA_pretrain( object ):
             A_net       = conv_unit( A_net,     A_W_conv3,      is_training )
 
             # bi-lstm
+            print('shape before reshape')
+            print(A_net.get_shape())
             A_net       = tf.reshape( A_net,    [-1, A_net.get_shape()[1].value, A_net.get_shape()[2].value*A_net.get_shape()[3].value] )
+            print('shape before transpose')
+            print(A_net.get_shape())
             A_net       = tf.transpose( A_net,  [1, 0, 2] )
+            print('shape after transpose')
+            print(A_net.get_shape())
             A_lstm_unit = tf.contrib.cudnn_rnn.CudnnLSTM( num_layers=1, num_units=128, input_mode='auto_select', direction='bidirectional', dropout=0.1 )
             A_net, _    = A_lstm_unit( inputs=A_net, scope='lstm' )
+            print('shape after LSTM')
+            print(A_net.get_shape())
             A_net       = tf.transpose( A_net,  [1, 0, 2] )
+            print('shape after transpose')
+            print(A_net.get_shape())
 
         with tf.variable_scope( 'user_network' ):
             # weights of CNN
