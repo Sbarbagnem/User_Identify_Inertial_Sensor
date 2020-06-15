@@ -132,9 +132,9 @@ class Model():
         if self.model_type == 'resnet18_multi_branch':
             self.model = resnet18MultiBranch(
                 self.sensor_dict, self.multi_task, self.num_act, self.num_user)
-        if self.model == 'resnet18_lstm':
+        if self.model_type == 'resnet18_lstm':
             self.model = resnet18_lstm(
-                self.sensor_dict, self.multi_task, self.num_act, self.num_user)
+                self.multi_task, self.num_act, self.num_user, self.axes)
 
     def print_model_summary(self):
         axes = self.axes

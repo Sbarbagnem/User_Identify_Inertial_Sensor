@@ -506,7 +506,8 @@ if __name__ == '__main__':
                         help='path to store data preprocessed')
 
     args = parser.parse_args()
-    for overlap in [0.5, 0.6, 0.7, 0.8, 0.9]:
-        #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=False, size_overlapping=overlap)
-        preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=False, size_overlapping=overlap)
-        #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "acc_gyro_magn", 'acc_gyro_magn', "all", magnitude=False)
+    for magnitude in [True, False]:
+        for overlap in [0.5, 0.6, 0.7, 0.8, 0.9]:
+            preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
+            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
+            #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "acc_gyro_magn", 'acc_gyro_magn', "all", magnitude=False)
