@@ -6,6 +6,9 @@ import tensorflow as tf
 
 
 class ResNet18SingleBranchLSTM(tf.keras.Model):
+    '''
+        parallel simplify Resnet18 and LSTM
+    '''
     def __init__(self, layer_params, multi_task, num_act, num_user, axes):
         super(ResNet18SingleBranchLSTM, self).__init__()
 
@@ -42,9 +45,9 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
 
         # LSTM
-        LSTM_1 = tf.keras.layers.LSTMCell(units=64) 
-        LSTM_2 = tf.keras.layers.LSTMCell(units=128)
-        self.RNN = tf.keras.layers.RNN(cell=[LSTM_1, LSTM_2], return_sequences=False, time_major=False)
+        lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=False, time_major=False) 
+        lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=False, go_backwards=True, time_major=False)
+        self.lstm_bidirectional = tf.keras.layers.Bidirectional(layer=lstm_forward, merge_mode='concat', backward_layer=lstm_backward)
         #self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
 
         if multi_task:
@@ -80,7 +83,7 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         
         input_lstm = tf.transpose(tf.reshape(inputs, [-1, inputs.shape[1], inputs.shape[2]*inputs.shape[3]]), [0,2,1])
         print('input LSTM: {}'.format(input_lstm.shape))
-        out_lstm = self.RNN (input_lstm, training=training)
+        out_lstm = self.lstm_bidirectional(input_lstm, training=training)
         print('output LSTM: {} '.format(out_lstm.shape))
         #out_lstm = self.avgpool_1d(out_lstm)
         #print('output LSTM after global 1d: {}'.format(out_lstm.shape))
