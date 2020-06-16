@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     # 10-cross validation
     for model_type in ['resnet18MonoKernel']:
-        for dataset_name in ['unimib']:
+        for dataset_name in ['unimib', 'sbhar']:
             for task in [True, False]:
                 for overlap in [5.0, 6.0, 7.0, 8.0, 9.0]:
                     for magnitude in [True, False]:
@@ -33,7 +33,7 @@ if __name__ == '__main__':
                                 f"Train on dataset {dataset_name}, with task {'multi_task' if task else 'single_task'}, on overlap {overlap}, on fold {fold}")
                             model = Model(dataset_name=dataset_name, configuration_file=configuration, multi_task=task, lr='dynamic',
                                         model_type=model_type, fold=fold, save_dir=save_dir, 
-                                        outer_dir=outer_dir+str(overlap)+'/', overlap=overlap, magnitude=magnitude, log=True)
+                                        outer_dir=outer_dir+str(overlap)+'/', overlap=overlap, magnitude=magnitude, log=False)
                             model.create_dataset()
                             model.load_data()
                             model.build_model()
