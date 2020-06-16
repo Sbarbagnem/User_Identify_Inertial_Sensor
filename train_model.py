@@ -17,7 +17,7 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(gpu, True)
 
     # 10-cross validation
-    for model_type in ['resnet18_lstm_parallel']:
+    for model_type in ['resnet18_lstm_consecutive']:
         for dataset_name in ['unimib']:
             for task in [True]:
                 for overlap in [5.0]:

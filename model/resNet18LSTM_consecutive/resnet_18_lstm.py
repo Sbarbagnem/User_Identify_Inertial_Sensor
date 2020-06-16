@@ -18,7 +18,7 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         self.num_user = num_user
         self.axes= axes
 
-        # features about single axis sensor (parameters from metier)
+        # CNN for extract features about single axes sonsors
 
         self.conv1 = tf.keras.layers.Conv2D(filters=32,
                                             kernel_size=(1,5),
@@ -29,7 +29,6 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(1,2),
                                                strides=(1,2),
                                                padding="valid")
-        # features about interaction between sensor
 
         self.layer1 = make_basic_block_layer(filter_num=32,
                                              blocks=2,
@@ -40,16 +39,23 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
                                              blocks=2,
                                              name='residual_block_2',
                                              stride=1,
-                                             kernel=(self.axes,1))
-
-        self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
+                                             kernel=(1,3),
+                                             downsample=True)
 
         # LSTM
-        lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=False, time_major=False) 
-        lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=False, go_backwards=True, time_major=False)
+        lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.2, return_sequences=True, time_major=False) 
+        lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.2, return_sequences=True, go_backwards=True, time_major=False)
         self.lstm_bidirectional = tf.keras.layers.Bidirectional(layer=lstm_forward, merge_mode='concat', backward_layer=lstm_backward)
         #self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
 
+        # CNN for extracte feature about all sensor
+        self.layer3 = make_basic_block_layer(filter_num=128,
+                                             blocks=2,
+                                             name='residual_block_3',
+                                             stride=1,
+                                             kernel=(3,3),
+                                            )
+        self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
         if multi_task:
             # activity classification
             self.fc_activity = tf.keras.layers.Dense(units=num_act,
@@ -74,38 +80,34 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         print('shape pool1: {}'.format(x.shape))
         x = self.layer1(x, training=training)
         print('shape res_1: {}'.format(x.shape))
-        x = self.layer2(x, training=training)
-        print('shape res_2: {}'.format(x.shape))
-        out_cnn = self.avgpool_2d(x)
-        print('shape avg_pool: {}'.format(out_cnn.shape))
+        out_cnn = self.layer2(x, training=training)
+        print('shape res_2: {}'.format(out_cnn.shape))
 
         ### LSTM ###
-        
-        input_lstm = tf.transpose(tf.reshape(inputs, [-1, inputs.shape[1], inputs.shape[2]*inputs.shape[3]]), [0,2,1])
+        input_lstm = tf.transpose(out_cnn, [0,2,1,3])
+        input_lstm = tf.reshape(input_lstm, [-1, input_lstm.shape[1], input_lstm.shape[2]*input_lstm.shape[3]])
         print('input LSTM: {}'.format(input_lstm.shape))
         out_lstm = self.lstm_bidirectional(input_lstm, training=training)
         print('output LSTM: {} '.format(out_lstm.shape))
         #out_lstm = self.avgpool_1d(out_lstm)
         #print('output LSTM after global 1d: {}'.format(out_lstm.shape))
-
-        ### MERGE CNN and LSTM output
-        merge = tf.concat([out_cnn,out_lstm], axis=1)
-        print('shape merge: {}'.format(merge.shape))
-
-        #merge = out_cnn
+        out_cnn = self.layer3(tf.expand_dims(out_lstm, 3), training=training)
+        print('shape res_3: {}'.format(out_cnn.shape))
+        out_cnn = self.avgpool_2d(out_cnn)
+        print('shape pool2: {}'.format(out_cnn.shape))
 
         if self.multi_task:
-            output_activity = self.fc_activity(merge)
-            output_user = self.fc_user(merge)
+            output_activity = self.fc_activity(out_cnn)
+            output_user = self.fc_user(out_cnn)
             return output_activity, output_user
         else:
-            output_user = self.fc_user(merge)
+            output_user = self.fc_user(out_cnn)
             return output_user
 
 
 class BasicBlock(tf.keras.layers.Layer):
 
-    def __init__(self, filter_num, kernel, stride=1):
+    def __init__(self, filter_num, kernel, stride=1, downsample=False):
         super(BasicBlock, self).__init__()
         self.conv1 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
@@ -118,7 +120,7 @@ class BasicBlock(tf.keras.layers.Layer):
                                             padding="same")
         self.bn2 = tf.keras.layers.BatchNormalization()
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
-        if stride != 1 or kernel[0]!=1:
+        if stride != 1 or downsample:
             self.downsample = tf.keras.Sequential()
             self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
                                                        kernel_size=(1, 1),
@@ -143,9 +145,9 @@ class BasicBlock(tf.keras.layers.Layer):
         return output
 
 
-def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1):
+def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1, downsample=False):
     res_block = tf.keras.Sequential(name=name)
-    res_block.add(BasicBlock(filter_num, kernel=kernel, stride=stride))
+    res_block.add(BasicBlock(filter_num, kernel=kernel, stride=stride, downsample=downsample))
 
     for _ in range(1, blocks):
         res_block.add(BasicBlock(filter_num, kernel=kernel, stride=1))
