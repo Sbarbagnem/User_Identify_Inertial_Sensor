@@ -7,7 +7,8 @@ import datetime
 
 from model.resNet18.resnet_18 import resnet18
 from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
-from model.resNet18LSTM.resnet_18_lstm import resnet18_lstm
+from model.resNet18LSTM_parallel.resnet_18_lstm import resnet18_lstm as parallel
+from model.resNet18LSTM_consecutive.resnet_18_lstm import resnet18_lstm as consecutive
 from model.resNet18monoKernel.resNet18_mono_kernel import resnet18MonoKernel
 from util.data_loader import Dataset
 
@@ -133,8 +134,11 @@ class Model():
         if self.model_type == 'resnet18_multi_branch':
             self.model = resnet18MultiBranch(
                 self.sensor_dict, self.multi_task, self.num_act, self.num_user)
-        if self.model_type == 'resnet18_lstm':
-            self.model = resnet18_lstm(
+        if self.model_type == 'resnet18_lstm_parallel':
+            self.model = parallel(
+                self.multi_task, self.num_act, self.num_user, self.axes)
+        if self.model_type == 'resnet18_lstm_consecutive':
+            self.model = consecutive(
                 self.multi_task, self.num_act, self.num_user, self.axes)
         if self.model_type == 'resnet18MonoKernel':
             self.model = resnet18MonoKernel(
