@@ -8,6 +8,7 @@ import datetime
 from model.resNet18.resnet_18 import resnet18
 from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
 from model.resNet18LSTM.resnet_18_lstm import resnet18_lstm
+from model.resNet18monoKernel.resNet18_mono_kernel import resnet18MonoKernel
 from util.data_loader import Dataset
 
 
@@ -135,6 +136,9 @@ class Model():
         if self.model_type == 'resnet18_lstm':
             self.model = resnet18_lstm(
                 self.multi_task, self.num_act, self.num_user, self.axes)
+        if self.model_type == 'resnet18MonoKernel':
+            self.model = resnet18MonoKernel(
+                self.multi_task, self.num_act, self.num_user)
 
     def print_model_summary(self):
         axes = self.axes
