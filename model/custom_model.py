@@ -139,12 +139,12 @@ class Model():
         if self.model_type == 'resnet18MonoKernel':
             self.model = resnet18MonoKernel(
                 self.multi_task, self.num_act, self.num_user)
-
-    def print_model_summary(self):
         axes = self.axes
         samples = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
         channels = self.configuration.config[self.dataset_name]['CHANNELS']
         self.model.build(input_shape=(None, axes, samples, channels))
+
+    def print_model_summary(self):
         self.model.summary()
 
     def loss_opt_metric(self):

@@ -32,11 +32,6 @@ class ResNet18SingleBranch(tf.keras.Model):
                                              blocks=2,
                                              name='residual_block_1',
                                              kernel=(1, 3))
-        '''
-        self.pool2 = tf.keras.layers.MaxPool2D(pool_size=(1,2),
-                                               strides=(1,2),
-                                               padding="valid")   
-        '''  
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
                                              name='residual_block_2',
@@ -45,13 +40,6 @@ class ResNet18SingleBranch(tf.keras.Model):
 
         self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
 
-        # LSTM
-        '''
-        LSTM_1 = tf.keras.layers.LSTMCell(units=32) 
-        LSTM_2 = tf.keras.layers.LSTMCell(units=64)
-        self.RNN = tf.keras.layers.RNN(cell=[LSTM_1, LSTM_2], return_sequences=True, time_major=False)
-        self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
-        '''
         if multi_task:
             # activity classification
             self.fc_activity = tf.keras.layers.Dense(units=num_act,
@@ -76,32 +64,17 @@ class ResNet18SingleBranch(tf.keras.Model):
         print('shape pool1: {}'.format(x.shape))
         x = self.layer1(x, training=training)
         print('shape res_1: {}'.format(x.shape))
-        #x = self.pool2(x)
-        #print('shape pool2: {}'.format(x.shape))
         x = self.layer2(x, training=training)
         print('shape res_2: {}'.format(x.shape))
         out_cnn = self.avgpool_2d(x)
         print('shape avg_pool: {}'.format(out_cnn.shape))
 
-        ### LSTM ###
-        '''
-        input_lstm = tf.transpose(tf.reshape(inputs, [-1, inputs.shape[1], inputs.shape[2]*inputs.shape[3]]), [0,2,1])
-        print('input LSTM: {}'.format(input_lstm.shape))
-        out_lstm = self.avgpool_1d(self.RNN (input_lstm, training=training))
-        print('shape LSTM: {}'.format(out_lstm.shape))
-
-        ### MERGE CNN and LSTM output
-        merge = tf.concat([out_cnn,out_lstm], axis=1)
-        print('shape merge: {}'.format(merge.shape))
-        '''
-        merge = out_cnn
-
         if self.multi_task:
-            output_activity = self.fc_activity(merge)
-            output_user = self.fc_user(merge)
+            output_activity = self.fc_activity(out_cnn)
+            output_user = self.fc_user(out_cnn)
             return output_activity, output_user
         else:
-            output_user = self.fc_user(merge)
+            output_user = self.fc_user(out_cnn)
             return output_user
 
 

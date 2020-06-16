@@ -17,10 +17,10 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(gpu, True)
 
     # 10-cross validation
-    for model_type in ['resnet18MonoKernel']:
-        for dataset_name in ['unimib', 'sbhar']:
+    for model_type in ['resnet18_lstm']:
+        for dataset_name in ['unimib']:
             for task in [True, False]:
-                for overlap in [5.0, 6.0, 7.0, 8.0, 9.0]:
+                for overlap in [5.0]:
                     for magnitude in [True, False]:
                         if magnitude:
                             outer_dir = 'OuterPartition_magnitude_'
@@ -37,7 +37,7 @@ if __name__ == '__main__':
                             model.create_dataset()
                             model.load_data()
                             model.build_model()
-                            model.print_model_summary()
+                            #model.print_model_summary()
                             model.loss_opt_metric()
                             model.train()
 
