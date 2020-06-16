@@ -45,10 +45,10 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
 
         # LSTM
-        lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=False, time_major=False) 
-        lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=False, go_backwards=True, time_major=False)
+        lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=True, time_major=False) 
+        lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=True, go_backwards=True, time_major=False)
         self.lstm_bidirectional = tf.keras.layers.Bidirectional(layer=lstm_forward, merge_mode='concat', backward_layer=lstm_backward)
-        #self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
+        self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
 
         if multi_task:
             # activity classification
@@ -85,8 +85,8 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         print('input LSTM: {}'.format(input_lstm.shape))
         out_lstm = self.lstm_bidirectional(input_lstm, training=training)
         print('output LSTM: {} '.format(out_lstm.shape))
-        #out_lstm = self.avgpool_1d(out_lstm)
-        #print('output LSTM after global 1d: {}'.format(out_lstm.shape))
+        out_lstm = self.avgpool_1d(out_lstm)
+        print('output LSTM after global 1d: {}'.format(out_lstm.shape))
 
         ### MERGE CNN and LSTM output
         merge = tf.concat([out_cnn,out_lstm], axis=1)
