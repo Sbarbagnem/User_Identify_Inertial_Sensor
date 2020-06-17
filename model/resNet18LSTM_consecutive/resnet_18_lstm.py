@@ -46,16 +46,9 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.2, return_sequences=True, time_major=False) 
         lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.2, return_sequences=True, go_backwards=True, time_major=False)
         self.lstm_bidirectional = tf.keras.layers.Bidirectional(layer=lstm_forward, merge_mode='concat', backward_layer=lstm_backward)
-        #self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
+        self.avg_pol_1d = tf.keras.layers.GlobalAveragePooling1D()
+        self.dense1 = tf.keras.layers.Dense(128, activation='relu')
 
-        # CNN for extracte feature about all sensor
-        self.layer3 = make_basic_block_layer(filter_num=128,
-                                             blocks=2,
-                                             name='residual_block_3',
-                                             stride=1,
-                                             kernel=(3,3),
-                                            )
-        self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
         if multi_task:
             # activity classification
             self.fc_activity = tf.keras.layers.Dense(units=num_act,
@@ -89,19 +82,16 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         print('input LSTM: {}'.format(input_lstm.shape))
         out_lstm = self.lstm_bidirectional(input_lstm, training=training)
         print('output LSTM: {} '.format(out_lstm.shape))
-        #out_lstm = self.avgpool_1d(out_lstm)
-        #print('output LSTM after global 1d: {}'.format(out_lstm.shape))
-        out_cnn = self.layer3(tf.expand_dims(out_lstm, 3), training=training)
-        print('shape res_3: {}'.format(out_cnn.shape))
-        out_cnn = self.avgpool_2d(out_cnn)
-        print('shape pool2: {}'.format(out_cnn.shape))
+
+        ### FULLY CONNECTED ###
+        out_fully = self.dense1(self.avg_pol_1d(out_lstm), training=training)
 
         if self.multi_task:
-            output_activity = self.fc_activity(out_cnn)
-            output_user = self.fc_user(out_cnn)
+            output_activity = self.fc_activity(out_fully)
+            output_user = self.fc_user(out_fully)
             return output_activity, output_user
         else:
-            output_user = self.fc_user(out_cnn)
+            output_user = self.fc_user(out_fully)
             return output_user
 
 
