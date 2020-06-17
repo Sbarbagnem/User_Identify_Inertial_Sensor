@@ -5,7 +5,7 @@ BATCH_SIZE = 128
 # parameters based on dataset
 config = {
     'unimib': {
-        'PATH_OUTER_PARTITION'  : './data/datasets/UNIMIBDataset/',
+        'PATH_OUTER_PARTITION'  : '../data/datasets/UNIMIBDataset/',
         'NUM_CLASSES_ACTIVITY'  : 9,
         'NUM_CLASSES_USER'      : 30,
         'WINDOW_AXES'           : 3,  # number of sample for window
@@ -16,7 +16,7 @@ config = {
         }
     },
     'sbhar': {
-        'PATH_OUTER_PARTITION'  : './data/datasets/SBHAR_processed/',
+        'PATH_OUTER_PARTITION'  : '../data/datasets/SBHAR_processed/',
         'NUM_CLASSES_ACTIVITY'  : 12,
         'NUM_CLASSES_USER'      : 30,
         'WINDOW_AXES'           : 6,  # number of sample for window
@@ -28,7 +28,7 @@ config = {
         }
     },
     'realdisp': {
-        'PATH_OUTER_PARTITION'  : './data/datasets/REALDISP_processed/',
+        'PATH_OUTER_PARTITION'  : '../data/datasets/REALDISP_processed/',
         'NUM_CLASSES_ACTIVITY'  : 33,
         'NUM_CLASSES_USER'      : 17,
         'WINDOW_AXES'           : 9,  # number of sample for window

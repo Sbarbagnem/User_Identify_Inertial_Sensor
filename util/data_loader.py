@@ -9,6 +9,7 @@ from scipy.fftpack import fft
 from scipy.io import loadmat
 from sklearn import utils as skutils
 
+from util.data_augmentation import add_gaussian_noise, scaling_sequence
 
 class Dataset(object):
 
@@ -25,7 +26,7 @@ class Dataset(object):
         self._save_dir = save_dir
         self.outer_dir = outer_dir
 
-    def load_data(self, step=0, overlapping=0.5):
+    def load_data(self, augmented=False, step=0, overlapping=0.5):
 
         TrainData = np.empty([0, self._winlen, self._channel], dtype=np.float)
         TrainLA = np.empty([0], dtype=np.int32)
@@ -68,6 +69,13 @@ class Dataset(object):
         TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
         # deleted
 
+        # adding augmentation to train data
+        if augmented:
+            data_noisy = add_gaussian_noise(TrainData)
+            #data_scaled = scaling_sequence(TrainData) 
+            TrainData = np.concatenate((TrainData, data_noisy), axis=0)
+            TrainLA = np.tile(TrainLA, 2)
+            TrainLU = np.tile(TrainLU, 2)
         # normalization
         mean = np.mean(np.reshape(TrainData, [-1, self._channel]), axis=0)
         std = np.std(np.reshape(TrainData, [-1, self._channel]), axis=0)

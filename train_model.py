@@ -17,7 +17,7 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(gpu, True)
 
     # 10-cross validation
-    for model_type in ['resnet18_lstm_consecutive']:
+    for model_type in ['resnet18']:
         for dataset_name in ['unimib']:
             for task in [True]:
                 for overlap in [5.0]:
@@ -28,15 +28,16 @@ if __name__ == '__main__':
                         else:
                             outer_dir = 'OuterPartition_'
                             save_dir = 'log_no_magnitude'
-                        save_dir = 'log_prova'
+                        outer_dir = 'OuterPartition_magnitude_5.0/'
+                        save_dir = 'log_augmented'
                         for fold in [0]:
                             print(
                                 f"Train on dataset {dataset_name}, with task {'multi_task' if task else 'single_task'}, on overlap {overlap}, on fold {fold}")
                             model = Model(dataset_name=dataset_name, configuration_file=configuration, multi_task=task, lr='dynamic',
                                         model_type=model_type, fold=fold, save_dir=save_dir, 
-                                        outer_dir=outer_dir+str(overlap)+'/', overlap=overlap, magnitude=magnitude, log=True)
+                                        outer_dir=outer_dir, overlap=overlap, magnitude=magnitude, log=True)
                             model.create_dataset()
-                            model.load_data()
+                            model.load_data(augmented=True)
                             model.build_model()
                             model.print_model_summary()
                             model.loss_opt_metric()

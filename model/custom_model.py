@@ -93,15 +93,12 @@ class Model():
                                    outer_dir=self.outer_dir,
                                    save_dir='acc_gyro_magn/')
 
-    def load_data(self):
+    def load_data(self, augmented=False):
         # gat data [examples, window_samples, axes, channel]
         TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU = self.dataset.load_data(
-            step=self.fold)
+            step=self.fold, augmented=augmented)
 
         train_shape = TrainData.shape
-
-        print(np.unique(TrainLU, return_counts=True))
-        print(np.unique(TestLU, return_counts=True))
 
         print('shape train data: {}'.format(train_shape))
         print('shape test data: {}'.format(TestData.shape))
