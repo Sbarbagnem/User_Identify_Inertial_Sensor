@@ -162,6 +162,8 @@ class Model():
             name='train_accuracy_activity')
         self.train_accuracy_user = tf.keras.metrics.SparseCategoricalAccuracy(
             name='train_accuracy_user')
+        self.train_precision_user = tf.keras.metrics.Precision()
+        self.train_recall_user = tf.keras.metrics.Recall()
 
         # performance on val
         self.valid_loss_activity = tf.keras.metrics.Mean(
@@ -171,6 +173,8 @@ class Model():
             name='valid_accuracy_activity')
         self.valid_accuracy_user = tf.keras.metrics.SparseCategoricalAccuracy(
             name='valid_accuracy_user')
+        self.val_precision_user = tf.keras.metrics.Precision()
+        self.val_recall_user = tf.keras.metrics.Recall()
 
     @tf.function
     def train_step(self, batch, label_activity, label_user):
@@ -207,6 +211,13 @@ class Model():
         self.train_loss_user.update_state(values=loss_u)
         self.train_accuracy_user.update_state(
             y_true=label_user, y_pred=predictions_user)
+        print(predictions_user.shape)
+        self.train_precision_user.update_state(
+            y_true=label_user, y_pred=tf.argmax(predictions_user, axis=1)
+        )
+        self.train_recall_user.update_state(
+            y_true=label_user, y_pred=tf.argmax(predictions_user, axis=1)
+        )
 
     @tf.function
     def valid_step(self, batch, label_activity, label_user):
@@ -225,6 +236,12 @@ class Model():
         self.valid_loss_user.update_state(values=loss_u)
         self.valid_accuracy_user.update_state(
             y_true=label_user, y_pred=predictions_user)
+        self.val_precision_user.update_state(
+            y_true=label_user, y_pred=predictions_user
+        )
+        self.val_recall_user.update_state(
+            y_true=label_user, y_pred=predictions_user
+        )
 
     def train(self):
         if self.multi_task:
@@ -275,18 +292,11 @@ class Model():
     def train_multi_task(self):
         for epoch in range(1, self.epochs + 1):
             if self.multi_task:
+
                 for batch, label_act, label_user in self.train_data:
                     self.train_step(batch, label_act, label_user)
-                if self.log:
-                    print(
-                        "TRAIN: epoch: {}/{}, loss_act: {:.5f}, loss_user: {:.5f}, "
-                        "acc_act: {:.5f}, acc_user: {:.5f}".format(
-                            epoch,
-                            self.epochs,
-                            self.train_loss_activity.result().numpy(),
-                            self.train_loss_user.result().numpy(),
-                            self.train_accuracy_activity.result().numpy(),
-                            self.train_accuracy_user.result().numpy()))
+
+                f1_measure = 2 * (self.train_precision_user.result()*self.train_recall_user.result())(self.train_precision_user + self.train_recall_user)
                 with self.train_writer.as_default():
                     tf.summary.scalar(
                         'loss_activity', self.train_loss_activity.result(), step=epoch)
@@ -296,13 +306,38 @@ class Model():
                         'loss_user', self.train_loss_user.result(), step=epoch)
                     tf.summary.scalar(
                         'accuracy_user', self.train_accuracy_user.result(), step=epoch)
+                    tf.summary.scalar(
+                        'precision_user', self.train_precision_user.result(), step=epoch)
+                    tf.summary.scalar(
+                        'recall_user', self.train_recall_user.result(), step=epoch)
+                    tf.summary.scalar(
+                        'f1_measure_user', f1_measure, step=epoch
+                    )
+
+                if self.log:
+                    print(
+                        "TRAIN: epoch: {}/{}, loss_act: {:.5f}, loss_user: {:.5f}, "
+                        "acc_act: {:.5f}, acc_user: {:.5f}, prec_user: {:.5f}, rec_user: {:.5f}, f1_user: {:.5f}".format(
+                            epoch,
+                            self.epochs,
+                            self.train_loss_activity.result().numpy(),
+                            self.train_loss_user.result().numpy(),
+                            self.train_accuracy_activity.result().numpy(),
+                            self.train_accuracy_user.result().numpy(),
+                            self.train_precision_user.result().numpy(),
+                            self.train_recall_user.result().numpy()),
+                            f1_measure)
+
                 self.train_loss_activity.reset_states()
                 self.train_loss_user.reset_states()
                 self.train_accuracy_activity.reset_states()
                 self.train_accuracy_user.reset_states()
+                self.train_precision_user.reset_states()
+                self.train_recall_user.reset_states()
 
                 for batch, label_act, label_user in self.test_data:
                     self.valid_step(batch, label_act, label_user)
+                f1_measure = 2 * (self.train_precision_user.result()*self.train_recall_user.result())(self.train_precision_user + self.train_recall_user)
                 with self.val_writer.as_default():
                     tf.summary.scalar(
                         'loss_activity', self.valid_loss_activity.result(), step=epoch)
@@ -312,16 +347,26 @@ class Model():
                         'loss_user', self.valid_loss_user.result(), step=epoch)
                     tf.summary.scalar(
                         'accuracy_user', self.valid_accuracy_user.result(), step=epoch)
+                    tf.summary.scalar(
+                        'precision_user', self.val_precision_user.result(), step=epoch)
+                    tf.summary.scalar(
+                        'recall_user', self.val_recall_user.result(), step=epoch)
+                    tf.summary.scalar(
+                        'f1_measure_user', f1_measure, step=epoch
+                    )
                 if self.log:
                     print(
                         "VALIDATION: epoch: {}/{}, loss_act: {:.5f}, loss_user: {:.5f}, "
-                        "acc_act: {:.5f}, acc_user: {:.5f}".format(
+                        "acc_act: {:.5f}, acc_user: {:.5f}, prec_user: {:.5f}, rec_user: {:.5f}, f1_user: {:.5f}".format(
                             epoch,
                             self.epochs,
                             self.valid_loss_activity.result().numpy(),
                             self.valid_loss_user.result().numpy(),
                             self.valid_accuracy_activity.result().numpy(),
-                            self.valid_accuracy_user.result().numpy()))
+                            self.valid_accuracy_user.result().numpy(),
+                            self.val_precision_user().result().numpy(),
+                            self.val_recall_user.result().numpy(),
+                            f1_measure))
                 self.valid_loss_activity.reset_states()
                 self.valid_loss_user.reset_states()
                 self.valid_accuracy_activity.reset_states()

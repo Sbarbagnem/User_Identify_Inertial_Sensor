@@ -45,8 +45,8 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
 
         # LSTM
-        lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=True, time_major=False) 
-        lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.0, recurrent_dropout=0.0, return_sequences=True, go_backwards=True, time_major=False)
+        lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.2, return_sequences=True, time_major=False) 
+        lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.2, return_sequences=True, go_backwards=True, time_major=False)
         self.lstm_bidirectional = tf.keras.layers.Bidirectional(layer=lstm_forward, merge_mode='concat', backward_layer=lstm_backward)
         self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
 
