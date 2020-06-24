@@ -216,13 +216,6 @@ class Model():
         self.train_loss_user.update_state(values=loss_u)
         self.train_accuracy_user.update_state(
             y_true=label_user, y_pred=predictions_user)
-        print(predictions_user.shape)
-        self.train_precision_user.update_state(
-            y_true=label_user, y_pred=tf.argmax(predictions_user, axis=1)
-        )
-        self.train_recall_user.update_state(
-            y_true=label_user, y_pred=tf.argmax(predictions_user, axis=1)
-        )
 
         # confusion matrix on batch
         cm = tf.math.confusion_matrix(label_user, tf.math.argmax(predictions_user, axis=1), num_classes=num_user)
@@ -248,12 +241,6 @@ class Model():
         self.valid_loss_user.update_state(values=loss_u)
         self.valid_accuracy_user.update_state(
             y_true=label_user, y_pred=predictions_user)
-        self.val_precision_user.update_state(
-            y_true=label_user, y_pred=predictions_user
-        )
-        self.val_recall_user.update_state(
-            y_true=label_user, y_pred=predictions_user
-        )
 
         # calculate precision, recall and f1 from confusion matrix
         cm = tf.math.confusion_matrix(label_user, tf.math.argmax(predictions_user, axis=1), num_classes=num_user)

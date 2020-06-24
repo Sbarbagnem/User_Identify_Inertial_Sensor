@@ -19,7 +19,7 @@ if __name__ == '__main__':
     # 10-cross validation
     for model_type in ['resnet18']:
         for dataset_name in ['unimib']:
-            for multitask in [True]:
+            for multitask in [False]:
                 for overlap in [5.0]:
                     for magnitude in [True]:
                         if magnitude:
@@ -28,7 +28,7 @@ if __name__ == '__main__':
                         else:
                             outer_dir = 'OuterPartition_'
                             save_dir = 'log_no_magnitude'
-                        save_dir = 'log_prova'
+                        save_dir = 'log_prova_overlap_giusto'
                         for fold in [0]:
                             print(
                                 f"Train on dataset {dataset_name}, with task {'multi_task' if multitask else 'single_task'}, on overlap {overlap}, on fold {fold}")
