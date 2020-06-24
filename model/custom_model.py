@@ -166,6 +166,8 @@ class Model():
             name='train_accuracy_activity')
         self.train_accuracy_user = tf.keras.metrics.SparseCategoricalAccuracy(
             name='train_accuracy_user')
+        self.train_precision_user = tf.keras.metrics.Precision()
+        self.train_recall_user = tf.keras.metrics.Recall()
 
         # performance on val
         self.valid_loss_activity = tf.keras.metrics.Mean(
@@ -175,6 +177,8 @@ class Model():
             name='valid_accuracy_activity')
         self.valid_accuracy_user = tf.keras.metrics.SparseCategoricalAccuracy(
             name='valid_accuracy_user')
+        self.val_precision_user = tf.keras.metrics.Precision()
+        self.val_recall_user = tf.keras.metrics.Recall()
 
     @tf.function
     def train_step(self, batch, label_activity, label_user, num_user):
@@ -212,6 +216,13 @@ class Model():
         self.train_loss_user.update_state(values=loss_u)
         self.train_accuracy_user.update_state(
             y_true=label_user, y_pred=predictions_user)
+        print(predictions_user.shape)
+        self.train_precision_user.update_state(
+            y_true=label_user, y_pred=tf.argmax(predictions_user, axis=1)
+        )
+        self.train_recall_user.update_state(
+            y_true=label_user, y_pred=tf.argmax(predictions_user, axis=1)
+        )
 
         # confusion matrix on batch
         cm = tf.math.confusion_matrix(label_user, tf.math.argmax(predictions_user, axis=1), num_classes=num_user)
@@ -237,6 +248,12 @@ class Model():
         self.valid_loss_user.update_state(values=loss_u)
         self.valid_accuracy_user.update_state(
             y_true=label_user, y_pred=predictions_user)
+        self.val_precision_user.update_state(
+            y_true=label_user, y_pred=predictions_user
+        )
+        self.val_recall_user.update_state(
+            y_true=label_user, y_pred=predictions_user
+        )
 
         # calculate precision, recall and f1 from confusion matrix
         cm = tf.math.confusion_matrix(label_user, tf.math.argmax(predictions_user, axis=1), num_classes=num_user)
@@ -314,6 +331,7 @@ class Model():
         for epoch in range(1, self.epochs + 1):
             cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
             if self.multi_task:
+
                 for batch, label_act, label_user in self.train_data:
                     cm_batch = self.train_step(batch, label_act, label_user, self.dataset._user_num)
                     cm = cm + cm_batch
