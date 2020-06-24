@@ -31,12 +31,12 @@ class ResNet18SingleBranch(tf.keras.Model):
         self.layer1 = make_basic_block_layer(filter_num=32,
                                              blocks=2,
                                              name='residual_block_1',
-                                             kernel=(1, 3))
+                                             kernel=(3,3))
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
                                              name='residual_block_2',
                                              stride=1,
-                                             kernel=(self.axes,1))
+                                             kernel=(3,3))
 
         self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
 

@@ -11,14 +11,18 @@ from model.resNet18LSTM_parallel.resnet_18_lstm import resnet18_lstm as parallel
 from model.resNet18LSTM_consecutive.resnet_18_lstm import resnet18_lstm as consecutive
 from model.resNet18monoKernel.resNet18_mono_kernel import resnet18MonoKernel
 from util.data_loader import Dataset
-
+from util.tf_metrics import custom_metrics
+import seaborn as sn
+import matplotlib.pyplot as plt
+import pandas as pd
 
 class Model():
-    def __init__(self, dataset_name, configuration_file, multi_task, lr, model_type, fold=0, save_dir='log', outer_dir='OuterPartition/', overlap=0.5, magnitude=False, log=False):
+    def __init__(self, dataset_name, configuration_file, multi_task, lr, model_type, fold=0, save_dir='log', outer_dir='OuterPartition/', overlap=5.0, magnitude=False, log=False):
         self.dataset_name = dataset_name
         self.configuration = configuration_file
         self.multi_task = multi_task
         self.lr = lr
+        self.overlap = overlap
         self.model_type = model_type
         self.epochs = configuration_file.EPOCHS
         self.num_act = configuration_file.config[dataset_name]['NUM_CLASSES_ACTIVITY']
@@ -96,7 +100,7 @@ class Model():
     def load_data(self, augmented=False):
         # gat data [examples, window_samples, axes, channel]
         TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU = self.dataset.load_data(
-            step=self.fold, augmented=augmented)
+            step=self.fold, overlapping=self.overlap, augmented=augmented)
 
         train_shape = TrainData.shape
 
@@ -173,7 +177,7 @@ class Model():
             name='valid_accuracy_user')
 
     @tf.function
-    def train_step(self, batch, label_activity, label_user):
+    def train_step(self, batch, label_activity, label_user, num_user):
         with tf.GradientTape() as tape:
             if self.multi_task:
                 predictions_act, predictions_user = self.model(
@@ -193,7 +197,8 @@ class Model():
                     y_true=label_user, y_pred=predictions_user)
                 penality = sum(tf.nn.l2_loss(tf_var)
                                for tf_var in self.model.trainable_variables)
-                loss_global = loss_u + 0.003*penality
+                #loss_global = loss_u + 0.003*penality
+                loss_global = loss_u
 
         gradients = tape.gradient(loss_global, self.model.trainable_variables)
         self.optimizer.apply_gradients(
@@ -208,8 +213,15 @@ class Model():
         self.train_accuracy_user.update_state(
             y_true=label_user, y_pred=predictions_user)
 
+        # confusion matrix on batch
+        cm = tf.math.confusion_matrix(label_user, tf.math.argmax(predictions_user, axis=1), num_classes=num_user)
+
+        return cm
+
+
+
     @tf.function
-    def valid_step(self, batch, label_activity, label_user):
+    def valid_step(self, batch, label_activity, label_user, num_user):
         if self.multi_task:
             predictions_act, predictions_user = self.model(
                 batch, training=False)
@@ -226,6 +238,11 @@ class Model():
         self.valid_accuracy_user.update_state(
             y_true=label_user, y_pred=predictions_user)
 
+        # calculate precision, recall and f1 from confusion matrix
+        cm = tf.math.confusion_matrix(label_user, tf.math.argmax(predictions_user, axis=1), num_classes=num_user)
+
+        return cm
+        
     def train(self):
         if self.multi_task:
             self.train_multi_task()
@@ -234,13 +251,21 @@ class Model():
 
     def train_single_task(self):
         for epoch in range(1, self.epochs + 1):
+            cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
             for batch, _, label_user in self.train_data:
-                self.train_step(batch, None, label_user)
+                cm_batch = self.train_step(batch, None, label_user, self.dataset._user_num)
+                cm = cm + cm_batch
+            metrics = custom_metrics(cm)
             if self.log:
-                print("TRAIN: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}".format(epoch,
-                                                                                        self.epochs,
-                                                                                        self.train_loss_user.result().numpy(),
-                                                                                        self.train_accuracy_user.result().numpy()))
+                print("TRAIN: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
+                        epoch,
+                        self.epochs,
+                        self.train_loss_user.result().numpy(),
+                        self.train_accuracy_user.result().numpy(),
+                        metrics['macro_precision'],
+                        metrics['macro_recall'],
+                        metrics['macro_f1']))
+                        
             with self.train_writer.as_default():
                 tf.summary.scalar(
                     'loss_user', self.train_loss_user.result(), step=epoch)
@@ -248,45 +273,64 @@ class Model():
                     'accuracy_user', self.train_accuracy_user.result(), step=epoch)
             self.train_loss_user.reset_states()
             self.train_accuracy_user.reset_states()
+            
+            cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
 
             for batch, _, label_user in self.test_data:
-                self.valid_step(batch, None, label_user)
+                cm_batch = self.valid_step(batch, None, label_user, self.dataset._user_num)
+                cm = cm + cm_batch
+            metrics = custom_metrics(cm)
             if self.log:
                 print(
-                    "VALIDATION: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}".format(
-                        epoch,
-                        self.epochs,
-                        self.valid_loss_user.result().numpy(),
-                        self.valid_accuracy_user.result().numpy()))
+                    "VALIDATION: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
+                    epoch,
+                    self.epochs,
+                    self.valid_loss_user.result().numpy(),
+                    self.valid_accuracy_user.result().numpy(),
+                    metrics['macro_precision'],
+                    metrics['macro_recall'],
+                    metrics['macro_f1']))
             with self.val_writer.as_default():
                 tf.summary.scalar(
                     'loss_user', self.valid_loss_user.result(), step=epoch)
                 tf.summary.scalar(
                     'accuracy_user', self.valid_accuracy_user.result(), step=epoch)
             self.valid_loss_user.reset_states()
-            self.valid_accuracy_activity.reset_states()
+            self.valid_accuracy_user.reset_states()
 
             if self.lr == 'dynamic':
                 new_lr = self.decay_lr(epoch=epoch)
                 self.optimizer.learning_rate.assign(new_lr)
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
+            if epoch == 50:
+                df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
+                                columns = [str(i) for i in range(0,self.dataset._user_num)])
+                plt.figure(figsize = (30,21))
+                sn.heatmap(df_cm, annot=True)
+                plt.show()
 
     def train_multi_task(self):
         for epoch in range(1, self.epochs + 1):
+            cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
             if self.multi_task:
                 for batch, label_act, label_user in self.train_data:
-                    self.train_step(batch, label_act, label_user)
+                    cm_batch = self.train_step(batch, label_act, label_user, self.dataset._user_num)
+                    cm = cm + cm_batch
+                metrics = custom_metrics(cm)
                 if self.log:
                     print(
                         "TRAIN: epoch: {}/{}, loss_act: {:.5f}, loss_user: {:.5f}, "
-                        "acc_act: {:.5f}, acc_user: {:.5f}".format(
+                        "acc_act: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
                             epoch,
                             self.epochs,
                             self.train_loss_activity.result().numpy(),
                             self.train_loss_user.result().numpy(),
                             self.train_accuracy_activity.result().numpy(),
-                            self.train_accuracy_user.result().numpy()))
+                            self.train_accuracy_user.result().numpy(),
+                            metrics['macro_precision'],
+                            metrics['macro_recall'],
+                            metrics['macro_f1']))
                 with self.train_writer.as_default():
                     tf.summary.scalar(
                         'loss_activity', self.train_loss_activity.result(), step=epoch)
@@ -296,13 +340,22 @@ class Model():
                         'loss_user', self.train_loss_user.result(), step=epoch)
                     tf.summary.scalar(
                         'accuracy_user', self.train_accuracy_user.result(), step=epoch)
+                    tf.summary.scalar(
+                        'macro_precision', metrics['macro_precision'], step=epoch)
+                    tf.summary.scalar(
+                        'macro_recall', metrics['macro_recall'], step=epoch)
+                    tf.summary.scalar(
+                        'macro_f1', metrics['macro_f1'], step=epoch)
                 self.train_loss_activity.reset_states()
                 self.train_loss_user.reset_states()
                 self.train_accuracy_activity.reset_states()
                 self.train_accuracy_user.reset_states()
+                cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
 
                 for batch, label_act, label_user in self.test_data:
-                    self.valid_step(batch, label_act, label_user)
+                    cm_batch = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
+                    cm = cm + cm_batch
+                metrics = custom_metrics(cm)
                 with self.val_writer.as_default():
                     tf.summary.scalar(
                         'loss_activity', self.valid_loss_activity.result(), step=epoch)
@@ -312,16 +365,25 @@ class Model():
                         'loss_user', self.valid_loss_user.result(), step=epoch)
                     tf.summary.scalar(
                         'accuracy_user', self.valid_accuracy_user.result(), step=epoch)
+                    tf.summary.scalar(
+                        'macro_precision', metrics['macro_precision'], step=epoch)
+                    tf.summary.scalar(
+                        'macro_recall', metrics['macro_recall'], step=epoch)
+                    tf.summary.scalar(
+                        'macro_f1', metrics['macro_f1'], step=epoch)
                 if self.log:
                     print(
                         "VALIDATION: epoch: {}/{}, loss_act: {:.5f}, loss_user: {:.5f}, "
-                        "acc_act: {:.5f}, acc_user: {:.5f}".format(
+                        "acc_act: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
                             epoch,
                             self.epochs,
                             self.valid_loss_activity.result().numpy(),
                             self.valid_loss_user.result().numpy(),
                             self.valid_accuracy_activity.result().numpy(),
-                            self.valid_accuracy_user.result().numpy()))
+                            self.valid_accuracy_user.result().numpy(),
+                            metrics['macro_precision'],
+                            metrics['macro_recall'],
+                            metrics['macro_f1']))
                 self.valid_loss_activity.reset_states()
                 self.valid_loss_user.reset_states()
                 self.valid_accuracy_activity.reset_states()
@@ -332,6 +394,14 @@ class Model():
                     self.optimizer.learning_rate.assign(new_lr)
                     with self.train_writer.as_default():
                         tf.summary.scalar("learning_rate", new_lr, step=epoch)
+            #plot confusion matrix
+            #if epoch == 50:
+                #print(cm.numpy())
+                #df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
+                #                columns = [str(i) for i in range(0,self.dataset._user_num)])
+                #plt.figure(figsize = (30,21))
+                #sn.heatmap(df_cm, annot=True)
+                #plt.show()
 
     def decay_lr(self, initAlpha=0.001, factor=0.25, dropEvery=15, epoch=0):
         exp = np.floor((1 + epoch) / dropEvery)

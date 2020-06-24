@@ -59,23 +59,31 @@ class Dataset(object):
                 TrainLU = np.concatenate((TrainLU, LU), axis=0)
                 TrainID = np.concatenate((TrainID, ID), axis=0)
 
-        # delete overlap samples form training_data
-        overlap_ID = np.unique(np.concatenate((TestID+1, TestID-1)))
+        print('before delete: ', TrainData.shape)
+
+        # delete overlap samples form training_data, based on overlap percentage
+        distances_to_delete = to_delete(overlapping)
+        print('distance to delete: ', distances_to_delete)
+        overlap_ID = np.empty([0], dtype=np.int32)
+        for distance in distances_to_delete:
+            overlap_ID = np.concatenate((overlap_ID, TestID+distance, TestID-distance))
+        overlap_ID = np.unique(overlap_ID)
         invalid_idx = np.array([i for i in np.arange(
             len(TrainID)) if TrainID[i] in overlap_ID])
 
         TrainData = np.delete(TrainData, invalid_idx, axis=0)
+        print('after delete: ', TrainData.shape)
         TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
         TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
-        # deleted
 
-        # adding augmentation to train data
+        # adding augmentation to train data if set to true
         if augmented:
             data_noisy = add_gaussian_noise(TrainData)
             #data_scaled = scaling_sequence(TrainData) 
             TrainData = np.concatenate((TrainData, data_noisy), axis=0)
             TrainLA = np.tile(TrainLA, 2)
             TrainLU = np.tile(TrainLU, 2)
+            
         # normalization
         mean = np.mean(np.reshape(TrainData, [-1, self._channel]), axis=0)
         std = np.std(np.reshape(TrainData, [-1, self._channel]), axis=0)
@@ -87,3 +95,15 @@ class Dataset(object):
         TestData = np.expand_dims(TestData,  3)
 
         return TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU
+
+def to_delete(overlapping):
+    if overlapping == 5.0:
+        return [1]
+    if overlapping == 6.0:
+        return [1,2]
+    if overlapping == 7.0:
+        return [1,2,3]
+    if overlapping == 8.0:
+        return [1,2,3,4]
+    if overlapping == 9.0:
+        return [1,2,3,4,5,6,7,8,9]
