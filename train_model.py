@@ -17,10 +17,10 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(gpu, True)
 
     # 10-cross validation
-    for model_type in ['resnet18']:
-        for dataset_name in ['unimib_sbhar']:
-            for multitask in [False]:
-                for overlap in [5.0]:
+    for model_type in ['resnet18_lstm_consecutive']:
+        for dataset_name in ['unimib', 'sbhar']:
+            for multitask in [True, False]:
+                for overlap in [5.0, 6.0, 7.0, 8.0, 9.0]:
                     for magnitude in [True]:
                         if magnitude:
                             outer_dir = 'OuterPartition_magnitude_'
@@ -28,7 +28,7 @@ if __name__ == '__main__':
                         else:
                             outer_dir = 'OuterPartition_'
                             save_dir = 'log_no_magnitude'
-                        save_dir = 'log_merged_dataset'
+                        #save_dir = 'log_merged_dataset'
                         for fold in [0]:
                             print(
                                 f"Train on dataset {dataset_name}, with task {'multi_task' if multitask else 'single_task'}, on overlap {overlap}, on fold {fold}")

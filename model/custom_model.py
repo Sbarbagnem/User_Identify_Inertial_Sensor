@@ -353,7 +353,7 @@ class Model():
                 self.optimizer.learning_rate.assign(new_lr)
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
-            
+
             if epoch == 50:
                 df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
                                 columns = [str(i) for i in range(0,self.dataset._user_num)])
