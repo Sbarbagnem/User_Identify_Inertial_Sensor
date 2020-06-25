@@ -29,20 +29,23 @@ class Dataset(object):
     def load_data(self, augmented=False, step=0, overlapping=0.5):
 
         TrainData = np.empty([0, self._winlen, self._channel], dtype=np.float)
-        TrainLA = np.empty([0], dtype=np.int32)
+        if self._name != 'unimib_sbhar':
+            TrainLA = np.empty([0], dtype=np.int32)
         TrainLU = np.empty([0], dtype=np.int32)
         TrainID = np.empty([0], dtype=np.int32)
 
         TestData = np.empty([0, self._winlen, self._channel], dtype=np.float)
-        TestLA = np.empty([0], dtype=np.int32)
+        if self._name != 'unimib_sbhar':
+            TestLA = np.empty([0], dtype=np.int32)
         TestLU = np.empty([0], dtype=np.int32)
         TestID = np.empty([0], dtype=np.int32)
 
         for i in range(10):
             Data = np.load(self._path + self.outer_dir +
                            self._save_dir + 'fold{}/data.npy'.format(i))
-            LA = np.load(self._path + self.outer_dir +
-                         self._save_dir + 'fold{}/act_label.npy'.format(i))
+            if self._name != 'unimib_sbhar':
+                LA = np.load(self._path + self.outer_dir +
+                            self._save_dir + 'fold{}/act_label.npy'.format(i))
             LU = np.load(self._path + self.outer_dir +
                          self._save_dir + 'fold{}/user_label.npy'.format(i))
             ID = np.load(self._path + self.outer_dir +
@@ -50,12 +53,14 @@ class Dataset(object):
 
             if step == i:
                 TestData = np.concatenate((TestData, Data), axis=0)
-                TestLA = np.concatenate((TestLA, LA), axis=0)
+                if self._name != 'unimib_sbhar':
+                    TestLA = np.concatenate((TestLA, LA), axis=0)
                 TestLU = np.concatenate((TestLU, LU), axis=0)
                 TestID = np.concatenate((TestID, ID), axis=0)
             else:
                 TrainData = np.concatenate((TrainData, Data), axis=0)
-                TrainLA = np.concatenate((TrainLA, LA), axis=0)
+                if self._name != 'unimib_sbhar':
+                    TrainLA = np.concatenate((TrainLA, LA), axis=0)
                 TrainLU = np.concatenate((TrainLU, LU), axis=0)
                 TrainID = np.concatenate((TrainID, ID), axis=0)
 
@@ -73,7 +78,8 @@ class Dataset(object):
 
         TrainData = np.delete(TrainData, invalid_idx, axis=0)
         print('after delete: ', TrainData.shape)
-        TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
+        if self._name != 'unimib_sbhar':
+         TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
         TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
 
         # adding augmentation to train data if set to true
@@ -81,7 +87,8 @@ class Dataset(object):
             data_noisy = add_gaussian_noise(TrainData)
             #data_scaled = scaling_sequence(TrainData) 
             TrainData = np.concatenate((TrainData, data_noisy), axis=0)
-            TrainLA = np.tile(TrainLA, 2)
+            if self._name != 'unimib_sbhar':
+                TrainLA = np.tile(TrainLA, 2)
             TrainLU = np.tile(TrainLU, 2)
             
         # normalization
@@ -94,7 +101,10 @@ class Dataset(object):
         TrainData = np.expand_dims(TrainData, 3)
         TestData = np.expand_dims(TestData,  3)
 
-        return TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU
+        if self._name != 'unimib_sbhar':
+            return TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU
+        else:
+            return TrainData, TrainLU, TestData, TestLU
 
 def to_delete(overlapping):
     if overlapping == 5.0:
