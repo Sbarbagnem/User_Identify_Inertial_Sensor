@@ -73,7 +73,7 @@ class Model():
             channel = self.configuration.config[self.dataset_name]['WINDOW_AXES']
         if self.dataset_name == 'unimib':
             self.dataset = Dataset(path='data/datasets/UNIMIBDataset/',
-                                   name='unimib',
+                                   name=self.dataset_name,
                                    channel=channel,
                                    winlen=100,
                                    user_num=30,
@@ -81,7 +81,7 @@ class Model():
                                    outer_dir=self.outer_dir)
         elif self.dataset_name == 'sbhar':
             self.dataset = Dataset(path='data/datasets/SBHAR_processed/',
-                                   name='sbhar',
+                                   name=self.dataset_name,
                                    channel=channel,
                                    winlen=100,
                                    user_num=30,
@@ -89,13 +89,21 @@ class Model():
                                    outer_dir=self.outer_dir)
         elif self.dataset_name == 'realdisp':
             self.dataset = Dataset(path='data/datasets/REALDISP_processed/',
-                                   name='realdisp',
+                                   name=self.dataset_name,
                                    channel=channel,
                                    winlen=100,
                                    user_num=17,
                                    act_num=33,
                                    outer_dir=self.outer_dir,
                                    save_dir='acc_gyro_magn/')
+        elif self.dataset_name == 'unimib_sbhar':
+             self.dataset = Dataset(path='data/datasets/merged_unimib_sbhar/',
+                                   name=self.dataset_name,
+                                   channel=channel,
+                                   winlen=100,
+                                   user_num=60,
+                                   act_num=-1,
+                                   outer_dir=self.outer_dir)       
 
     def load_data(self, augmented=False):
         # gat data [examples, window_samples, axes, channel]
@@ -125,6 +133,34 @@ class Model():
             buffer_size=train_shape[0], reshuffle_each_iteration=True)
 
         test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
+        self.test_data = test_data.batch(self.batch_size, drop_remainder=True)
+
+    def load_data_merged(self, augmented=False):
+        # gat data [examples, window_samples, axes, channel]
+        TrainData, TrainLU, TestData, TestLU = self.dataset.load_data(
+            step=self.fold, overlapping=self.overlap, augmented=augmented)
+
+        train_shape = TrainData.shape
+
+        print('shape train data: {}'.format(train_shape))
+        print('shape test data: {}'.format(TestData.shape))
+
+        # reshape [examples, axes, window_samples, channel]
+        TrainData = np.transpose(TrainData, (0, 2, 1, 3))
+        TestData = np.transpose(TestData, (0, 2, 1, 3))
+
+        TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
+        TrainLU = tf.data.Dataset.from_tensor_slices(TrainLU)
+
+        TestData = tf.data.Dataset.from_tensor_slices(TestData)
+        TestLU = tf.data.Dataset.from_tensor_slices(TestLU)
+
+        train_data = tf.data.Dataset.zip((TrainData, TrainLU))
+        train_data = train_data.batch(self.batch_size, drop_remainder=True)
+        self.train_data = train_data.shuffle(
+            buffer_size=train_shape[0], reshuffle_each_iteration=True)
+
+        test_data = tf.data.Dataset.zip((TestData, TestLU))
         self.test_data = test_data.batch(self.batch_size, drop_remainder=True)
 
     def build_model(self):
@@ -201,8 +237,8 @@ class Model():
                     y_true=label_user, y_pred=predictions_user)
                 penality = sum(tf.nn.l2_loss(tf_var)
                                for tf_var in self.model.trainable_variables)
-                #loss_global = loss_u + 0.003*penality
-                loss_global = loss_u
+                loss_global = loss_u + 0.003*penality
+                #loss_global = loss_u
 
         gradients = tape.gradient(loss_global, self.model.trainable_variables)
         self.optimizer.apply_gradients(
@@ -256,9 +292,14 @@ class Model():
     def train_single_task(self):
         for epoch in range(1, self.epochs + 1):
             cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
-            for batch, _, label_user in self.train_data:
-                cm_batch = self.train_step(batch, None, label_user, self.dataset._user_num)
-                cm = cm + cm_batch
+            if self.dataset_name != 'unimib_sbhar':
+                for batch, _, label_user in self.train_data:
+                    cm_batch = self.train_step(batch, None, label_user, self.dataset._user_num)
+                    cm = cm + cm_batch
+            else:
+                 for batch, label_user in self.train_data:
+                    cm_batch = self.train_step(batch, None, label_user, self.dataset._user_num)
+                    cm = cm + cm_batch               
             metrics = custom_metrics(cm)
             if self.log:
                 print("TRAIN: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
@@ -280,9 +321,14 @@ class Model():
             
             cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
 
-            for batch, _, label_user in self.test_data:
-                cm_batch = self.valid_step(batch, None, label_user, self.dataset._user_num)
-                cm = cm + cm_batch
+            if self.dataset_name != 'unimib_sbhar':
+                for batch, _, label_user in self.test_data:
+                    cm_batch = self.valid_step(batch, None, label_user, self.dataset._user_num)
+                    cm = cm + cm_batch
+            else:
+                for batch, label_user in self.test_data:
+                    cm_batch = self.valid_step(batch, None, label_user, self.dataset._user_num)
+                    cm = cm + cm_batch              
             metrics = custom_metrics(cm)
             if self.log:
                 print(
@@ -307,14 +353,14 @@ class Model():
                 self.optimizer.learning_rate.assign(new_lr)
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
-            '''
+            
             if epoch == 50:
                 df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
                                 columns = [str(i) for i in range(0,self.dataset._user_num)])
                 plt.figure(figsize = (30,21))
                 sn.heatmap(df_cm, annot=True)
                 plt.show()
-            '''
+            
     def train_multi_task(self):
         for epoch in range(1, self.epochs + 1):
             cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)

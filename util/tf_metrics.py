@@ -2,14 +2,16 @@ import numpy as np
 import tensorflow as tf
 
 def custom_metrics(confusion_matrix):
+
     '''
     Compute:
         - precision, recall and f1 per class
         - accuracy
         - precision, recall and f1 macro
     Return:
-        - dict with a liste for precision, recall and f1
+        - a dict with a key for metric
     '''
+
     confusion_matrix = confusion_matrix.numpy()
     num_user = confusion_matrix.shape[0]
     metrics = {
