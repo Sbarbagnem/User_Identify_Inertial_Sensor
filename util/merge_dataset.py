@@ -2,6 +2,7 @@ import numpy as np
 import os
 import shutil
 from sklearn import utils as skutils
+import matplotlib.pyplot as plt
 
 from configuration import config
 
@@ -80,8 +81,32 @@ def save_mergede_dataset(path_to_save, data, lu, idx):
         np.save(path_to_save+'/fold{}/user_label'.format(i), lu[idx_temp])
         np.save(path_to_save+'/fold{}/id'.format(i),         idx[idx_temp])
 
-if __name__ == "__main__":
+def balance_dataset(data, label, idx):
 
+    label = np.asarray(label)
+    idx = np.asarray(idx)
+
+    data_balanced = np.empty([0, data.shape[1], data.shape[2]], dtype=np.float)
+    label_balanced = np.empty([0], dtype=np.int32)
+    idx_balanced = np.empty([0], dtype=np.int32)
+
+    labels, freq = np.unique(label, return_counts=True)
+    min_freq = min(freq)
+    max_freq = max(freq)
+
+    max_freq_balanc = int((max_freq - min_freq)/3 + min_freq)
+
+    for user in labels:
+        idx_user = np.where(label==user)[0] # indici dati user
+        if len(idx_user) > max_freq_balanc:
+            idx_user = idx_user[:max_freq_balanc]
+        data_balanced = np.concatenate((data_balanced, data[idx_user,:,:]))
+        label_balanced = np.concatenate((label_balanced, label[idx_user]))
+        idx_balanced = np.concatenate((idx_balanced, idx[idx_user]))
+
+    return data_balanced, label_balanced, idx_balanced
+
+if __name__ == "__main__":
 
     dataset_a = 'unimib'
     dataset_b = 'sbhar'
@@ -96,9 +121,24 @@ if __name__ == "__main__":
     lu, idx = uniform_user_index(list_user = [lu_A,lu_B], list_index=[idx_A,idx_B]) 
     data = merge_data(data_A, data_B)
 
+    label, freq = np.unique(lu, return_counts=True)
+    l = list(range(1, len(label)+1))
+    plt.barh(l, width=freq, height=0.5)
+    plt.yticks(l, label, rotation='horizontal')
+    plt.show()
+    
+    # balance dataset (downsample majority classes)
+    data_balanced, lu_balanced, idx_balanced = balance_dataset(data, lu, idx)
+    
+    label, freq = np.unique(lu_balanced, return_counts=True)
+    l = list(range(1, len(label)+1))
+    plt.barh(l, width=freq, height=0.5)
+    plt.yticks(l, label, rotation='horizontal')
+    plt.show()
+
     path_to_save = f'../data/datasets/merged_{dataset_a}_{dataset_b}/OuterPartition_'
     if magnitude:
         path_to_save = path_to_save + 'magnitude_'
     path_to_save = path_to_save + str(overlap) + '/'
 
-    save_mergede_dataset(path_to_save, data, lu, idx)
+    save_mergede_dataset(path_to_save, data_balanced, lu_balanced, idx_balanced)
