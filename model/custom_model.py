@@ -307,13 +307,14 @@ class Model():
                 self.optimizer.learning_rate.assign(new_lr)
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
+            '''
             if epoch == 50:
                 df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
                                 columns = [str(i) for i in range(0,self.dataset._user_num)])
                 plt.figure(figsize = (30,21))
                 sn.heatmap(df_cm, annot=True)
                 plt.show()
-
+            '''
     def train_multi_task(self):
         for epoch in range(1, self.epochs + 1):
             cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
@@ -400,13 +401,15 @@ class Model():
                     with self.train_writer.as_default():
                         tf.summary.scalar("learning_rate", new_lr, step=epoch)
             #plot confusion matrix
-            #if epoch == 50:
-                #print(cm.numpy())
-                #df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
-                #                columns = [str(i) for i in range(0,self.dataset._user_num)])
-                #plt.figure(figsize = (30,21))
-                #sn.heatmap(df_cm, annot=True)
-                #plt.show()
+            '''
+            if epoch == 50:
+                print(cm.numpy())
+                df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
+                                columns = [str(i) for i in range(0,self.dataset._user_num)])
+                plt.figure(figsize = (30,21))
+                sn.heatmap(df_cm, annot=True)
+                plt.show()
+            '''
 
     def decay_lr(self, initAlpha=0.001, factor=0.25, dropEvery=15, epoch=0):
         exp = np.floor((1 + epoch) / dropEvery)
