@@ -10,6 +10,7 @@ from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
 from model.resNet18LSTM_parallel.resnet_18_lstm import resnet18_lstm as parallel
 from model.resNet18LSTM_consecutive.resnet_18_lstm import resnet18_lstm as consecutive
 from model.resNet18monoKernel.resNet18_mono_kernel import resnet18MonoKernel
+from model.resNet181D.resnet18_1D import resnet18 as resnet18_1D
 from util.data_loader import Dataset
 from util.tf_metrics import custom_metrics
 import seaborn as sn
@@ -180,6 +181,9 @@ class Model():
         if self.model_type == 'resnet18MonoKernel':
             self.model = resnet18MonoKernel(
                 self.multi_task, self.num_act, self.num_user)
+        if self.model_type == 'resnet18_1D':
+            self.model = resnet18_1D(
+                self.multi_task, self.num_act, self.num_user, self.axes)
         axes = self.axes
         samples = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
         channels = self.configuration.config[self.dataset_name]['CHANNELS']
