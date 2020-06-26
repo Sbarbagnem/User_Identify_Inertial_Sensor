@@ -33,13 +33,13 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         self.layer1 = make_basic_block_layer(filter_num=32,
                                              blocks=2,
                                              name='residual_block_1',
-                                             kernel=(1, 3))
+                                             kernel=(1, 5))
                                        
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
                                              name='residual_block_2',
-                                             stride=1,
-                                             kernel=(1,3),
+                                             stride=(1,2),
+                                             kernel=(1,5),
                                              downsample=True)
 
         # LSTM
@@ -47,7 +47,6 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.0, return_sequences=True, go_backwards=True, time_major=False)
         self.lstm_bidirectional = tf.keras.layers.Bidirectional(layer=lstm_forward, merge_mode='concat', backward_layer=lstm_backward)
         self.avg_pol_1d = tf.keras.layers.GlobalAveragePooling1D()
-        #self.dense1 = tf.keras.layers.Dense(128, activation='relu')
 
         if multi_task:
             # activity classification
@@ -84,8 +83,7 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         print('output LSTM: {} '.format(out_lstm.shape))
 
         ### FULLY CONNECTED ###
-        #out_fully = self.dense1(self.avg_pol_1d(out_lstm), training=training)
-        out_fully = out_lstm
+        out_fully = self.avg_pol_1d(out_lstm)
 
         if self.multi_task:
             output_activity = self.fc_activity(out_fully)
