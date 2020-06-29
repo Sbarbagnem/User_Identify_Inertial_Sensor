@@ -1,37 +1,36 @@
 import tensorflow as tf
 
 '''
-    from https://github.com/calmisential/Basic_CNNs_TensorFlow2
+    A multi-head 1D-CNN, one cnn flow for every sensor in input.
+    Output of everu CNN is merge and then feed in a LSTM.
+    Before output there is a FC layer of 1000 neurons.
+
+    Ispired by: https://www.researchgate.net/publication/339946359_Human_Activity_Recognition_using_Multi-Head_CNN_followed_by_LSTM
 '''
 class Resnet18MultiBranch(tf.keras.Model):
-    def __init__(self, sensor_dict, multi_task, num_act, num_user):
+    def __init__(self, sensor_dict, num_user, magnitude):
         super(Resnet18MultiBranch, self).__init__()
 
         self.sensor_name = list(sensor_dict.keys())
-        self.sensor_axes = list(sensor_dict.values())
-        self.multi_task = multi_task
-        if multi_task:
-            self.num_act = num_act
+        if magnitude:
+            self.sensor_axes = [x+1 for x in list(sensor_dict.values())]
+        else:
+            self.sensor_axes = list(sensor_dict.values())
         self.num_user = num_user
 
         self.branches = []
 
+        ### MULTI-HEAD CNN-1D ###
         for sensor_name in self.sensor_name:
-            self.branches.append(resnet18BlockNoClass(sensor_name))    
+            #self.branches.append(resnet18BlockNoClass(sensor_name))
+            self.branches.append(new_head(sensor_name))    
 
-        self.conv1_merge = tf.keras.layers.Conv2D(filters=64,
-                                        kernel_size=(3,3),
-                                        strides=2,
-                                        padding="same",
-                                        name='conv1_merge_branch')
-        self.bn1_merge = tf.keras.layers.BatchNormalization(name='bn1_merge')
+        ### LSTM on merged output cnn ###
+        self.lstm = tf.keras.layers.LSTM(units=128)
 
-        self.avg_pool = tf.keras.layers.GlobalAveragePooling2D()
+        ### FC before output ###
+        self.fc = tf.keras.layers.Dense(256, activation='relu')
 
-        if multi_task:
-            self.fc_activity = tf.keras.layers.Dense(units=num_act,
-                                                     activation=tf.keras.activations.softmax,
-                                                     name='fc_act')
         self.fc_user = tf.keras.layers.Dense(units=num_user,
                                              activation=tf.keras.activations.softmax,
                                              name='fc_user')
@@ -39,15 +38,18 @@ class Resnet18MultiBranch(tf.keras.Model):
 
     def call(self, inputs, training=None):
         '''
-            input [batch_size, axes, samples, channel]
+            input [batch_size, samples, axes, 1]
         '''
+
+        inputs = tf.reshape(inputs, [-1, inputs.shape[1], inputs.shape[2]*inputs.shape[3]]) # [batch, time_step, feaures]
         merge_branch = []
 
         if len(self.sensor_name)>1:
-            sensor_split = tf.split(inputs, num_or_size_splits=self.sensor_axes, axis=1)
+            sensor_split = tf.split(inputs, num_or_size_splits=self.sensor_axes, axis=2)
             for input_sensor, branch in zip(sensor_split, self.branches):
-                #print(input_sensor.shape)
+                print(input_sensor.shape)
                 x = branch(input_sensor, training=training)
+                print('output head: {}'.format(x.shape))
                 #x = tf.reshape(x, shape=[-1, 1, x.shape[1]*x.shape[2]*x.shape[3], 1]) # flatten
                 merge_branch.append(x)
         else:
@@ -58,50 +60,47 @@ class Resnet18MultiBranch(tf.keras.Model):
 
         # merge output
         if len(merge_branch) > 1:
-            merge = tf.concat(merge_branch, axis=1) # [batch_size, k_sensor, flatten_conv]
+            merge = tf.concat(merge_branch, axis=2) # [batch_size, time_step, features]
         else:
             merge = merge_branch[0]
 
-        print(merge.shape)
+        print('shape merged: {}'.format(merge.shape))
 
-        merge = self.conv1_merge(merge, training=training)
-        merge = self.bn1_merge(merge, training=training)
-        merge = tf.nn.relu(merge)
+        x  = self.lstm(merge, training=training)
+        print('shape after lstm: {}'.format(x.shape))
 
-        merge = self.avg_pool(merge)
+        x  = self.fc(x, training=training)
 
-        #print(merge.shape)
+        x = tf.nn.dropout(x, rate=0.3)
 
-        if self.multi_task:
-            output_activity = self.fc_activity(merge)
-            output_user = self.fc_user(merge)
-            return output_activity, output_user
-        else:
-            output_user = self.fc_user(merge)
-            return output_user
+        output_user = self.fc_user(x)
+        return output_user
 
 class Resnet18BlockNoClass(tf.keras.layers.Layer):
     def __init__(self, sensor_name):
         super(Resnet18BlockNoClass, self).__init__()
 
-        self.conv1 = tf.keras.layers.Conv2D(filters=32,
-                                            kernel_size=(1,5),
-                                            strides=(1,1),
+        self.conv1 = tf.keras.layers.Conv1D(filters=32,
+                                            kernel_size=5,
+                                            strides=1,
                                             padding="valid")
         self.bn1 = tf.keras.layers.BatchNormalization()
-        self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(1,2),
-                                               strides=(1,2),
+        self.pool1 = tf.keras.layers.MaxPool1D(pool_size=2,
+                                               strides=2,
                                                padding="valid")
 
         # features about interaction between sensor's axes
 
         self.layer1 = make_basic_block_layer(filter_num=32,
                                              blocks=2,
-                                             name='residual_block_1_{}'.format(sensor_name))
+                                             name='residual_block_1',
+                                             kernel=3)
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
-                                             name='residual_block_2{}'.format(sensor_name),
-                                             stride=2)
+                                             name='residual_block_2',
+                                             stride=1,
+                                             kernel=3,
+                                             downsample=True)
 
     def call(self, inputs, training=None):
 
@@ -121,23 +120,23 @@ class Resnet18BlockNoClass(tf.keras.layers.Layer):
 
 class BasicBlock(tf.keras.layers.Layer):
 
-    def __init__(self, filter_num, stride=1):
+    def __init__(self, filter_num, kernel, stride=1, downsample=False):
         super(BasicBlock, self).__init__()
-        self.conv1 = tf.keras.layers.Conv2D(filters=filter_num,
-                                            kernel_size=(3,3),
+        self.conv1 = tf.keras.layers.Conv1D(filters=filter_num,
+                                            kernel_size=kernel,
                                             strides=stride,
                                             padding='same')
         self.bn1 = tf.keras.layers.BatchNormalization()
-        self.conv2 = tf.keras.layers.Conv2D(filters=filter_num,
-                                            kernel_size=(3,3),
+        self.conv2 = tf.keras.layers.Conv1D(filters=filter_num,
+                                            kernel_size=kernel,
                                             strides=1,
                                             padding="same")
         self.bn2 = tf.keras.layers.BatchNormalization()
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
-        if stride != 1:
+        if downsample:
             self.downsample = tf.keras.Sequential()
-            self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
-                                                       kernel_size=(1, 1),
+            self.downsample.add(tf.keras.layers.Conv1D(filters=filter_num,
+                                                       kernel_size=1,
                                                        strides=stride))
             self.downsample.add(tf.keras.layers.BatchNormalization())
         # all'interno del blocco le dimensioni del residuo in input sono le stesse
@@ -158,13 +157,36 @@ class BasicBlock(tf.keras.layers.Layer):
 
         return output
 
+class HeadCNN(tf.keras.layers.Layer):
+    def __init__(self):
+        super(HeadCNN, self).__init__()
 
-def make_basic_block_layer(filter_num, blocks, name, stride=1):
+        self.conv1 = tf.keras.layers.Conv1D(filters=512, kernel_size=3, strides=1)
+        self.max1 = tf.keras.layers.MaxPool1D(pool_size=2, strides=1)
+        self.conv2 = tf.keras.layers.Conv1D(filters=128, kernel_size=3, strides=1)
+        self.max2 = tf.keras.layers.MaxPool1D(pool_size=2, strides=1)
+        self.conv3 = tf.keras.layers.Conv1D(filters=64, kernel_size=3, strides=1)
+        self.max3 = tf.keras.layers.MaxPool1D(pool_size=2, strides=1)
+        self.conv4 = tf.keras.layers.Conv1D(filters=32, kernel_size=3, strides=1)
+        self.max4 = tf.keras.layers.MaxPool1D(pool_size=2, strides=1)
+
+    def call(self, inputs, training=None, **kwargs):
+        x = self.conv1(inputs, training=training)
+        x = self.max1(x)
+        x = self.conv2(inputs, training=training)
+        x = self.max2(x)
+        x = self.conv3(inputs, training=training)
+        x = self.max3(x)
+        x = self.conv4(inputs, training=training)
+        x = self.max4(x)
+        return x
+
+def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1, downsample=False):
     res_block = tf.keras.Sequential(name=name)
-    res_block.add(BasicBlock(filter_num, stride=stride))
+    res_block.add(BasicBlock(filter_num, kernel=kernel, stride=stride, downsample=downsample))
 
     for _ in range(1, blocks):
-        res_block.add(BasicBlock(filter_num, stride=1))
+        res_block.add(BasicBlock(filter_num, kernel=kernel, stride=1))
 
     return res_block
 
@@ -174,5 +196,10 @@ def resnet18BlockNoClass(sensor_name):
     resnet.add(Resnet18BlockNoClass(sensor_name))
     return resnet
 
-def resnet18MultiBranch(sensor_dict, multi_task, num_act, num_user):
-    return Resnet18MultiBranch(sensor_dict, multi_task, num_act, num_user)
+def resnet18MultiBranch(sensor_dict, num_user, magnitude):
+    return Resnet18MultiBranch(sensor_dict, num_user, magnitude)
+
+def new_head(sensor_name):
+    head = tf.keras.Sequential(name='branch_{}'.format(sensor_name))
+    head.add(HeadCNN())
+    return head

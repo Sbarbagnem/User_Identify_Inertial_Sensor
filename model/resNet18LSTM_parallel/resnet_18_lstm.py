@@ -34,21 +34,20 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         self.layer1 = make_basic_block_layer(filter_num=32,
                                              blocks=2,
                                              name='residual_block_1',
-                                             kernel=(1, 3))
-                                       
+                                             kernel=(3,3))
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
                                              name='residual_block_2',
                                              stride=1,
-                                             kernel=(self.axes,1))
+                                             kernel=(3,3))
 
         self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
 
         # LSTM
-        lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.0, return_sequences=True, time_major=False) 
-        lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.0, return_sequences=True, go_backwards=True, time_major=False)
+        lstm_forward = tf.keras.layers.LSTM(units=64, dropout=0.2, recurrent_dropout=0.0, return_sequences=False, time_major=False) 
+        lstm_backward = tf.keras.layers.LSTM(units=64, dropout=0.2, recurrent_dropout=0.0, return_sequences=False, go_backwards=True, time_major=False)
         self.lstm_bidirectional = tf.keras.layers.Bidirectional(layer=lstm_forward, merge_mode='concat', backward_layer=lstm_backward)
-        self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
+        #self.avgpool_1d = tf.keras.layers.GlobalAveragePooling1D()
 
         if multi_task:
             # activity classification
@@ -85,14 +84,12 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         print('input LSTM: {}'.format(input_lstm.shape))
         out_lstm = self.lstm_bidirectional(input_lstm, training=training)
         print('output LSTM: {} '.format(out_lstm.shape))
-        out_lstm = self.avgpool_1d(out_lstm)
-        print('output LSTM after global 1d: {}'.format(out_lstm.shape))
+        #out_lstm = self.avgpool_1d(out_lstm)
+        #print('output LSTM after global 1d: {}'.format(out_lstm.shape))
 
         ### MERGE CNN and LSTM output
         merge = tf.concat([out_cnn,out_lstm], axis=1)
         print('shape merge: {}'.format(merge.shape))
-
-        #merge = out_cnn
 
         if self.multi_task:
             output_activity = self.fc_activity(merge)

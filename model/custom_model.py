@@ -11,6 +11,7 @@ from model.resNet18LSTM_parallel.resnet_18_lstm import resnet18_lstm as parallel
 from model.resNet18LSTM_consecutive.resnet_18_lstm import resnet18_lstm as consecutive
 from model.resNet18monoKernel.resNet18_mono_kernel import resnet18MonoKernel
 from model.resNet181D.resnet18_1D import resnet18 as resnet18_1D
+from model.lstm.lstm import create_single_lstm
 from util.data_loader import Dataset
 from util.tf_metrics import custom_metrics
 import seaborn as sn
@@ -33,6 +34,7 @@ class Model():
         self.sensor_dict = configuration_file.config[dataset_name]['SENSOR_DICT']
         self.fold = fold
         self.log  = log
+        self.magnitude = magnitude
         if magnitude:
             self.axes = self.configuration.config[self.dataset_name]['WINDOW_AXES'] + len(
                 list(self.configuration.config[self.dataset_name]['SENSOR_DICT'].keys()))
@@ -116,10 +118,6 @@ class Model():
         print('shape train data: {}'.format(train_shape))
         print('shape test data: {}'.format(TestData.shape))
 
-        # reshape [examples, axes, window_samples, channel]
-        TrainData = np.transpose(TrainData, (0, 2, 1, 3))
-        TestData = np.transpose(TestData, (0, 2, 1, 3))
-
         TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
         TrainLA = tf.data.Dataset.from_tensor_slices(TrainLA)
         TrainLU = tf.data.Dataset.from_tensor_slices(TrainLU)
@@ -146,10 +144,6 @@ class Model():
         print('shape train data: {}'.format(train_shape))
         print('shape test data: {}'.format(TestData.shape))
 
-        # reshape [examples, axes, window_samples, channel]
-        TrainData = np.transpose(TrainData, (0, 2, 1, 3))
-        TestData = np.transpose(TestData, (0, 2, 1, 3))
-
         TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
         TrainLU = tf.data.Dataset.from_tensor_slices(TrainLU)
 
@@ -168,26 +162,35 @@ class Model():
         # create model
         if self.model_type == 'resnet18':
             self.model = resnet18(
-                self.multi_task, self.num_act, self.num_user, self.axes)
+                self.multi_task, self.num_act, self.num_user, self.axes
+            )
         if self.model_type == 'resnet18_multi_branch':
             self.model = resnet18MultiBranch(
-                self.sensor_dict, self.multi_task, self.num_act, self.num_user)
+                self.sensor_dict, self.num_user, self.magnitude
+            )
         if self.model_type == 'resnet18_lstm_parallel':
             self.model = parallel(
-                self.multi_task, self.num_act, self.num_user, self.axes)
+                self.multi_task, self.num_act, self.num_user, self.axes
+            )
         if self.model_type == 'resnet18_lstm_consecutive':
             self.model = consecutive(
-                self.multi_task, self.num_act, self.num_user, self.axes)
+                self.multi_task, self.num_act, self.num_user, self.axes
+            )
         if self.model_type == 'resnet18MonoKernel':
             self.model = resnet18MonoKernel(
-                self.multi_task, self.num_act, self.num_user)
+                self.multi_task, self.num_act, self.num_user
+            )
         if self.model_type == 'resnet18_1D':
             self.model = resnet18_1D(
-                self.multi_task, self.num_act, self.num_user, self.axes)
+                self.multi_task, self.num_act, self.num_user, self.axes
+            )
+        if self.model_type == 'lstm':
+            self.model = create_single_lstm(
+                self.num_user
+            )
         axes = self.axes
         samples = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
-        channels = self.configuration.config[self.dataset_name]['CHANNELS']
-        self.model.build(input_shape=(None, axes, samples, channels))
+        self.model.build(input_shape=(None, samples, axes, 1))
 
     def print_model_summary(self):
         self.model.summary()
@@ -241,8 +244,8 @@ class Model():
                     y_true=label_user, y_pred=predictions_user)
                 penality = sum(tf.nn.l2_loss(tf_var)
                                for tf_var in self.model.trainable_variables)
-                loss_global = loss_u + 0.003*penality
-                #loss_global = loss_u
+                #loss_global = loss_u + 0.003*penality
+                loss_global = loss_u
 
         gradients = tape.gradient(loss_global, self.model.trainable_variables)
         self.optimizer.apply_gradients(
