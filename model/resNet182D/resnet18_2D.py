@@ -1,12 +1,21 @@
 import tensorflow as tf
 
-class SingleLSTM(tf.keras.Model):
-    def __init__(self, num_user):
-        super(SingleLSTM, self).__init__()
+'''
+    from https://github.com/calmisential/Basic_CNNs_TensorFlow2
+'''
 
+
+class ResNet18SingleBranch(tf.keras.Model):
+    def __init__(self, layer_params, multi_task, num_act, num_user, axes):
+        super(ResNet18SingleBranch, self).__init__()
+
+        self.multi_task = multi_task
+        if multi_task:
+            self.num_act = num_act
         self.num_user = num_user
+        self.axes= axes
 
-        self.lstm = tf.keras.layers.LSTM(128, return_sequences=True)
+        # features about single axis sensor (parameters from metier)
 
         self.conv1 = tf.keras.layers.Conv2D(filters=32,
                                             kernel_size=(5,1),
@@ -15,7 +24,7 @@ class SingleLSTM(tf.keras.Model):
                                             kernel_regularizer=tf.keras.regularizers.l2)
         self.bn1 = tf.keras.layers.BatchNormalization()
         
-        self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(2,1),
+        self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(3,1),
                                                strides=(2,1),
                                                padding="valid")
         # features about interaction between sensor
@@ -28,23 +37,27 @@ class SingleLSTM(tf.keras.Model):
                                              blocks=2,
                                              name='residual_block_2',
                                              stride=1,
-                                             kernel=(3,3),
-                                             downsample=True)
+                                             kernel=(3,3))
 
         self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
 
+        if multi_task:
+            # activity classification
+            self.fc_activity = tf.keras.layers.Dense(units=num_act,
+                                                     activation=tf.keras.activations.softmax,
+                                                     name='fc_act')
+
+        # user classification
         self.fc_user = tf.keras.layers.Dense(units=num_user,
                                              activation=tf.keras.activations.softmax,
                                              name='fc_user')
 
-    def call(self, inputs, training=None, **kwargs):
-        x = tf.reshape(inputs, [-1, inputs.shape[1], inputs.shape[2]*inputs.shape[3]])
-        x = self.lstm(x, training=training)
-        print('output lstm: {}'.format(x.shape))
+    def call(self, inputs, training=None):
 
-        x = tf.expand_dims(x, 3) # add channel=1 for conv2d
+        print('shape input: {}'.format(inputs.shape))
 
-        x = self.conv1(x)
+        ### CNN ###
+        x = self.conv1(inputs)
         print('shape conv1: {}'.format(x.shape))
         x = self.bn1(x, training=training)
         x = tf.nn.relu(x)
@@ -54,35 +67,39 @@ class SingleLSTM(tf.keras.Model):
         print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
         print('shape res_2: {}'.format(x.shape))
+        out_cnn = self.avgpool_2d(x)
+        print('shape avg_pool: {}'.format(out_cnn.shape))
 
-        x = self.avgpool_2d(x)
-        print('output avg pool: {}'.format(x.shape))
+        if self.multi_task:
+            output_activity = self.fc_activity(out_cnn)
+            output_user = self.fc_user(out_cnn)
+            return output_activity, output_user
+        else:
+            output_user = self.fc_user(out_cnn)
+            return output_user
 
-        x = self.fc_user(x)
-        return x
-
-def create_single_lstm(num_user):
-    return SingleLSTM(num_user)
 
 class BasicBlock(tf.keras.layers.Layer):
 
-    def __init__(self, filter_num, kernel, stride=1, downsample=False):
+    def __init__(self, filter_num, kernel, stride=1):
         super(BasicBlock, self).__init__()
         self.conv1 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=stride,
-                                            padding='same')
+                                            padding='same',
+                                            kernel_regularizer=tf.keras.regularizers.l2)
         self.bn1 = tf.keras.layers.BatchNormalization()
         self.conv2 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=1,
-                                            padding="same")
+                                            padding="same",
+                                            kernel_regularizer=tf.keras.regularizers.l2)
         self.bn2 = tf.keras.layers.BatchNormalization()
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
-        if stride != 1 or downsample:
+        if stride != 1 or kernel[0]!=1:
             self.downsample = tf.keras.Sequential()
             self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
-                                                       kernel_size=(1,1),
+                                                       kernel_size=(1, 1),
                                                        strides=stride))
             self.downsample.add(tf.keras.layers.BatchNormalization())
         # all'interno del blocco le dimensioni del residuo in input sono le stesse
@@ -104,11 +121,15 @@ class BasicBlock(tf.keras.layers.Layer):
         return output
 
 
-def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1, downsample=False):
+def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1):
     res_block = tf.keras.Sequential(name=name)
-    res_block.add(BasicBlock(filter_num, kernel=kernel, stride=stride, downsample=downsample))
+    res_block.add(BasicBlock(filter_num, kernel=kernel, stride=stride))
 
     for _ in range(1, blocks):
         res_block.add(BasicBlock(filter_num, kernel=kernel, stride=1))
 
     return res_block
+
+
+def resnet18(multi_task, num_act, num_user, axes):
+    return ResNet18SingleBranch(layer_params=[2, 2, 2, 2], multi_task=multi_task, num_act=num_act, num_user=num_user, axes=axes)

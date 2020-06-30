@@ -120,7 +120,7 @@ if __name__ == "__main__":
 
     lu, idx = uniform_user_index(list_user = [lu_A,lu_B], list_index=[idx_A,idx_B]) 
     data = merge_data(data_A, data_B)
-
+    '''
     label, freq = np.unique(lu, return_counts=True)
     l = list(range(1, len(label)+1))
     plt.barh(l, width=freq, height=0.5)
@@ -128,17 +128,17 @@ if __name__ == "__main__":
     plt.show()
     
     # balance dataset (downsample majority classes)
-    data_balanced, lu_balanced, idx_balanced = balance_dataset(data, lu, idx)
+    data, lu, idx = balance_dataset(data, lu, idx)
     
-    label, freq = np.unique(lu_balanced, return_counts=True)
+    label, freq = np.unique(lu, return_counts=True)
     l = list(range(1, len(label)+1))
     plt.barh(l, width=freq, height=0.5)
     plt.yticks(l, label, rotation='horizontal')
     plt.show()
-
+    '''
     path_to_save = f'../data/datasets/merged_{dataset_a}_{dataset_b}/OuterPartition_'
     if magnitude:
         path_to_save = path_to_save + 'magnitude_'
     path_to_save = path_to_save + str(overlap) + '/'
 
-    save_mergede_dataset(path_to_save, data_balanced, lu_balanced, idx_balanced)
+    save_mergede_dataset(path_to_save, data, lu, idx)

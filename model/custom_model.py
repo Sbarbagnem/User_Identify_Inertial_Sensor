@@ -4,14 +4,13 @@ import numpy as np
 from sklearn import utils as skutils
 import math
 import datetime
+import json
 
-from model.resNet18.resnet_18 import resnet18
+from model.resNet182D.resnet18_2D import resnet18 as resnet2D
 from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
 from model.resNet18LSTM_parallel.resnet_18_lstm import resnet18_lstm as parallel
 from model.resNet18LSTM_consecutive.resnet_18_lstm import resnet18_lstm as consecutive
-from model.resNet18monoKernel.resNet18_mono_kernel import resnet18MonoKernel
-from model.resNet181D.resnet18_1D import resnet18 as resnet18_1D
-from model.lstm.lstm import create_single_lstm
+from model.resNet181D.resnet18_1D import resnet18 as resnet1D
 from util.data_loader import Dataset
 from util.tf_metrics import custom_metrics
 import seaborn as sn
@@ -78,7 +77,7 @@ class Model():
             self.dataset = Dataset(path='data/datasets/UNIMIBDataset/',
                                    name=self.dataset_name,
                                    channel=channel,
-                                   winlen=100,
+                                   winlen=self.configuration.config[self.dataset_name]['WINDOW_SAMPLES'],
                                    user_num=30,
                                    act_num=9,
                                    outer_dir=self.outer_dir)
@@ -160,8 +159,8 @@ class Model():
 
     def build_model(self):
         # create model
-        if self.model_type == 'resnet18':
-            self.model = resnet18(
+        if self.model_type == 'resnet18_2D':
+            self.model = resnet2D(
                 self.multi_task, self.num_act, self.num_user, self.axes
             )
         if self.model_type == 'resnet18_multi_branch':
@@ -176,17 +175,9 @@ class Model():
             self.model = consecutive(
                 self.multi_task, self.num_act, self.num_user, self.axes
             )
-        if self.model_type == 'resnet18MonoKernel':
-            self.model = resnet18MonoKernel(
-                self.multi_task, self.num_act, self.num_user
-            )
         if self.model_type == 'resnet18_1D':
-            self.model = resnet18_1D(
+            self.model = resnet1D(
                 self.multi_task, self.num_act, self.num_user, self.axes
-            )
-        if self.model_type == 'lstm':
-            self.model = create_single_lstm(
-                self.num_user
             )
         axes = self.axes
         samples = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
@@ -244,8 +235,8 @@ class Model():
                     y_true=label_user, y_pred=predictions_user)
                 penality = sum(tf.nn.l2_loss(tf_var)
                                for tf_var in self.model.trainable_variables)
-                #loss_global = loss_u + 0.003*penality
-                loss_global = loss_u
+                loss_global = loss_u #+ 0.003*penality
+                #loss_global = loss_u
 
         gradients = tape.gradient(loss_global, self.model.trainable_variables)
         self.optimizer.apply_gradients(
@@ -361,14 +352,19 @@ class Model():
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
 
-            if epoch == 50:
+            if epoch == 50 or epoch == 100:
                 df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
                                 columns = [str(i) for i in range(0,self.dataset._user_num)])
                 plt.figure(figsize = (30,21))
                 sn.heatmap(df_cm, annot=True)
                 plt.show()
+
+                print(json.dumps(metrics,sort_keys=False, indent=4))
+
+
             
     def train_multi_task(self):
+        best_seen = []
         for epoch in range(1, self.epochs + 1):
             cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
             if self.multi_task:
@@ -464,7 +460,7 @@ class Model():
                 plt.show()
             '''
 
-    def decay_lr(self, initAlpha=0.001, factor=0.25, dropEvery=15, epoch=0):
+    def decay_lr(self, initAlpha=0.001, factor=0.25, dropEvery=20, epoch=0):
         exp = np.floor((1 + epoch) / dropEvery)
         alpha = initAlpha * (factor ** exp)
         return float(alpha)

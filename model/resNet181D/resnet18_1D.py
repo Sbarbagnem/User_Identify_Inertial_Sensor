@@ -19,10 +19,15 @@ class ResNet18SingleBranch(tf.keras.Model):
         self.axes= axes
 
         self.conv1 = tf.keras.layers.Conv1D(filters=32,
-                                            kernel_size=1,
+                                            kernel_size=5,
                                             strides=1,
-                                            padding="valid")
-
+                                            padding="valid",
+                                            kernel_regularizer=tf.keras.regularizers.l2)
+        self.bn1 = tf.keras.layers.BatchNormalization()
+        
+        self.pool1 = tf.keras.layers.MaxPool1D(pool_size=3,
+                                               strides=2,
+                                               padding="valid")
         self.layer1 = make_basic_block_layer(filter_num=32,
                                              blocks=2,
                                              name='residual_block_1',
@@ -30,16 +35,10 @@ class ResNet18SingleBranch(tf.keras.Model):
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
                                              name='residual_block_2',
-                                             kernel=5,
+                                             kernel=3,
                                              downsample=True,
                                              stride=2)
-
-        # LSTM
-        lstm_forward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.0, return_sequences=True, time_major=False) 
-        lstm_backward = tf.keras.layers.LSTM(units=128, dropout=0.2, recurrent_dropout=0.0, return_sequences=True, go_backwards=True, time_major=False)
-        self.lstm_bidirectional = tf.keras.layers.Bidirectional(layer=lstm_forward, merge_mode='concat', backward_layer=lstm_backward)
-        self.avg_pol_1d = tf.keras.layers.GlobalAveragePooling1D()
-
+        self.avgpool = tf.keras.layers.GlobalAveragePooling1D()
 
         if multi_task:
             # activity classification
@@ -58,24 +57,24 @@ class ResNet18SingleBranch(tf.keras.Model):
 
         # reshape input for conv1d layer
         x = tf.reshape(inputs, [-1, inputs.shape[1], inputs.shape[2]])
-        x = tf.transpose(x, [0,2,1])
 
         print('shape after reshape and transpose: {}'.format(x.shape))
 
         ### CNN ###
         x = self.conv1(x)
+        x = self.bn1(x, training=training)
+        x = tf.nn.relu(x)
+        x = self.pool1(x)
         print('shape conv1: {}'.format(x.shape))
         x = self.layer1(x, training=training)
         print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
         print('shape res_2: {}'.format(x.shape))
+        x = self.layer3(x, training=training)
+        print('shape res_3: {}'.format(x.shape))
 
-        ### LSTM ###
-        x = self.lstm_bidirectional(x, training=training)
-        print('shape after lstm: {}'.format(x.shape))
-        x = self.avg_pol_1d(x)
-        print('shape after avg pool: {}'.format(x.shape))
-
+        x = self.avgpool(x)
+        
         if self.multi_task:
             output_activity = self.fc_activity(x)
             output_user = self.fc_user(x)
@@ -92,12 +91,14 @@ class BasicBlock(tf.keras.layers.Layer):
         self.conv1 = tf.keras.layers.Conv1D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=stride,
-                                            padding='same')
+                                            padding='same',
+                                            kernel_regularizer=tf.keras.regularizers.l2)
         self.bn1 = tf.keras.layers.BatchNormalization()
         self.conv2 = tf.keras.layers.Conv1D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=1,
-                                            padding="same")
+                                            padding="same",
+                                            kernel_regularizer=tf.keras.regularizers.l2)
         self.bn2 = tf.keras.layers.BatchNormalization()
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
         if downsample:
