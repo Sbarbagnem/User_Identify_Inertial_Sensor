@@ -8,17 +8,18 @@ import numpy as np
 
 def add_gaussian_noise(data):
     # data (batch, window_len, axes)
+    print(data.shape)
     data_out = np.empty([data.shape[0], data.shape[1], data.shape[2]], dtype=np.float)
 
-    noise = np.random.normal(0,0.01,100)
-    # add noise to every axis (no magnitude)
-    data_out[:,:,0] = data[:,:,0] + noise
-    data_out[:,:,1] = data[:,:,1] + noise
-    data_out[:,:,2] = data[:,:,2] + noise
-
-    # calculate magnitude on noisy axes
-    magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=2,arr=data_out)
-    data_out[:,:,2] = magnitude
+    for sequence in range(data.shape[0]):
+        noise = np.random.normal(0,0.01,100)
+        # add noise to every axis not magnitude
+        for axes in range(data.shape[2]):
+            if axes in [3,7,11]: # for magnitude calculate it on noisy data
+                magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=0,arr=data_out[sequence,:,range(axes-3, axes)])
+                data_out[sequence,:,axes] = magnitude 
+            else: 
+                data_out[sequence,:,axes] = data[sequence,:,axes] + noise
    
     return data_out
 
