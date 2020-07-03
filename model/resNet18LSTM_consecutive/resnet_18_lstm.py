@@ -20,28 +20,28 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
 
         # CNN for extract features about single axes sonsors
 
-        self.conv1 = tf.keras.layers.Conv1D(filters=32,
-                                            kernel_size=5,
+        self.conv1 = tf.keras.layers.Conv2D(filters=32,
+                                            kernel_size=(5,1),
                                             strides=1,
                                             padding="valid",
                                             kernel_regularizer=tf.keras.regularizers.l2)
 
         self.bn1 = tf.keras.layers.BatchNormalization()
             
-        self.pool1 = tf.keras.layers.MaxPool1D(pool_size=3,
-                                               strides=2,
+        self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(3,1),
+                                               strides=(2,1),
                                                padding="valid")
 
         self.layer1 = make_basic_block_layer(filter_num=32,
                                              blocks=2,
                                              name='residual_block_1',
-                                             kernel=3,
+                                             kernel=(3,1),
                                              downsample=True)
 
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
                                              name='residual_block_2',
-                                             kernel=3,
+                                             kernel=(3,1),
                                              downsample=True)
 
         # LSTM
@@ -75,7 +75,7 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         print('shape input: {}'.format(inputs.shape))
 
         ### CNN ###
-        x = self.conv1(tf.reshape(inputs, [-1, inputs.shape[1], inputs.shape[2]]), training=training)
+        x = self.conv1(inputs, training=training)
         print('shape conv1: {}'.format(x.shape))
         x = self.bn1(x, training=training)
         x = tf.nn.relu(x)
@@ -88,7 +88,7 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
         print('shape res_2: {}'.format(x.shape))
 
         ### LSTM ###
-        out_lstm = self.lstm(x, training=training)
+        out_lstm = self.lstm(tf.reshape(x, [-1, x.shape[1], x.shape[2]*x.shape[3]]), training=training)
         print('output LSTM: {} '.format(out_lstm.shape))
 
         ### FULLY CONNECTED ###
@@ -108,13 +108,13 @@ class BasicBlock(tf.keras.layers.Layer):
 
     def __init__(self, filter_num, kernel, stride=1, downsample=False):
         super(BasicBlock, self).__init__()
-        self.conv1 = tf.keras.layers.Conv1D(filters=filter_num,
+        self.conv1 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=stride,
                                             padding='same',
                                             kernel_regularizer=tf.keras.regularizers.l2)
         self.bn1 = tf.keras.layers.BatchNormalization()
-        self.conv2 = tf.keras.layers.Conv1D(filters=filter_num,
+        self.conv2 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=1,
                                             padding="same",
@@ -123,7 +123,7 @@ class BasicBlock(tf.keras.layers.Layer):
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
         if stride != 1 or downsample:
             self.downsample = tf.keras.Sequential()
-            self.downsample.add(tf.keras.layers.Conv1D(filters=filter_num,
+            self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
                                                        kernel_size=1,
                                                        strides=stride))
             self.downsample.add(tf.keras.layers.BatchNormalization())

@@ -12,7 +12,7 @@ def add_gaussian_noise(data):
     data_out = np.empty([data.shape[0], data.shape[1], data.shape[2]], dtype=np.float)
 
     for sequence in range(data.shape[0]):
-        noise = np.random.normal(0,0.02,100)
+        noise = np.random.normal(0,0.01,100)
         # add noise to every axis not magnitude
         for axes in range(data.shape[2]):
             if axes in [3,7,11]: # for magnitude calculate it on noisy data
