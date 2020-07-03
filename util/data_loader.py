@@ -51,7 +51,7 @@ class Dataset(object):
             ID = np.load(self._path + self.outer_dir +
                          self._save_dir + 'fold{}/id.npy'.format(i))
 
-            if step == i:
+            if i in step:
                 TestData = np.concatenate((TestData, Data), axis=0)
                 if self._name != 'unimib_sbhar':
                     TestLA = np.concatenate((TestLA, LA), axis=0)

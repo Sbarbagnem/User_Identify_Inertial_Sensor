@@ -46,12 +46,12 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
 
         # LSTM
         lstm_forward = tf.keras.layers.LSTM(units=128, 
-                                            dropout=0.0, 
+                                            dropout=0.2, 
                                             recurrent_dropout=0.0, 
                                             return_sequences=True, 
                                             kernel_regularizer=tf.keras.regularizers.l2) 
         lstm_backward = tf.keras.layers.LSTM(units=128, 
-                                            dropout=0.0, 
+                                            dropout=0.2, 
                                             recurrent_dropout=0.0, 
                                             return_sequences=True, 
                                             go_backwards=True, 
