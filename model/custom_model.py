@@ -53,7 +53,7 @@ class Model():
                                                                                   self.batch_size,
                                                                                   self.lr,
                                                                                   str(overlap),
-                                                                                  self.fold,
+                                                                                  self.fold[0],
                                                                                   datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         self.val_log_dir = "{}/{}/{}/{}/batch_{}/lr_{}/over_{}/fold_{}/{}/val".format(save_dir,
                                                                               self.model_type,
@@ -62,7 +62,7 @@ class Model():
                                                                               self.batch_size,
                                                                               self.lr,
                                                                               str(overlap),
-                                                                              self.fold,
+                                                                              self.fold[0],
                                                                               datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         self.train_writer = tf.summary.create_file_writer(self.train_log_dir)
         self.val_writer = tf.summary.create_file_writer(self.val_log_dir)
@@ -107,12 +107,17 @@ class Model():
                                    act_num=-1,
                                    outer_dir=self.outer_dir)       
 
-    def load_data(self, augmented=False):
+    def load_data(self, augmented=False, only_acc=False):
         # gat data [examples, window_samples, axes, channel]
         TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU = self.dataset.load_data(
             step=self.fold, overlapping=self.overlap, augmented=augmented)
 
         train_shape = TrainData.shape
+
+        if only_acc:
+            TrainData = TrainData[:,:,[0,1,2,3]]
+            TestData = TestData[:,:,[0,1,2,3]]
+            self.axes = 4
 
         print('shape train data: {}'.format(train_shape))
         print('shape test data: {}'.format(TestData.shape))
@@ -179,9 +184,9 @@ class Model():
             self.model = resnet1D(
                 self.multi_task, self.num_act, self.num_user, self.axes
             )
-        axes = self.axes
+
         samples = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
-        self.model.build(input_shape=(None, samples, axes, 1))
+        self.model.build(input_shape=(None, samples, self.axes, 1))
 
     def print_model_summary(self):
         self.model.summary()
@@ -226,17 +231,16 @@ class Model():
                 loss_u = self.loss_user(
                     y_true=label_user,
                     y_pred=predictions_user)
-                penality = sum(tf.nn.l2_loss(tf_var)
-                               for tf_var in self.model.trainable_variables)
-                loss_global = loss_a + loss_u + 0.003*penality
+                #penality = sum(tf.nn.l2_loss(tf_var)
+                #               for tf_var in self.model.trainable_variables)
+                loss_global = loss_a + loss_u
             else:
                 predictions_user = self.model(batch, training=True)
                 loss_u = self.loss_user(
                     y_true=label_user, y_pred=predictions_user)
-                penality = sum(tf.nn.l2_loss(tf_var)
-                               for tf_var in self.model.trainable_variables)
-                loss_global = loss_u #+ 0.003*penality
-                #loss_global = loss_u
+                #penality = sum(tf.nn.l2_loss(tf_var)
+                #               for tf_var in self.model.trainable_variables)
+                loss_global = loss_u
 
         gradients = tape.gradient(loss_global, self.model.trainable_variables)
         self.optimizer.apply_gradients(
@@ -314,6 +318,12 @@ class Model():
                     'loss_user', self.train_loss_user.result(), step=epoch)
                 tf.summary.scalar(
                     'accuracy_user', self.train_accuracy_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'macro_precision_user', metrics['macro_precision'], step=epoch)
+                tf.summary.scalar(
+                    'macro_recall_user', metrics['macro_recall'], step=epoch)
+                tf.summary.scalar(
+                    'macro_f1_user', metrics['macro_f1'], step=epoch)
             self.train_loss_user.reset_states()
             self.train_accuracy_user.reset_states()
             
@@ -343,6 +353,12 @@ class Model():
                     'loss_user', self.valid_loss_user.result(), step=epoch)
                 tf.summary.scalar(
                     'accuracy_user', self.valid_accuracy_user.result(), step=epoch)
+                tf.summary.scalar(
+                    'macro_precision_user', metrics['macro_precision'], step=epoch)
+                tf.summary.scalar(
+                    'macro_recall_user', metrics['macro_recall'], step=epoch)
+                tf.summary.scalar(
+                    'macro_f1_user', metrics['macro_f1'], step=epoch)
             self.valid_loss_user.reset_states()
             self.valid_accuracy_user.reset_states()
 
@@ -351,24 +367,19 @@ class Model():
                 self.optimizer.learning_rate.assign(new_lr)
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
-
-            if epoch == 50 or epoch == 100:
+            
+            if epoch == 50:
                 df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
                                 columns = [str(i) for i in range(0,self.dataset._user_num)])
                 plt.figure(figsize = (30,21))
                 sn.heatmap(df_cm, annot=True)
                 plt.show()
 
-                print(json.dumps(metrics,sort_keys=False, indent=4))
-
-
             
     def train_multi_task(self):
-        best_seen = []
         for epoch in range(1, self.epochs + 1):
             cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
             if self.multi_task:
-
                 for batch, label_act, label_user in self.train_data:
                     cm_batch = self.train_step(batch, label_act, label_user, self.dataset._user_num)
                     cm = cm + cm_batch

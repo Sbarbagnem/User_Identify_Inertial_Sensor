@@ -54,21 +54,21 @@ class ResNet18SingleBranch(tf.keras.Model):
 
     def call(self, inputs, training=None):
 
-        print('shape input: {}'.format(inputs.shape))
+        #print('shape input: {}'.format(inputs.shape))
 
         ### CNN ###
         x = self.conv1(inputs)
-        print('shape conv1: {}'.format(x.shape))
+        #print('shape conv1: {}'.format(x.shape))
         x = self.bn1(x, training=training)
         x = tf.nn.relu(x)
         x = self.pool1(x)
-        print('shape pool1: {}'.format(x.shape))
+        #print('shape pool1: {}'.format(x.shape))
         x = self.layer1(x, training=training)
-        print('shape res_1: {}'.format(x.shape))
+        #print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
-        print('shape res_2: {}'.format(x.shape))
+        #print('shape res_2: {}'.format(x.shape))
         out_cnn = self.avgpool_2d(x)
-        print('shape avg_pool: {}'.format(out_cnn.shape))
+        #print('shape avg_pool: {}'.format(out_cnn.shape))
 
         if self.multi_task:
             output_activity = self.fc_activity(out_cnn)

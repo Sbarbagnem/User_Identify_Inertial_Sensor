@@ -37,7 +37,7 @@ class ResNet18SingleBranch(tf.keras.Model):
                                              name='residual_block_2',
                                              kernel=3,
                                              downsample=True,
-                                             stride=2)
+                                             stride=1)
         self.avgpool = tf.keras.layers.GlobalAveragePooling1D()
 
         if multi_task:
@@ -53,25 +53,24 @@ class ResNet18SingleBranch(tf.keras.Model):
 
     def call(self, inputs, training=None):
 
-        print('shape input: {}'.format(inputs.shape))
+        #print('shape input: {}'.format(inputs.shape))
 
-        # reshape input for conv1d layer
+        # reshape input for conv1d layer (delete channel=1)
         x = tf.reshape(inputs, [-1, inputs.shape[1], inputs.shape[2]])
 
-        print('shape after reshape and transpose: {}'.format(x.shape))
+        #print('shape after reshape and transpose: {}'.format(x.shape))
 
         ### CNN ###
         x = self.conv1(x)
         x = self.bn1(x, training=training)
         x = tf.nn.relu(x)
         x = self.pool1(x)
-        print('shape conv1: {}'.format(x.shape))
+        #print('shape conv1: {}'.format(x.shape))
         x = self.layer1(x, training=training)
-        print('shape res_1: {}'.format(x.shape))
+        #print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
-        print('shape res_2: {}'.format(x.shape))
-        x = self.layer3(x, training=training)
-        print('shape res_3: {}'.format(x.shape))
+        #print('shape res_2: {}'.format(x.shape))
+
 
         x = self.avgpool(x)
         
