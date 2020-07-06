@@ -2,6 +2,7 @@ import os
 import shutil
 import zipfile
 import argparse
+import sys
 
 import numpy as np
 from scipy import stats
@@ -301,7 +302,7 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
                         (acc, file_acc[int(start):int(stop), :]), axis=0)
                     gyro = np.concatenate(
                         (gyro, file_gyro[int(start):int(stop), :]), axis=0)
-
+                
             if magnitude:
                 acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=acc).reshape(-1,1)), axis=1)
                 gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=gyro).reshape(-1,1)), axis=1)
@@ -506,8 +507,8 @@ if __name__ == '__main__':
                         help='path to store data preprocessed')
 
     args = parser.parse_args()
-    for magnitude in [True, False]:
-        for overlap in [0.5, 0.6, 0.7, 0.8, 0.9]:
-            preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
+    for magnitude in [True]:
+        for overlap in [0.5]:
+            #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
             preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
             #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "acc_gyro_magn", 'acc_gyro_magn', "all", magnitude=False)

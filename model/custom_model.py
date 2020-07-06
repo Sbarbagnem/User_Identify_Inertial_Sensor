@@ -136,7 +136,7 @@ class Model():
             buffer_size=train_shape[0], reshuffle_each_iteration=True)
 
         test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
-        self.test_data = test_data.batch(self.batch_size, drop_remainder=True)
+        self.test_data = test_data.batch(1, drop_remainder=False)
 
     def load_data_merged(self, augmented=False):
         # gat data [examples, window_samples, axes, channel]
@@ -195,6 +195,7 @@ class Model():
         # define loss and optimizer
         self.loss_act = tf.keras.losses.SparseCategoricalCrossentropy()
         self.loss_user = tf.keras.losses.SparseCategoricalCrossentropy()
+        #self.optimizer = tf.keras.optimizers.SGD(learning_rate=0.1, momentum=0.9) # simile ad Adam con lr 0.001 e dynamic, sgd con static
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
         # performance on train
@@ -367,14 +368,14 @@ class Model():
                 self.optimizer.learning_rate.assign(new_lr)
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
-            
+            '''
             if epoch == 50:
                 df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
                                 columns = [str(i) for i in range(0,self.dataset._user_num)])
                 plt.figure(figsize = (30,21))
                 sn.heatmap(df_cm, annot=True)
                 plt.show()
-
+            '''
             
     def train_multi_task(self):
         for epoch in range(1, self.epochs + 1):

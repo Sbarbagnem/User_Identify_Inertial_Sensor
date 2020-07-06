@@ -9,7 +9,7 @@ from scipy.fftpack import fft
 from scipy.io import loadmat
 from sklearn import utils as skutils
 
-from util.data_augmentation import add_gaussian_noise, scaling_sequence
+from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, wdba, random_guided_warp, random_transformation
 
 class Dataset(object):
 
@@ -82,14 +82,26 @@ class Dataset(object):
          TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
         TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
 
+        print('train data before augmented: {}'.format(TrainData.shape))
+
         # adding augmentation to train data if set to true
         if augmented:
-            data_noisy = add_gaussian_noise(TrainData)
+            #data_noisy = add_gaussian_noise(TrainData)
             #data_scaled = scaling_sequence(TrainData) 
-            TrainData = np.concatenate((TrainData, data_noisy), axis=0)
+            random_guided_warp_data = random_guided_warp(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False)
+            random_data_transformed, lu, la = random_transformation(TrainData, TrainLU, TrainLA)
+            #wba_data = wdba(TrainData, TrainLU, batch_size=10)
+            TrainData = np.concatenate((TrainData, random_guided_warp_data, random_data_transformed), axis=0)
             if self._name != 'unimib_sbhar':
                 TrainLA = np.tile(TrainLA, 2)
+                TrainLA = np.append(TrainLA, la)
             TrainLU = np.tile(TrainLU, 2)
+            TrainLU = np.append(TrainLU, lu)
+
+        TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)
+        TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)
+
+        print('train data after augmented: {}'.format(TrainData.shape))
             
         # normalization
         mean = np.mean(np.reshape(TrainData, [-1, self._channel]), axis=0)

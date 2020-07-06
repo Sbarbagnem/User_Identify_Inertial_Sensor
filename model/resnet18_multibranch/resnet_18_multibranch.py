@@ -28,20 +28,20 @@ class Resnet18MultiBranch(tf.keras.Model):
                                                 kernel_size=(5,1),
                                                 strides=1,
                                                 padding="same",
-                                                name='conv_merge',
+                                                name='conv_merge_1',
                                                 kernel_regularizer=tf.keras.regularizers.l2)
-            self.bn_merge1 = tf.keras.layers.BatchNormalization(name='bn_merge')
+            self.bn_merge1 = tf.keras.layers.BatchNormalization(name='bn_merge_1')
             self.conv_merge2 = tf.keras.layers.Conv2D(filters=128,
                                                 kernel_size=(5,1),
                                                 strides=1,
                                                 padding="same",
-                                                name='conv_merge',
+                                                name='conv_merge_2',
                                                 kernel_regularizer=tf.keras.regularizers.l2)
-            self.bn_merge2 = tf.keras.layers.BatchNormalization(name='bn_merge')
+            self.bn_merge2 = tf.keras.layers.BatchNormalization(name='bn_merge_2')
 
         ### LSTM ###
         self.lstm = tf.keras.layers.Bidirectional(
-            tf.keras.layers.LSTM(units=128, return_sequences=True), merge_mode='concat')
+            tf.keras.layers.LSTM(units=128, dropout=0.2, return_sequences=True), merge_mode='concat')
         self.global_avg_pool_1d = tf.keras.layers.GlobalAveragePooling1D()
 
         self.fc_user = tf.keras.layers.Dense(units=num_user,
@@ -120,15 +120,15 @@ class resnet18Block(tf.keras.layers.Layer):
         self.layer1 = make_basic_block_layer(filter_num=32,
                                              blocks=1,
                                              name='residual_block_1',
-                                             kernel=(5,1))
-        '''
+                                             kernel=(3,3))
+        
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=1,
                                              name='residual_block_2',
                                              stride=2,
                                              kernel=(3,3),
                                              downsample=True)
-        '''
+        
 
     def call(self, inputs, training=None):
 
@@ -137,7 +137,7 @@ class resnet18Block(tf.keras.layers.Layer):
         x = tf.nn.relu(x)
         x = self.pool1(x)
         x = self.layer1(x, training=training)
-        #x = self.layer2(x, training=training)
+        x = self.layer2(x, training=training)
 
         return x
 
