@@ -42,7 +42,7 @@ config = {
     },
     'unimib_sbhar':{
         'PATH_OUTER_PARTITION'  : './data/datasets/merged_unimib_sbhar/',
-        'NUM_CLASSES_ACTIVITY'  : -1,
+        'NUM_CLASSES_ACTIVITY'  : 21,
         'NUM_CLASSES_USER'      : 60,
         'WINDOW_AXES'           : 3,  # number of sample for window
         'WINDOW_SAMPLES'        : 100,    # number of axes' sensor

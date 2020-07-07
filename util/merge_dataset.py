@@ -31,40 +31,47 @@ def read_outer_partition(dataset, path_outer, magnitude=True, overlap=5.0):
     
     data = np.empty([0, 100, channel], dtype=np.float)
     lu = np.empty([0], dtype=np.int32)
+    la = np.empty([0], dtype=np.int)
     idx = np.empty([0], dtype=np.int32)
 
     for fold in os.listdir(path):
         data_temp = np.load(os.path.join(path, fold, 'data.npy'))
         lu_temp = np.load(os.path.join(path, fold, 'user_label.npy'))
+        la_temp = np.load(os.path.join(path, fold, 'act_label.npy'))
         idx_temp = np.load(os.path.join(path, fold, 'id.npy'))
         data = np.concatenate((data, data_temp))
         lu = np.concatenate((lu, lu_temp))
+        la = np.concatenate((la, la_temp))
         idx = np.concatenate((idx, idx_temp))
         
 
-    return data, lu, idx
+    return data, lu, la, idx
 
-def uniform_user_index(list_user, list_index):
+def uniform_user_index(list_user, list_act, list_index):
 
     for i in range(len(list_user))[1:]:
         max_temp = np.max(list_user[i-1])
         list_user[i] = list(list_user[i] + max_temp + 1)
+        max_temp = np.max(list_act[i-1])
+        list_act[i] = list(list_act[i] + max_temp + 1)
         max_temp = np.max(list_index[i-1])
         list_index[i] = list(list_index[i] + max_temp)
 
     # flat list
     list_user = [item for sublist in list_user for item in sublist]
     list_index = [item for sublist in list_index for item in sublist]
-    return list_user, list_index
+    list_act = [item for sublist in list_act for item in sublist]
+    return list_user, list_act, list_index
 
-def save_mergede_dataset(path_to_save, data, lu, idx):
+def save_mergede_dataset(path_to_save, data, lu, la, idx):
     if not os.path.exists(path_to_save):
         os.makedirs(path_to_save)
 
-    data, lu, idx = skutils.shuffle(data, lu, idx)
-    data, lu, idx = skutils.shuffle(data, lu, idx)
+    data, lu, la, idx = skutils.shuffle(data, lu, la, idx)
+    data, lu, la, idx = skutils.shuffle(data, lu, la, idx)
 
     lu = np.asarray(lu)
+    la = np.asarray(la)
     idx = np.asarray(idx)
 
     # create dir partition
@@ -80,6 +87,7 @@ def save_mergede_dataset(path_to_save, data, lu, idx):
         np.save(path_to_save+'/fold{}/data'.format(i),       data[idx_temp])
         np.save(path_to_save+'/fold{}/user_label'.format(i), lu[idx_temp])
         np.save(path_to_save+'/fold{}/id'.format(i),         idx[idx_temp])
+        np.save(path_to_save+'/fold{}/act_label'.format(i),  la[idx_temp])
 
 def balance_dataset(data, label, idx):
 
@@ -115,10 +123,10 @@ if __name__ == "__main__":
     magnitude = True
     overlap = 5.0
 
-    data_A, lu_A, idx_A = read_outer_partition(dataset_a, path_a, magnitude=magnitude, overlap=overlap)
-    data_B, lu_B, idx_B = read_outer_partition(dataset_b, path_b, magnitude=magnitude, overlap=overlap)
+    data_A, lu_A, la_A, idx_A = read_outer_partition(dataset_a, path_a, magnitude=magnitude, overlap=overlap)
+    data_B, lu_B, la_B, idx_B = read_outer_partition(dataset_b, path_b, magnitude=magnitude, overlap=overlap)
 
-    lu, idx = uniform_user_index(list_user = [lu_A,lu_B], list_index=[idx_A,idx_B]) 
+    lu, la, idx = uniform_user_index(list_user = [lu_A,lu_B], list_act = [la_A, la_B], list_index=[idx_A,idx_B]) 
     data = merge_data(data_A, data_B)
     '''
     label, freq = np.unique(lu, return_counts=True)
@@ -141,4 +149,4 @@ if __name__ == "__main__":
         path_to_save = path_to_save + 'magnitude_'
     path_to_save = path_to_save + str(overlap) + '/'
 
-    save_mergede_dataset(path_to_save, data, lu, idx)
+    save_mergede_dataset(path_to_save, data, lu, la, idx)

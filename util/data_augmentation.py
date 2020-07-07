@@ -372,11 +372,13 @@ def discriminative_guided_warp(x, labels_user, labels_activity, batch_size=6, sl
     return ret
 
 
-def random_transformation(data, labels_user, labels_activity):
+def random_transformation(data, labels_user, labels_activity, log=False):
     '''
         Take orignal train data and apply randomly transformation between jitter, scaling, rotation, permutation
         magnitude warp and time warp
     '''
+
+    steps = np.arange(data.shape[1])
 
     transformed = np.empty([0, data.shape[1], data.shape[2]], dtype=np.float)
     lu = np.empty([0], dtype=np.int)
@@ -397,10 +399,24 @@ def random_transformation(data, labels_user, labels_activity):
         random_transformation = np.random.randint(0,5,size=6) if number_transformations > 0 else []
 
         if len(random_transformation) != 0 :
-            for tranformation in [0,1,2,3,4,5]:
-                ret = functions_transformation[list(functions_transformation.keys())[tranformation]](seq)
-                transformed = np.concatenate((transformed, ret), axis=0)
+            if log:
+                plt.figure(figsize=(12, 8))
+                plt.subplot(3, 3, 2)
+                plt.title('original')
+                plt.plot(steps, seq[0,:,0], '-')
+            for transformation in [0,1,2,3,4,5]:
+                ret = functions_transformation[list(functions_transformation.keys())[transformation]](seq[:,:,[0,1,2]]).reshape((100,3))
+                magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=ret[:,:]).reshape((100,1))
+                ret = np.append(ret, magnitude, axis=1).reshape((1,100,4))
+                transformed = np.append(transformed, ret, axis=0)
                 lu = np.append(lu, labels_user[i])
                 la = np.append(la, labels_activity[i])
+                if log:
+                    plt.subplot(3, 3, transformation+4)
+                    plt.title('{}'.format(list(functions_transformation.keys())[transformation]))
+                    plt.plot(steps, ret[0,:,0], '-')
+            if log:
+                plt.tight_layout()
+                plt.show()
 
     return transformed, lu, la
