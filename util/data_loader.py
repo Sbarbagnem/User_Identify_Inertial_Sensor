@@ -87,8 +87,8 @@ class Dataset(object):
             random_data_transformed = []
             random_guided_warp_data = []
 
-            random_guided_warp_data = random_guided_warp_multivariate(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False, magnitude=True)
-            random_data_transformed, lu, la = random_transformation(TrainData, TrainLU, TrainLA, use_magnitude=True)
+            #random_guided_warp_data = random_guided_warp_multivariate(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False, magnitude=True)
+            random_data_transformed, lu, la = random_transformation(TrainData, TrainLU, TrainLA, use_magnitude=True, log=True)
 
             if random_guided_warp_data != []:
                 TrainData = np.concatenate((TrainData, random_guided_warp_data), axis=0)

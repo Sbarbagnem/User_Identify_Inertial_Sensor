@@ -417,35 +417,31 @@ def random_transformation(data, labels_user, labels_activity, log=False, use_mag
 
     for i, seq in enumerate(tqdm(data)):
         seq = np.reshape(seq, (1, seq.shape[0], seq.shape[1]))
-        number_transformations = np.random.randint(0, 4)
-        random_transformation = np.random.randint(0,3,size=number_transformations) if number_transformations > 0 else []
+        number_transformations = np.random.randint(0, len(functions_transformation))
+        rng =np.random.default_rng()
+        random_transformation = rng.choice(len(functions_transformation), size=number_transformations, replace=False) if number_transformations > 0 else []
 
         if len(random_transformation) != 0 :
-            '''
+            
             if log:
                 plt.figure(figsize=(12, 8))
-                plt.subplot(3, 3, 2)
+                plt.subplot(2,4,1)
                 plt.title('original')
-                plt.plot(steps, seq[0,:,0], '-')
-            '''
-            for transformation in random_transformation:
-                ret = functions_transformation[list(functions_transformation.keys())[transformation]](seq).reshape((1,100,seq.shape[2])) # apply random transformation only on axis not magnitude
-                '''
-                if use_magnitude:
-                    magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=ret[:,:]).reshape((100,1))
-                    ret = np.append(ret, magnitude, axis=1).reshape((1,100,4))
-                '''
+                plt.plot(steps, seq[0,:,3], '-')
+                
+            for i,transformation in enumerate(random_transformation):
+                key_func = list(functions_transformation.keys())[transformation]
+                ret = functions_transformation[key_func](seq).reshape((1,100,seq.shape[2])) # apply random transformation only on axis not magnitude
                 transformed = np.concatenate((transformed, ret), axis=0)
                 lu = np.concatenate((lu, labels_user[i].reshape((1))), axis=0)
                 la = np.concatenate((la, labels_activity[i].reshape((1))), axis=0)
-            '''
                 if log:
-                    plt.subplot(3, 3, transformation+4)
-                    plt.title('{}'.format(list(functions_transformation.keys())[transformation]))
-                    plt.plot(steps, ret[0,:,0], '-')
-            if log:
-                plt.tight_layout()
-                plt.show()
-            '''
+                    plt.subplot(2, 4, i+2)
+                    plt.title('{}'.format(key_func))
+                    plt.plot(steps, ret[0,:,3], '-')
+        if log:
+            plt.tight_layout()
+            plt.show()
+
     print('shape data augmented after radom tranformation {}'.format(transformed.shape))
     return transformed, lu, la
