@@ -242,7 +242,7 @@ def wdba(x, labels, batch_size=6, slope_constraint="symmetric", use_window=True)
 
 # Proposed
 
-def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_constraint='symmetric', use_window=True, dtw_type='normal', magnitude=True):
+def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_constraint='symmetric', use_window=True, dtw_type='normal', magnitude=True, log=False):
     '''
         call random guided warp on every sensors' data
     '''
@@ -262,17 +262,19 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
     for i,idx in enumerate(np.arange(0,x.shape[2],step)):
         idx_sensor = np.arange(i+(offset*i),idx+step)
         #print('idx scelti: {}'.format(idx_sensor))
-        ret, idx_prototype = random_guided_warp(x[:,:,idx_sensor], labels_user, labels_activity, slope_constraint, use_window, dtw_type, idx_prototype)
+        ret, idx_prototype = random_guided_warp(x[:,:,idx_sensor], labels_user, labels_activity, slope_constraint, use_window, dtw_type, idx_prototype, log)
         #print('shape sensor\' data augmented {}'.format(ret.shape))
         data_aug[:,:,idx_sensor] = ret
 
     return data_aug
 
     
-def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmetric", use_window=True, dtw_type="normal", idx_prototype=None):
+def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmetric", use_window=True, dtw_type="normal", idx_prototype=None, log=False):
     import util.dtw as dtw
 
     ret_idx_prototype = []
+
+    print(x.shape)
     
     if use_window:
         window = np.ceil(x.shape[1] / 10.).astype(int)
@@ -281,24 +283,44 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
     orig_steps = np.arange(x.shape[1])
     lu = np.argmax(labels_user, axis=1) if labels_user.ndim > 1 else labels_user
     la = np.argmax(labels_activity, axis=1) if labels_activity.ndim > 1 else labels_activity
-    
+
     ret = np.zeros_like(x)
     for i, pat in enumerate(tqdm(x)):
-        # guarentees that same one isnt selected
-        choices = np.delete(np.arange(x.shape[0]), i)
-        # remove ones of different classes and add selection based on label activity
-        choices = np.where(lu[choices] == lu[i])[0]
-        choices = np.where(la[choices] == la[i])[0]
-        if choices.size > 0:        
+        user = lu[i]
+        activity = la[i]
+        print('sample: user {} activity {}'.format(user, activity))
+        if log:
+            plt.figure(figsize=(12, 8))
+            plt.style.use('seaborn-darkgrid')
+            plt.subplot(1,3,1)
+            plt.title('original signal, user {} activity {}'.format(lu[i], la[i]))
+            plt.plot(orig_steps, pat[:,0], 'b-', label='x')
+            plt.plot(orig_steps, pat[:,1], 'g-', label='y')
+            plt.plot(orig_steps, pat[:,2], 'r-', label='z')
+            plt.legend(loc='upper left')
+            
+        # remove ones of different classes and add selection based on label activity, different from pat
+        temp_u = np.where(lu[np.arange(x.shape[0])] == lu[i])[0]
+        temp_a = np.where(la[np.arange(x.shape[0])] == la[i])[0]
+        choices = [a for u in temp_u for a in temp_a if a == u and a != i] 
+        if len(choices) > 0:        
             # pick random intra-class pattern 
             if idx_prototype == None:
+                print('idx prototype not define yet')
                 idx = np.random.choice(choices)
+                print(idx)
                 random_prototype = x[idx]
                 ret_idx_prototype.append(idx)
             else:
-                random_prototype = x[idx_prototype[i]]
-
-            #print('shape prototype and sample {} {}'.format(random_prototype.shape, pat.shape))
+                idx = idx_prototype[i]
+                random_prototype = x[idx]
+            if log:
+                plt.subplot(1,3,2)
+                plt.title('prototype signal, user {} activity {}'.format(lu[idx], la[idx]))
+                plt.plot(orig_steps, random_prototype[:,0], 'b-', label='x')
+                plt.plot(orig_steps, random_prototype[:,1], 'g-', label='y')
+                plt.plot(orig_steps, random_prototype[:,2], 'r-', label='z')
+                plt.legend(loc='upper left')
    
             if dtw_type == "shape":
                 path = dtw.shape_dtw(random_prototype[:,[0,1,2]], pat[:,[0,1,2]], dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window) # add dtw only on axis and not magnitude
@@ -321,6 +343,14 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
             if x.shape[2] == 3:
                 for dim in range(x.shape[2]):
                     ret[i,:,dim] = np.interp(orig_steps, np.linspace(0, x.shape[1]-1., num=warped.shape[0]), warped[:,dim]).T
+            if log:
+                plt.subplot(1,3,3)
+                plt.title('warped signal')
+                plt.plot(orig_steps, ret[i,:,0], 'b-', label='x')
+                plt.plot(orig_steps, ret[i,:,1], 'g-', label='y')
+                plt.plot(orig_steps, ret[i,:,2], 'r-', label='z')
+                plt.legend(loc='upper left')
+                plt.show()
 
         else:
             print("There is only one pattern of class user  {} and class activity {}, skipping timewarping".format(lu[i], la[i]))
@@ -453,8 +483,8 @@ def random_transformation(data, labels_user, labels_activity, log=False, use_mag
         la[i] = labels_activity[i]
         lu[i] = labels_user[i]
         if log:
-            plt.tight_layout()
-            plt.show()
+                plt.tight_layout()
+                plt.show()
 
     print('shape data augmented after radom tranformation {}'.format(transformed.shape))
 
