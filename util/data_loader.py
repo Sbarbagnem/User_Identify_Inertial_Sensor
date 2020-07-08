@@ -89,17 +89,17 @@ class Dataset(object):
 
             random_guided_warp_data = random_guided_warp_multivariate(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False, magnitude=True)
 
+            random_data_transformed, lu_random, la_random = random_transformation(TrainData, TrainLU, TrainLA, use_magnitude=True, log=False)
+
             if random_guided_warp_data != []:
                 TrainData = np.concatenate((TrainData, random_guided_warp_data), axis=0)
                 TrainLA = np.tile(TrainLA, 2)
                 TrainLU = np.tile(TrainLU, 2)
 
-            random_data_transformed, lu, la = random_transformation(TrainData, TrainLU, TrainLA, use_magnitude=True, log=False)
-
             if random_data_transformed != []:
                 TrainData = np.concatenate((TrainData, random_data_transformed), axis=0)
-                TrainLA = np.append(TrainLA, la)
-                TrainLU = np.append(TrainLU, lu)
+                TrainLA = np.append(TrainLA, la_random)
+                TrainLU = np.append(TrainLU, lu_random)
 
         TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)
         TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)

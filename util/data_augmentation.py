@@ -410,11 +410,16 @@ def random_transformation(data, labels_user, labels_activity, log=False, use_mag
         magnitude warp and time warp
     '''
 
+    # TODO add random merged transformation on the same sequence
+
     steps = np.arange(data.shape[1])
 
-    transformed = np.empty([0, data.shape[1], data.shape[2]], dtype=np.float)
-    lu = np.empty([0], dtype=np.int)
-    la = np.empty([0], dtype=np.int)
+    number_transformations = 6
+    random_transformation = [0,1,2,3,4,5]
+
+    transformed = np.zeros([data.shape[0], data.shape[1], data.shape[2]], dtype=np.float)
+    lu = np.zeros([labels_user.shape[0]], dtype=np.int)
+    la = np.zeros([labels_activity.shape[0]], dtype=np.int)
 
     functions_transformation = {
         'jitter': jitter,
@@ -427,31 +432,30 @@ def random_transformation(data, labels_user, labels_activity, log=False, use_mag
 
     for i, seq in enumerate(tqdm(data)):
         seq = np.reshape(seq, (1, seq.shape[0], seq.shape[1]))
-        number_transformations = np.random.randint(0, len(functions_transformation))
-        rng =np.random.default_rng()
-        random_transformation = rng.choice(len(functions_transformation), size=number_transformations, replace=False) if number_transformations > 0 else []
-
-        if len(random_transformation) != 0 :
+        
+        if log:
+            plt.figure(figsize=(12, 8))
+            plt.subplot(2,4,1)
+            plt.title('original')
+            plt.plot(steps, seq[0,:,3], '-')
             
+        ret = []
+        for j,transformation in enumerate(random_transformation):
+            key_func = list(functions_transformation.keys())[transformation]
+            if ret == []:
+                ret = seq
+            ret = functions_transformation[key_func](ret).reshape((1,ret.shape[1],ret.shape[2])) 
             if log:
-                plt.figure(figsize=(12, 8))
-                plt.subplot(2,4,1)
-                plt.title('original')
-                plt.plot(steps, seq[0,:,3], '-')
-                
-            for i,transformation in enumerate(random_transformation):
-                key_func = list(functions_transformation.keys())[transformation]
-                ret = functions_transformation[key_func](seq).reshape((1,100,seq.shape[2])) # apply random transformation only on axis not magnitude
-                transformed = np.concatenate((transformed, ret), axis=0)
-                lu = np.concatenate((lu, labels_user[i].reshape((1))), axis=0)
-                la = np.concatenate((la, labels_activity[i].reshape((1))), axis=0)
-                if log:
-                    plt.subplot(2, 4, i+2)
-                    plt.title('{}'.format(key_func))
-                    plt.plot(steps, ret[0,:,3], '-')
+                plt.subplot(2, 4, j+2)
+                plt.title('{}'.format(key_func))
+                plt.plot(steps, ret[0,:,3], '-')
+        transformed[i,:,:] = ret
+        la[i] = labels_activity[i]
+        lu[i] = labels_user[i]
         if log:
             plt.tight_layout()
             plt.show()
 
     print('shape data augmented after radom tranformation {}'.format(transformed.shape))
+
     return transformed, lu, la
