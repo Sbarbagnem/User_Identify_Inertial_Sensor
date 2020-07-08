@@ -242,6 +242,31 @@ def wdba(x, labels, batch_size=6, slope_constraint="symmetric", use_window=True)
 
 # Proposed
 
+def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_constraint='symmetric', use_window=True, dtw_type='normal', magnitude=True):
+    '''
+        call random guided warp on every sensors' data
+    '''
+
+    data_aug = np.zeros_like(x)
+    #print('shape input {}'.format(data_aug.shape))
+
+    if magnitude:
+        step = 4
+        offset = 3
+    else:
+        step = 3
+        offset = 2
+
+    for i,idx in enumerate(np.arange(0,x.shape[2],step)):
+        idx_sensor = np.arange(i+(offset*i),idx+step)
+        #print('idx scelti: {}'.format(idx_sensor))
+        ret = random_guided_warp(x[:,:,idx_sensor], labels_user, labels_activity, slope_constraint, use_window,dtw_type)
+        #print('shape sensor\' data augmented {}'.format(ret.shape))
+        data_aug[:,:,idx_sensor] = ret
+
+    return data_aug
+
+    
 def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmetric", use_window=True, dtw_type="normal"):
     import util.dtw as dtw
     
@@ -263,16 +288,17 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
         if choices.size > 0:        
             # pick random intra-class pattern 
             random_prototype = x[np.random.choice(choices)]
-            
+
+            #print('shape prototype and sample {} {}'.format(random_prototype.shape, pat.shape))
+   
             if dtw_type == "shape":
-                path = dtw.shape_dtw(random_prototype, pat, dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window)
+                path = dtw.shape_dtw(random_prototype[:,[0,1,2]], pat[:,[0,1,2]], dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window) # add dtw only on axis and not magnitude
             else:
-                path = dtw.dtw(random_prototype, pat, dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window)
-                            
-            # Time warp
+                path = dtw.dtw(random_prototype[:,[0,1,2]], pat[:,[0,1,2]], dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window) # add dtw only on axis and not magnitude
+            
             warped = pat[path[1]]
 
-            # 1 sensors
+            # magnitude
             if x.shape[2] == 4:
                 for dim in range(x.shape[2]):
                     if dim not in [3]:
@@ -282,15 +308,11 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
                         magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=ret[i,:,np.arange(dim-3, dim)].transpose([1,0]))
                         ret[i,:,dim] = magnitude
 
-            # 2 sensors
-            if x.shape[2] == 8:
+            # no magnitude
+            if x.shape[2] == 3:
                 for dim in range(x.shape[2]):
-                    if dim not in [3, 7]:
-                        ret[i,:,dim] = np.interp(orig_steps, np.linspace(0, x.shape[1]-1., num=warped.shape[0]), warped[:,dim]).T
-                    else:
-                        # magnitude data
-                        magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=ret[i,:,np.arange(dim-3, dim)].transpose([1,0]))
-                        ret[i,:,dim] = magnitude
+                    ret[i,:,dim] = np.interp(orig_steps, np.linspace(0, x.shape[1]-1., num=warped.shape[0]), warped[:,dim]).T
+
         else:
             print("There is only one pattern of class user  {} and class activity {}, skipping timewarping".format(lu[i], la[i]))
             ret[i,:] = pat
@@ -372,7 +394,7 @@ def discriminative_guided_warp(x, labels_user, labels_activity, batch_size=6, sl
     return ret
 
 
-def random_transformation(data, labels_user, labels_activity, log=False):
+def random_transformation(data, labels_user, labels_activity, log=False, use_magnitude=True):
     '''
         Take orignal train data and apply randomly transformation between jitter, scaling, rotation, permutation
         magnitude warp and time warp
@@ -387,8 +409,8 @@ def random_transformation(data, labels_user, labels_activity, log=False):
     functions_transformation = {
         'jitter': jitter,
         'scaling': scaling,
-        'rotation': rotation,
-        'permutation': permutation,
+        #'rotation': rotation,
+        #'permutation': permutation,
         'magnitude warp': magnitude_warp,
         'time warp': time_warp
     }
@@ -396,21 +418,27 @@ def random_transformation(data, labels_user, labels_activity, log=False):
     for i, seq in enumerate(tqdm(data)):
         seq = np.reshape(seq, (1, seq.shape[0], seq.shape[1]))
         number_transformations = np.random.randint(0, 4)
-        random_transformation = np.random.randint(0,5,size=6) if number_transformations > 0 else []
+        random_transformation = np.random.randint(0,3,size=number_transformations) if number_transformations > 0 else []
 
         if len(random_transformation) != 0 :
+            '''
             if log:
                 plt.figure(figsize=(12, 8))
                 plt.subplot(3, 3, 2)
                 plt.title('original')
                 plt.plot(steps, seq[0,:,0], '-')
-            for transformation in [0,1,2,3,4,5]:
-                ret = functions_transformation[list(functions_transformation.keys())[transformation]](seq[:,:,[0,1,2]]).reshape((100,3))
-                magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=ret[:,:]).reshape((100,1))
-                ret = np.append(ret, magnitude, axis=1).reshape((1,100,4))
-                transformed = np.append(transformed, ret, axis=0)
-                lu = np.append(lu, labels_user[i])
-                la = np.append(la, labels_activity[i])
+            '''
+            for transformation in random_transformation:
+                ret = functions_transformation[list(functions_transformation.keys())[transformation]](seq).reshape((1,100,seq.shape[2])) # apply random transformation only on axis not magnitude
+                '''
+                if use_magnitude:
+                    magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=ret[:,:]).reshape((100,1))
+                    ret = np.append(ret, magnitude, axis=1).reshape((1,100,4))
+                '''
+                transformed = np.concatenate((transformed, ret), axis=0)
+                lu = np.concatenate((lu, labels_user[i].reshape((1))), axis=0)
+                la = np.concatenate((la, labels_activity[i].reshape((1))), axis=0)
+            '''
                 if log:
                     plt.subplot(3, 3, transformation+4)
                     plt.title('{}'.format(list(functions_transformation.keys())[transformation]))
@@ -418,5 +446,6 @@ def random_transformation(data, labels_user, labels_activity, log=False):
             if log:
                 plt.tight_layout()
                 plt.show()
-
+            '''
+    print('shape data augmented after radom tranformation {}'.format(transformed.shape))
     return transformed, lu, la

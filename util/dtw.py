@@ -68,6 +68,12 @@ def dtw(prototype, sample, return_flag = RETURN_VALUE, slope_constraint="asymmet
     for i in range(p):
         start = max(0, i-window)
         end = min(s, i+window)+1
+        #print('start {} end {}'.format(start, end))
+        #print(sample[start:end].shape)
+        #print(prototype[i].shape)
+        #print((sample[start:end] - prototype[i]).shape)
+        #print(np.linalg.norm(sample[start:end] - prototype[i], axis=1).shape)
+        #sys.exit(0)
         cost[i,start:end]=np.linalg.norm(sample[start:end] - prototype[i], axis=1)
 
     DTW = _cummulative_matrix(cost, slope_constraint, window)

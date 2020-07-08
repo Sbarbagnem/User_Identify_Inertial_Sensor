@@ -1,6 +1,7 @@
 import os
 import shutil
 import zipfile
+import sys
 
 import numpy as np
 from absl import app, flags
@@ -9,7 +10,7 @@ from scipy.fftpack import fft
 from scipy.io import loadmat
 from sklearn import utils as skutils
 
-from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, wdba, random_guided_warp, random_transformation
+from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, wdba, random_guided_warp, random_transformation, random_guided_warp_multivariate
 
 class Dataset(object):
 
@@ -80,21 +81,31 @@ class Dataset(object):
 
         # adding augmentation to train data if set to true
         if augmented:
+
             #data_noisy = add_gaussian_noise(TrainData)
-            #data_scaled = scaling_sequence(TrainData) 
-            random_guided_warp_data = random_guided_warp(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False)
-            #random_data_transformed, lu, la = random_transformation(TrainData, TrainLU, TrainLA)
-            #wba_data = wdba(TrainData, TrainLU, batch_size=10)
-            TrainData = np.concatenate((TrainData, random_guided_warp_data), axis=0)
-            TrainLA = np.tile(TrainLA, 2)
-                #TrainLA = np.append(TrainLA, la)
-            TrainLU = np.tile(TrainLU, 2)
-            #TrainLU = np.append(TrainLU, lu)
+
+            random_data_transformed = []
+            random_guided_warp_data = []
+
+            random_guided_warp_data = random_guided_warp_multivariate(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False, magnitude=True)
+            random_data_transformed, lu, la = random_transformation(TrainData, TrainLU, TrainLA, use_magnitude=True)
+
+            if random_guided_warp_data != []:
+                TrainData = np.concatenate((TrainData, random_guided_warp_data), axis=0)
+                TrainLA = np.tile(TrainLA, 2)
+                TrainLU = np.tile(TrainLU, 2)
+
+            if random_data_transformed != []:
+                TrainData = np.concatenate((TrainData, random_data_transformed), axis=0)
+                TrainLA = np.append(TrainLA, la)
+                TrainLU = np.append(TrainLU, lu)
 
         TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)
         TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)
 
         print('train data after augmented: {}'.format(TrainData.shape))
+
+        sys.exit(0)
             
         # normalization
         mean = np.mean(np.reshape(TrainData, [-1, self._channel]), axis=0)

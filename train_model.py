@@ -42,7 +42,7 @@ if __name__ == '__main__':
                                     model.load_data_merged(augmented=augmented)
                                 else:
                                     model.load_data(augmented=augmented, only_acc=False)
-                                model.build_model()
-                                model.print_model_summary()
-                                model.loss_opt_metric()
-                                model.train()
+                                #model.build_model()
+                                #model.print_model_summary()
+                                #model.loss_opt_metric()
+                                #model.train()

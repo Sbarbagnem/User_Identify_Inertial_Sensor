@@ -15,7 +15,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         self.num_user = num_user
         self.axes= axes
 
-        # features about single axis sensor (parameters from metier)
+        # features about single axis sensor (kernel len from metier paper)
 
         self.conv1 = tf.keras.layers.Conv2D(filters=32,
                                             kernel_size=(5,1),
@@ -27,6 +27,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(3,1),
                                                strides=(2,1),
                                                padding="valid")
+        
         # features about interaction between sensor
 
         self.layer1 = make_basic_block_layer(filter_num=32,
