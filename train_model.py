@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     # 10-cross validation
     for model_type in ['resnet18_2D']:
-        for dataset_name in ['unimib']:
+        for dataset_name in ['sbhar']:
             for multitask in [False]:
                 for overlap in [5.0]:
                     for magnitude in [True]:
@@ -42,7 +42,7 @@ if __name__ == '__main__':
                                     model.load_data_merged(augmented=augmented)
                                 else:
                                     model.load_data(augmented=augmented, only_acc=False)
-                                #model.build_model()
-                                #model.print_model_summary()
-                                #model.loss_opt_metric()
-                                #model.train()
+                                model.build_model()
+                                model.print_model_summary()
+                                model.loss_opt_metric()
+                                model.train()

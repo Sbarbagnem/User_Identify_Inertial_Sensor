@@ -94,7 +94,7 @@ class Dataset(object):
                 TrainLA = np.tile(TrainLA, 2)
                 TrainLU = np.tile(TrainLU, 2)
 
-            random_data_transformed, lu, la = random_transformation(TrainData, TrainLU, TrainLA, use_magnitude=True, log=True)
+            random_data_transformed, lu, la = random_transformation(TrainData, TrainLU, TrainLA, use_magnitude=True, log=False)
 
             if random_data_transformed != []:
                 TrainData = np.concatenate((TrainData, random_data_transformed), axis=0)

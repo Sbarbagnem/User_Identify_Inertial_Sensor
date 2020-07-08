@@ -324,6 +324,7 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
 
         else:
             print("There is only one pattern of class user  {} and class activity {}, skipping timewarping".format(lu[i], la[i]))
+            ret_idx_prototype.append(-1)
             ret[i,:] = pat
     return ret, ret_idx_prototype
 
