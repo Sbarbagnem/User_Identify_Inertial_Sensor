@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     # 10-cross validation
     for model_type in ['resnet18_2D']:
-        for dataset_name in ['unimib']:
+        for dataset_name in ['sbhar']:
             for multitask in [False]:
                 for overlap in [5.0]:
                     for magnitude in [True]:

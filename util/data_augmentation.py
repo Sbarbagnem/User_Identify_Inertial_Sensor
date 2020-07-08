@@ -306,7 +306,8 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
         if len(choices) > 0:        
             # pick random intra-class pattern 
             if idx_prototype == None:
-                print('idx prototype not define yet')
+                if log:
+                    print('idx prototype not define yet')
                 idx = np.random.choice(choices)
                 print(idx)
                 random_prototype = x[idx]
