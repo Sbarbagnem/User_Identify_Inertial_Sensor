@@ -42,7 +42,7 @@ def scaling_sequence(data):
    
     return data_out
 
-def jitter(x, sigma=0.03):
+def jitter(x, sigma=0.02):
     # https://arxiv.org/pdf/1706.00527.pdf
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
@@ -149,97 +149,6 @@ def window_warp(x, window_ratio=0.1, scales=[0.5, 2.]):
             ret[i,:,dim] = np.interp(np.arange(x.shape[1]), np.linspace(0, x.shape[1]-1., num=warped.size), warped).T
     return ret
 
-def spawner(x, labels, sigma=0.05, verbose=0):
-    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6983028/
-    
-    import util.dtw as dtw
-    from helper import dtw_graph1d
-    random_points = np.random.randint(low=1, high=x.shape[1]-1, size=x.shape[0])
-    window = np.ceil(x.shape[1] / 10.).astype(int)
-    orig_steps = np.arange(x.shape[1])
-    l = np.argmax(labels, axis=1) if labels.ndim > 1 else labels
-    
-    ret = np.zeros_like(x)
-    for i, pat in enumerate(tqdm(x)):
-        # guarentees that same one isnt selected
-        choices = np.delete(np.arange(x.shape[0]), i)
-        # remove ones of different classes
-        choices = np.where(l[choices] == l[i])[0]
-        if choices.size > 0:     
-            random_sample = x[np.random.choice(choices)]
-            # SPAWNER splits the path into two randomly
-            path1 = dtw.dtw(pat[:random_points[i]], random_sample[:random_points[i]], dtw.RETURN_PATH, slope_constraint="symmetric", window=window)
-            path2 = dtw.dtw(pat[random_points[i]:], random_sample[random_points[i]:], dtw.RETURN_PATH, slope_constraint="symmetric", window=window)
-            combined = np.concatenate((np.vstack(path1), np.vstack(path2+random_points[i])), axis=1)
-            if verbose:
-                print(random_points[i])
-                dtw_value, cost, DTW_map, path = dtw.dtw(pat, random_sample, return_flag = dtw.RETURN_ALL, slope_constraint="symmetric", window=window)
-                dtw_graph1d(cost, DTW_map, path, pat, random_sample)
-                dtw_graph1d(cost, DTW_map, combined, pat, random_sample)
-            mean = np.mean([pat[combined[0]], random_sample[combined[1]]], axis=0)
-            for dim in range(x.shape[2]):
-                ret[i,:,dim] = np.interp(orig_steps, np.linspace(0, x.shape[1]-1., num=mean.shape[0]), mean[:,dim]).T
-        else:
-            print("There is only one pattern of class %d, skipping pattern average"%l[i])
-            ret[i,:] = pat
-    return jitter(ret, sigma=sigma)
-
-def wdba(x, labels, batch_size=6, slope_constraint="symmetric", use_window=True):
-    # https://ieeexplore.ieee.org/document/8215569
-    
-    import util.dtw as dtw
-    
-    if use_window:
-        window = np.ceil(x.shape[1] / 10.).astype(int)
-    else:
-        window = None
-    orig_steps = np.arange(x.shape[1])
-    l = np.argmax(labels, axis=1) if labels.ndim > 1 else labels
-        
-    ret = np.zeros_like(x)
-    for i in tqdm(range(ret.shape[0])):
-        # get the same class as i
-        choices = np.where(l == l[i])[0]
-        if choices.size > 0:        
-            # pick random intra-class pattern
-            k = min(choices.size, batch_size)
-            random_prototypes = x[np.random.choice(choices, k, replace=False)]
-            
-            # calculate dtw between all
-            dtw_matrix = np.zeros((k, k))
-            for p, prototype in enumerate(random_prototypes):
-                for s, sample in enumerate(random_prototypes):
-                    if p == s:
-                        dtw_matrix[p, s] = 0.
-                    else:
-                        dtw_matrix[p, s] = dtw.dtw(prototype, sample, dtw.RETURN_VALUE, slope_constraint=slope_constraint, window=window)
-                        
-            # get medoid
-            medoid_id = np.argsort(np.sum(dtw_matrix, axis=1))[0]
-            nearest_order = np.argsort(dtw_matrix[medoid_id])
-            medoid_pattern = random_prototypes[medoid_id]
-            
-            # start weighted DBA
-            average_pattern = np.zeros_like(medoid_pattern)
-            weighted_sums = np.zeros((medoid_pattern.shape[0]))
-            for nid in nearest_order:
-                if nid == medoid_id or dtw_matrix[medoid_id, nearest_order[1]] == 0.:
-                    average_pattern += medoid_pattern 
-                    weighted_sums += np.ones_like(weighted_sums) 
-                else:
-                    path = dtw.dtw(medoid_pattern, random_prototypes[nid], dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window)
-                    dtw_value = dtw_matrix[medoid_id, nid]
-                    warped = random_prototypes[nid, path[1]]
-                    weight = np.exp(np.log(0.5)*dtw_value/dtw_matrix[medoid_id, nearest_order[1]])
-                    average_pattern[path[0]] += weight * warped
-                    weighted_sums[path[0]] += weight 
-            
-            ret[i,:] = average_pattern / weighted_sums[:,np.newaxis]
-        else:
-            print("There is only one pattern of class %d, skipping pattern average"%l[i])
-            ret[i,:] = x[i]
-    return ret
-
 # Proposed
 
 def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_constraint='symmetric', use_window=True, dtw_type='normal', magnitude=True, log=False):
@@ -273,8 +182,6 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
     import util.dtw as dtw
 
     ret_idx_prototype = []
-
-    print(x.shape)
     
     if use_window:
         window = np.ceil(x.shape[1] / 10.).astype(int)
@@ -288,8 +195,8 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
     for i, pat in enumerate(tqdm(x)):
         user = lu[i]
         activity = la[i]
-        print('sample: user {} activity {}'.format(user, activity))
         if log:
+            print('sample: user {} activity {}'.format(user, activity))
             plt.figure(figsize=(12, 8))
             plt.style.use('seaborn-darkgrid')
             plt.subplot(1,3,1)
@@ -309,7 +216,6 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
                 if log:
                     print('idx prototype not define yet')
                 idx = np.random.choice(choices)
-                print(idx)
                 random_prototype = x[idx]
                 ret_idx_prototype.append(idx)
             else:
@@ -441,48 +347,56 @@ def random_transformation(data, labels_user, labels_activity, log=False, use_mag
         magnitude warp and time warp
     '''
 
-    # TODO add random merged transformation on the same sequence
+    number_transformation = []
+    random_transformation = []
+
+    # cycle to define output data shape and improve speed augmentation
+    for i in enumerate(data):
+        rng = np.random.default_rng()
+        number = np.random.randint(1,4,1)
+        number_transformation.append(number)
+        transformations = rng.choice([0,1,2,3], number, replace=False)
+        random_transformation.append(transformations)
+
+    total_transformation = len([sub_item for item in number_transformation for sub_item in item])
+
+    transformed = np.zeros([total_transformation, data.shape[1], data.shape[2]], dtype=np.float)
+    lu = np.zeros([total_transformation], dtype=np.int)
+    la = np.zeros([total_transformation], dtype=np.int)
 
     steps = np.arange(data.shape[1])
-
-    number_transformations = 6
-    random_transformation = [0,1,2,3,4,5]
-
-    transformed = np.zeros([data.shape[0], data.shape[1], data.shape[2]], dtype=np.float)
-    lu = np.zeros([labels_user.shape[0]], dtype=np.int)
-    la = np.zeros([labels_activity.shape[0]], dtype=np.int)
 
     functions_transformation = {
         'jitter': jitter,
         'scaling': scaling,
-        'rotation': rotation,
-        'permutation': permutation,
         'magnitude warp': magnitude_warp,
         'time warp': time_warp
     }
 
     for i, seq in enumerate(tqdm(data)):
+        transformations = random_transformation[i]
         seq = np.reshape(seq, (1, seq.shape[0], seq.shape[1]))
         
         if log:
-            plt.figure(figsize=(12, 8))
-            plt.subplot(2,4,1)
+            plt.figure(figsize=(12, 3))
+            plt.style.use('seaborn-darkgrid')
+            plt.subplot(1,5,1)
             plt.title('original')
             plt.plot(steps, seq[0,:,3], '-')
             
         ret = []
-        for j,transformation in enumerate(random_transformation):
+        for j,transformation in enumerate(transformations):
             key_func = list(functions_transformation.keys())[transformation]
             if ret == []:
                 ret = seq
             ret = functions_transformation[key_func](ret).reshape((1,ret.shape[1],ret.shape[2])) 
             if log:
-                plt.subplot(2, 4, j+2)
+                plt.subplot(1, 5, j+2)
                 plt.title('{}'.format(key_func))
                 plt.plot(steps, ret[0,:,3], '-')
-        transformed[i,:,:] = ret
-        la[i] = labels_activity[i]
-        lu[i] = labels_user[i]
+            transformed[i+j-1,:,:] = ret
+            la[i+j-1] = labels_activity[i]
+            lu[i+j-1] = labels_user[i]
         if log:
                 plt.tight_layout()
                 plt.show()

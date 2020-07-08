@@ -10,7 +10,7 @@ from scipy.fftpack import fft
 from scipy.io import loadmat
 from sklearn import utils as skutils
 
-from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, wdba, random_guided_warp, random_transformation, random_guided_warp_multivariate
+from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, random_guided_warp, random_transformation, random_guided_warp_multivariate
 
 class Dataset(object):
 
@@ -87,7 +87,7 @@ class Dataset(object):
             random_data_transformed = []
             random_guided_warp_data = []
 
-            random_guided_warp_data = random_guided_warp_multivariate(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False, magnitude=True, log=True)
+            random_guided_warp_data = random_guided_warp_multivariate(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False, magnitude=True, log=False)
 
             random_data_transformed, lu_random, la_random = random_transformation(TrainData, TrainLU, TrainLA, use_magnitude=True, log=False)
 
