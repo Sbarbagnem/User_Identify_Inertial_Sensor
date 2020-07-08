@@ -409,8 +409,8 @@ def random_transformation(data, labels_user, labels_activity, log=False, use_mag
     functions_transformation = {
         'jitter': jitter,
         'scaling': scaling,
-        #'rotation': rotation,
-        #'permutation': permutation,
+        'rotation': rotation,
+        'permutation': permutation,
         'magnitude warp': magnitude_warp,
         'time warp': time_warp
     }
