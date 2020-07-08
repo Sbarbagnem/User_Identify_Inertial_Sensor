@@ -247,6 +247,8 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
         call random guided warp on every sensors' data
     '''
 
+    idx_prototype = None
+
     data_aug = np.zeros_like(x)
     #print('shape input {}'.format(data_aug.shape))
 
@@ -260,15 +262,17 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
     for i,idx in enumerate(np.arange(0,x.shape[2],step)):
         idx_sensor = np.arange(i+(offset*i),idx+step)
         #print('idx scelti: {}'.format(idx_sensor))
-        ret = random_guided_warp(x[:,:,idx_sensor], labels_user, labels_activity, slope_constraint, use_window,dtw_type)
+        ret, idx_prototype = random_guided_warp(x[:,:,idx_sensor], labels_user, labels_activity, slope_constraint, use_window, dtw_type, idx_prototype)
         #print('shape sensor\' data augmented {}'.format(ret.shape))
         data_aug[:,:,idx_sensor] = ret
 
     return data_aug
 
     
-def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmetric", use_window=True, dtw_type="normal"):
+def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmetric", use_window=True, dtw_type="normal", idx_prototype=None):
     import util.dtw as dtw
+
+    ret_idx_prototype = []
     
     if use_window:
         window = np.ceil(x.shape[1] / 10.).astype(int)
@@ -287,7 +291,12 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
         choices = np.where(la[choices] == la[i])[0]
         if choices.size > 0:        
             # pick random intra-class pattern 
-            random_prototype = x[np.random.choice(choices)]
+            if idx_prototype == None:
+                idx = np.random.choice(choices)
+                random_prototype = x[idx]
+                ret_idx_prototype.append(idx)
+            else:
+                random_prototype = x[idx_prototype[i]]
 
             #print('shape prototype and sample {} {}'.format(random_prototype.shape, pat.shape))
    
@@ -316,7 +325,7 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
         else:
             print("There is only one pattern of class user  {} and class activity {}, skipping timewarping".format(lu[i], la[i]))
             ret[i,:] = pat
-    return ret
+    return ret, ret_idx_prototype
 
 def discriminative_guided_warp(x, labels_user, labels_activity, batch_size=6, slope_constraint="symmetric", use_window=True, dtw_type="normal", use_variable_slice=True):
     import util.dtw as dtw
