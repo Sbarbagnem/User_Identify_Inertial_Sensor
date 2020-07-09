@@ -42,7 +42,7 @@ def scaling_sequence(data):
    
     return data_out
 
-def jitter(x, sigma=0.02):
+def jitter(x, sigma=0.01):
     # https://arxiv.org/pdf/1706.00527.pdf
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
@@ -341,7 +341,7 @@ def discriminative_guided_warp(x, labels_user, labels_activity, batch_size=6, sl
     return ret
 
 
-def random_transformation(data, labels_user, labels_activity, log=False, use_magnitude=True):
+def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, use_magnitude=True):
     '''
         Take orignal train data and apply randomly transformation between jitter, scaling, rotation, permutation
         magnitude warp and time warp
@@ -353,12 +353,12 @@ def random_transformation(data, labels_user, labels_activity, log=False, use_mag
     # cycle to define output data shape and improve speed augmentation
     for i in enumerate(data):
         rng = np.random.default_rng()
-        number = np.random.randint(1,4,1)
+        number = np.random.randint(0,4,1)
         number_transformation.append(number)
         transformations = rng.choice([0,1,2,3], number, replace=False)
         random_transformation.append(transformations)
 
-    total_transformation = len([sub_item for item in number_transformation for sub_item in item])
+    total_transformation = np.sum(number_transformation)
 
     transformed = np.zeros([total_transformation, data.shape[1], data.shape[2]], dtype=np.float)
     lu = np.zeros([total_transformation], dtype=np.int)
@@ -373,6 +373,10 @@ def random_transformation(data, labels_user, labels_activity, log=False, use_mag
         'time warp': time_warp
     }
 
+    idx, idx_flatten = compute_sub_seq(n_axis, use_magnitude)
+
+    past = 0
+
     for i, seq in enumerate(tqdm(data)):
         transformations = random_transformation[i]
         seq = np.reshape(seq, (1, seq.shape[0], seq.shape[1]))
@@ -381,26 +385,68 @@ def random_transformation(data, labels_user, labels_activity, log=False, use_mag
             plt.figure(figsize=(12, 3))
             plt.style.use('seaborn-darkgrid')
             plt.subplot(1,5,1)
-            plt.title('original')
-            plt.plot(steps, seq[0,:,3], '-')
+            plt.title('original accelerometer')
+            plt.plot(steps, seq[0,:,0], 'b-', label='x')
+            plt.plot(steps, seq[0,:,1], 'g-', label='y')
+            plt.plot(steps, seq[0,:,2], 'r-', label='z')
+            plt.legend(loc='upper left')
             
         ret = []
+        #function_apply = [] # list of index of function to apply
+
         for j,transformation in enumerate(transformations):
             key_func = list(functions_transformation.keys())[transformation]
+
+            '''
+            function_apply.append(str(key_func))
             if ret == []:
-                ret = seq
-            ret = functions_transformation[key_func](ret).reshape((1,ret.shape[1],ret.shape[2])) 
+                ret = seq[:,:,idx_flatten] # only single axis not magnitude
+            '''
+
+            ret = functions_transformation[key_func](seq[:,:,idx_flatten]).reshape((seq.shape[1],len(idx_flatten))) 
+            transformed[past,:,idx_flatten] = ret.transpose()
+
+            if use_magnitude:
+                # calculate magnitude
+                for sensor_axis in idx:
+                    magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=0,arr=seq[0,:,sensor_axis])
+                    transformed[past,:,sensor_axis[-1]+1] = magnitude
             if log:
+                plt.style.use('seaborn-darkgrid')
                 plt.subplot(1, 5, j+2)
                 plt.title('{}'.format(key_func))
-                plt.plot(steps, ret[0,:,3], '-')
-            transformed[i+j-1,:,:] = ret
-            la[i+j-1] = labels_activity[i]
-            lu[i+j-1] = labels_user[i]
+                plt.plot(steps, ret[:,0], 'b-', label='x')
+                plt.plot(steps, ret[:,1], 'g-', label='x')
+                plt.plot(steps, ret[:,2], 'r-', label='x')
+                plt.legend(loc='upper left')
+        
+            la[past] = labels_activity[i]
+            lu[past] = labels_user[i]
+
+            past += 1
+
         if log:
-                plt.tight_layout()
-                plt.show()
+            plt.tight_layout()
+            plt.show()
 
     print('shape data augmented after radom tranformation {}'.format(transformed.shape))
 
     return transformed, lu, la
+
+def compute_sub_seq(n_axis, use_magnitude=True):
+    '''
+        based on number of axis and using of magnitude return list of index for every sensor
+    '''
+    idx = []
+    idx_flatten = []
+
+    if use_magnitude:
+        step = 4
+    else:
+        step = 3
+
+    for i in np.arange(0,n_axis,step):
+        idx.append(list(np.arange(i,i+3)))
+        idx_flatten.extend(list(np.arange(i,i+3)))
+
+    return idx, idx_flatten
