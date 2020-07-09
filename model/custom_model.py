@@ -476,3 +476,10 @@ class Model():
         exp = np.floor((1 + epoch) / dropEvery)
         alpha = initAlpha * (factor ** exp)
         return float(alpha)
+
+    def analyze_train_test_data(self):
+        '''
+            TODO
+        '''
+
+        return 'ok'

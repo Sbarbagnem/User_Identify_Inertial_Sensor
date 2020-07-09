@@ -82,19 +82,27 @@ class Dataset(object):
         # adding augmentation to train data if set to true
         if augmented:
 
-            #data_noisy = add_gaussian_noise(TrainData)
-
             random_data_transformed = []
             random_guided_warp_data = []
+            data_noisy = []
 
-            #random_guided_warp_data = random_guided_warp_multivariate(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False, magnitude=True, log=False)
+            #data_noisy = add_gaussian_noise(TrainData)
 
-            random_data_transformed, lu_random, la_random = random_transformation(TrainData, TrainLU, TrainLA, n_axis=self._channel, use_magnitude=True, log=False)
+            #random_guided_warp_data, lu_warp, la_warp = random_guided_warp_multivariate(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False, magnitude=True, log=False)
+            #print('shape augmented warp ', random_guided_warp_data.shape)
+
+            random_data_transformed, lu_random, la_random = random_transformation(TrainData, TrainLU, TrainLA, n_axis=self._channel, use_magnitude=True, log=True)
+            print('shape augmented random ', random_data_transformed.shape)
+
+            if data_noisy != []:
+                TrainData = np.concatenate((TrainData, data_noisy), axis=0)
+                TrainLA = np.tile(TrainLA, 2)
+                TrainLU = np.tile(TrainLU, 2)
 
             if random_guided_warp_data != []:
                 TrainData = np.concatenate((TrainData, random_guided_warp_data), axis=0)
-                TrainLA = np.tile(TrainLA, 2)
-                TrainLU = np.tile(TrainLU, 2)
+                TrainLA = np.append(TrainLA, la_warp)
+                TrainLU = np.append(TrainLU, lu_warp)
 
             if random_data_transformed != []:
                 TrainData = np.concatenate((TrainData, random_data_transformed), axis=0)

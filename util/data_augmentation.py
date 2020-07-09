@@ -42,7 +42,7 @@ def scaling_sequence(data):
    
     return data_out
 
-def jitter(x, sigma=0.01):
+def jitter(x, sigma=0.03):
     # https://arxiv.org/pdf/1706.00527.pdf
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
@@ -175,7 +175,18 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
         #print('shape sensor\' data augmented {}'.format(ret.shape))
         data_aug[:,:,idx_sensor] = ret
 
-    return data_aug
+    idx_to_del = []
+
+    # delete rw with all zeros from data_aug and label
+    for i,_ in enumerate(data_aug):
+        if np.all(data_aug[i,:,:] == 0):
+            idx_to_del.append(i)
+
+    data_aug = np.delete(data_aug, idx_to_del, 0)
+    labels_user = np.delete(labels_user, idx_to_del, 0)
+    labels_activity = np.delete(labels_activity, idx_to_del, 0)
+
+    return data_aug, labels_user, labels_activity
 
     
 def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmetric", use_window=True, dtw_type="normal", idx_prototype=None, log=False):
@@ -193,76 +204,79 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
 
     ret = np.zeros_like(x)
     for i, pat in enumerate(tqdm(x)):
-        user = lu[i]
-        activity = la[i]
-        if log:
-            print('sample: user {} activity {}'.format(user, activity))
-            plt.figure(figsize=(12, 8))
-            plt.style.use('seaborn-darkgrid')
-            plt.subplot(1,3,1)
-            plt.title('original signal, user {} activity {}'.format(lu[i], la[i]))
-            plt.plot(orig_steps, pat[:,0], 'b-', label='x')
-            plt.plot(orig_steps, pat[:,1], 'g-', label='y')
-            plt.plot(orig_steps, pat[:,2], 'r-', label='z')
-            plt.legend(loc='upper left')
-            
-        # remove ones of different classes and add selection based on label activity, different from pat
-        temp_u = np.where(lu[np.arange(x.shape[0])] == lu[i])[0]
-        temp_a = np.where(la[np.arange(x.shape[0])] == la[i])[0]
-        choices = [a for u in temp_u for a in temp_a if a == u and a != i] 
-        if len(choices) > 0:        
-            # pick random intra-class pattern 
-            if idx_prototype == None:
+        if np.random.random() > 0.5 or (idx_prototype != None and idx_prototype[i] != -1):
+            user = lu[i]
+            activity = la[i]
+            if log:
+                print('sample: user {} activity {}'.format(user, activity))
+                plt.figure(figsize=(12, 8))
+                plt.style.use('seaborn-darkgrid')
+                plt.subplot(1,3,1)
+                plt.title('original signal, user {} activity {}'.format(lu[i], la[i]))
+                plt.plot(orig_steps, pat[:,0], 'b-', label='x')
+                plt.plot(orig_steps, pat[:,1], 'g-', label='y')
+                plt.plot(orig_steps, pat[:,2], 'r-', label='z')
+                plt.legend(loc='upper left')
+                
+            # remove ones of different classes and add selection based on label activity, different from pat
+            temp_u = np.where(lu[np.arange(x.shape[0])] == lu[i])[0]
+            temp_a = np.where(la[np.arange(x.shape[0])] == la[i])[0]
+            choices = [a for u in temp_u for a in temp_a if a == u and a != i] 
+            if len(choices) > 0:        
+                # pick random intra-class pattern 
+                if idx_prototype == None:
+                    if log:
+                        print('idx prototype not define yet')
+                    idx = np.random.choice(choices)
+                    random_prototype = x[idx]
+                    ret_idx_prototype.append(idx)
+                else:
+                    idx = idx_prototype[i]
+                    random_prototype = x[idx]
                 if log:
-                    print('idx prototype not define yet')
-                idx = np.random.choice(choices)
-                random_prototype = x[idx]
-                ret_idx_prototype.append(idx)
-            else:
-                idx = idx_prototype[i]
-                random_prototype = x[idx]
-            if log:
-                plt.subplot(1,3,2)
-                plt.title('prototype signal, user {} activity {}'.format(lu[idx], la[idx]))
-                plt.plot(orig_steps, random_prototype[:,0], 'b-', label='x')
-                plt.plot(orig_steps, random_prototype[:,1], 'g-', label='y')
-                plt.plot(orig_steps, random_prototype[:,2], 'r-', label='z')
-                plt.legend(loc='upper left')
-   
-            if dtw_type == "shape":
-                path = dtw.shape_dtw(random_prototype[:,[0,1,2]], pat[:,[0,1,2]], dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window) # add dtw only on axis and not magnitude
-            else:
-                path = dtw.dtw(random_prototype[:,[0,1,2]], pat[:,[0,1,2]], dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window) # add dtw only on axis and not magnitude
-            
-            warped = pat[path[1]]
+                    plt.subplot(1,3,2)
+                    plt.title('prototype signal, user {} activity {}'.format(lu[idx], la[idx]))
+                    plt.plot(orig_steps, random_prototype[:,0], 'b-', label='x')
+                    plt.plot(orig_steps, random_prototype[:,1], 'g-', label='y')
+                    plt.plot(orig_steps, random_prototype[:,2], 'r-', label='z')
+                    plt.legend(loc='upper left')
+    
+                if dtw_type == "shape":
+                    path = dtw.shape_dtw(random_prototype[:,[0,1,2]], pat[:,[0,1,2]], dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window) # add dtw only on axis and not magnitude
+                else:
+                    path = dtw.dtw(random_prototype[:,[0,1,2]], pat[:,[0,1,2]], dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window) # add dtw only on axis and not magnitude
+                
+                warped = pat[path[1]]
 
-            # magnitude
-            if x.shape[2] == 4:
-                for dim in range(x.shape[2]):
-                    if dim not in [3]:
+                # magnitude
+                if x.shape[2] == 4:
+                    for dim in range(x.shape[2]):
+                        if dim not in [3]:
+                            ret[i,:,dim] = np.interp(orig_steps, np.linspace(0, x.shape[1]-1., num=warped.shape[0]), warped[:,dim]).T
+                        else:
+                            # magnitude data
+                            magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=ret[i,:,np.arange(dim-3, dim)].transpose([1,0]))
+                            ret[i,:,dim] = magnitude
+
+                # no magnitude
+                if x.shape[2] == 3:
+                    for dim in range(x.shape[2]):
                         ret[i,:,dim] = np.interp(orig_steps, np.linspace(0, x.shape[1]-1., num=warped.shape[0]), warped[:,dim]).T
-                    else:
-                        # magnitude data
-                        magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=ret[i,:,np.arange(dim-3, dim)].transpose([1,0]))
-                        ret[i,:,dim] = magnitude
+                if log:
+                    plt.subplot(1,3,3)
+                    plt.title('warped signal')
+                    plt.plot(orig_steps, ret[i,:,0], 'b-', label='x')
+                    plt.plot(orig_steps, ret[i,:,1], 'g-', label='y')
+                    plt.plot(orig_steps, ret[i,:,2], 'r-', label='z')
+                    plt.legend(loc='upper left')
+                    plt.show()
 
-            # no magnitude
-            if x.shape[2] == 3:
-                for dim in range(x.shape[2]):
-                    ret[i,:,dim] = np.interp(orig_steps, np.linspace(0, x.shape[1]-1., num=warped.shape[0]), warped[:,dim]).T
-            if log:
-                plt.subplot(1,3,3)
-                plt.title('warped signal')
-                plt.plot(orig_steps, ret[i,:,0], 'b-', label='x')
-                plt.plot(orig_steps, ret[i,:,1], 'g-', label='y')
-                plt.plot(orig_steps, ret[i,:,2], 'r-', label='z')
-                plt.legend(loc='upper left')
-                plt.show()
-
+            else:
+                print("There is only one pattern of class user  {} and class activity {}, skipping timewarping".format(lu[i], la[i]))
+                ret_idx_prototype.append(-1)
+                #ret[i,:] = np.zeros_like(pat)
         else:
-            print("There is only one pattern of class user  {} and class activity {}, skipping timewarping".format(lu[i], la[i]))
             ret_idx_prototype.append(-1)
-            ret[i,:] = pat
     return ret, ret_idx_prototype
 
 def discriminative_guided_warp(x, labels_user, labels_activity, batch_size=6, slope_constraint="symmetric", use_window=True, dtw_type="normal", use_variable_slice=True):
@@ -349,61 +363,63 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
     number_transformation = []
     random_transformation = []
-
-    # cycle to define output data shape and improve speed augmentation
-    for i in enumerate(data):
-        rng = np.random.default_rng()
-        number = np.random.randint(0,4,1)
-        number_transformation.append(number)
-        transformations = rng.choice([0,1,2,3], number, replace=False)
-        random_transformation.append(transformations)
-
-    total_transformation = np.sum(number_transformation)
-
-    transformed = np.zeros([total_transformation, data.shape[1], data.shape[2]], dtype=np.float)
-    lu = np.zeros([total_transformation], dtype=np.int)
-    la = np.zeros([total_transformation], dtype=np.int)
-
     steps = np.arange(data.shape[1])
 
     functions_transformation = {
         'jitter': jitter,
         'scaling': scaling,
+        'permutation': permutation,
+        'rotation': rotation,
         'magnitude warp': magnitude_warp,
         'time warp': time_warp
     }
 
     idx, idx_flatten = compute_sub_seq(n_axis, use_magnitude)
 
+    # cycle to define output data shape and improve speed augmentation
+    for i in enumerate(data):
+        rng = np.random.default_rng()
+        number = np.random.randint(1,4,1)
+        number_transformation.append(number)
+        transformations = rng.choice(np.arange(len(functions_transformation)), number, replace=False)
+        random_transformation.append(transformations)
+
+    total_transformation = np.sum(number_transformation) 
+
+    transformed = np.zeros([total_transformation+len(random_transformation), data.shape[1], data.shape[2]], dtype=np.float)
+    lu = np.zeros([total_transformation+len(random_transformation)], dtype=np.int)
+    la = np.zeros([total_transformation+len(random_transformation)], dtype=np.int)
+
     past = 0
 
     for i, seq in enumerate(tqdm(data)):
+
         transformations = random_transformation[i]
+
         seq = np.reshape(seq, (1, seq.shape[0], seq.shape[1]))
         
         if log:
             plt.figure(figsize=(12, 3))
             plt.style.use('seaborn-darkgrid')
-            plt.subplot(1,5,1)
+            plt.subplot(1,6,1)
             plt.title('original accelerometer')
             plt.plot(steps, seq[0,:,0], 'b-', label='x')
             plt.plot(steps, seq[0,:,1], 'g-', label='y')
             plt.plot(steps, seq[0,:,2], 'r-', label='z')
             plt.legend(loc='upper left')
             
-        ret = []
+        all_transf = []
         #function_apply = [] # list of index of function to apply
 
         for j,transformation in enumerate(transformations):
             key_func = list(functions_transformation.keys())[transformation]
 
-            '''
-            function_apply.append(str(key_func))
-            if ret == []:
-                ret = seq[:,:,idx_flatten] # only single axis not magnitude
-            '''
+            if all_transf == []:
+                all_transf = seq # seq to apply all transformation on the same sequence
 
             ret = functions_transformation[key_func](seq[:,:,idx_flatten]).reshape((seq.shape[1],len(idx_flatten))) 
+            all_transf = functions_transformation[key_func](all_transf[:,:,idx_flatten]).reshape(1,seq.shape[1],len(idx_flatten)) 
+
             transformed[past,:,idx_flatten] = ret.transpose()
 
             if use_magnitude:
@@ -413,11 +429,11 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                     transformed[past,:,sensor_axis[-1]+1] = magnitude
             if log:
                 plt.style.use('seaborn-darkgrid')
-                plt.subplot(1, 5, j+2)
+                plt.subplot(1, 6, j+2)
                 plt.title('{}'.format(key_func))
                 plt.plot(steps, ret[:,0], 'b-', label='x')
-                plt.plot(steps, ret[:,1], 'g-', label='x')
-                plt.plot(steps, ret[:,2], 'r-', label='x')
+                plt.plot(steps, ret[:,1], 'g-', label='y')
+                plt.plot(steps, ret[:,2], 'r-', label='z')
                 plt.legend(loc='upper left')
         
             la[past] = labels_activity[i]
@@ -425,6 +441,24 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
             past += 1
 
+        transformed[past,:,idx_flatten] = all_transf[:,:,0]
+        if use_magnitude:
+            # calculate magnitude
+            for sensor_axis in idx:
+                magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=0,arr=all_transf[0,:,sensor_axis])
+                transformed[past,:,sensor_axis[-1]+1] = magnitude
+
+        la[past] = labels_activity[i]
+        lu[past] = labels_user[i]
+        past +=1
+        if log:
+            plt.style.use('seaborn-darkgrid')
+            plt.subplot(1, 6, len(transformations)+2)
+            plt.title('all transformations on same sequence')
+            plt.plot(steps, all_transf[0,:,0], 'b-', label='x')
+            plt.plot(steps, all_transf[0,:,1], 'g-', label='y')
+            plt.plot(steps, all_transf[0,:,2], 'r-', label='z')
+            plt.legend(loc='upper left')
         if log:
             plt.tight_layout()
             plt.show()
