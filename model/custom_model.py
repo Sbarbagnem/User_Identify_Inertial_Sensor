@@ -6,6 +6,7 @@ import math
 import datetime
 import json
 import matplotlib.pyplot as plt
+import sys
 
 from model.resNet182D.resnet18_2D import resnet18 as resnet2D
 from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
@@ -14,6 +15,8 @@ from model.resNet18LSTM_consecutive.resnet_18_lstm import resnet18_lstm as conse
 from model.resNet181D.resnet18_1D import resnet18 as resnet1D
 from util.data_loader import Dataset
 from util.tf_metrics import custom_metrics
+from util.data_augmentation import random_transformation
+from util.data_augmentation import random_guided_warp_multivariate
 import seaborn as sn
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -108,12 +111,19 @@ class Model():
                                    act_num=-1,
                                    outer_dir=self.outer_dir)       
 
-    def load_data(self, augmented=False, only_acc=False):
+    def load_data(self, only_acc=False, normalize=True):
         # gat data [examples, window_samples, axes, channel]
         TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU = self.dataset.load_data(
-            step=self.fold, overlapping=self.overlap, augmented=augmented)
+            step=self.fold, overlapping=self.overlap, normalize=normalize)
 
         train_shape = TrainData.shape
+
+        self.train = TrainData
+        self.train_user = TrainLU
+        self.train_act = TrainLA
+        self.test = TestData
+        self.test_user = TestLU
+        self.test_act = TestLA
 
         if only_acc:
             TrainData = TrainData[:,:,[0,1,2,3]]
@@ -123,45 +133,21 @@ class Model():
         print('shape train data: {}'.format(train_shape))
         print('shape test data: {}'.format(TestData.shape))
 
-        self.TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
-        self.TrainLA = tf.data.Dataset.from_tensor_slices(TrainLA)
-        self.TrainLU = tf.data.Dataset.from_tensor_slices(TrainLU)
-
-        self.TestData = tf.data.Dataset.from_tensor_slices(TestData)
-        self.TestLA = tf.data.Dataset.from_tensor_slices(TestLA)
-        self.TestLU = tf.data.Dataset.from_tensor_slices(TestLU)
-
-        train_data = tf.data.Dataset.zip((self.TrainData, self.TrainLA, self.TrainLU))
-        train_data = train_data.batch(self.batch_size, drop_remainder=True)
-        self.train_data = train_data.shuffle(
-            buffer_size=train_shape[0], reshuffle_each_iteration=True)
-
-        test_data = tf.data.Dataset.zip((self.TestData, self.TestLA, self.TestLU))
-        self.test_data = test_data.batch(1, drop_remainder=False)
-
-    def load_data_merged(self, augmented=False):
-        # gat data [examples, window_samples, axes, channel]
-        TrainData, TrainLU, TestData, TestLU = self.dataset.load_data(
-            step=self.fold, overlapping=self.overlap, augmented=augmented)
-
-        train_shape = TrainData.shape
-
-        print('shape train data: {}'.format(train_shape))
-        print('shape test data: {}'.format(TestData.shape))
-
         TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
+        TrainLA = tf.data.Dataset.from_tensor_slices(TrainLA)
         TrainLU = tf.data.Dataset.from_tensor_slices(TrainLU)
 
         TestData = tf.data.Dataset.from_tensor_slices(TestData)
+        TestLA = tf.data.Dataset.from_tensor_slices(TestLA)
         TestLU = tf.data.Dataset.from_tensor_slices(TestLU)
 
-        train_data = tf.data.Dataset.zip((TrainData, TrainLU))
+        train_data = tf.data.Dataset.zip((TrainData, TrainLA, TrainLU))
         train_data = train_data.batch(self.batch_size, drop_remainder=True)
         self.train_data = train_data.shuffle(
             buffer_size=train_shape[0], reshuffle_each_iteration=True)
 
-        test_data = tf.data.Dataset.zip((TestData, TestLU))
-        self.test_data = test_data.batch(self.batch_size, drop_remainder=True)
+        test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
+        self.test_data = test_data.batch(1, drop_remainder=False)
 
     def build_model(self):
         # create model
@@ -287,7 +273,7 @@ class Model():
 
         return cm
         
-    def train(self):
+    def train_model(self):
         if self.multi_task:
             self.train_multi_task()
         else:
@@ -473,52 +459,83 @@ class Model():
                 plt.show()
             '''
 
-    def decay_lr(self, initAlpha=0.001, factor=0.25, dropEvery=20, epoch=0):
+    def decay_lr(self, initLR=0.001, factor=0.25, dropEvery=20, epoch=0):
         exp = np.floor((1 + epoch) / dropEvery)
-        alpha = initAlpha * (factor ** exp)
+        alpha = initLR * (factor ** exp)
         return float(alpha)
 
-    def plot_distribution_data(self):
+    def augment_data(self, augmented_par = [], plot_augmented=False):
+
+        shape_original = self.train.shape[0]
+
+        train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(self.train, self.train_user, self.train_act, self.magnitude, augmented_par, plot_augmented)
+
+        train, test = self.dataset.normalize_data(train_augmented, self.test)
+
+        self.train = train_augmented
+        self.train_user = label_user_augmented
+        self.train_act = label_act_augmented
+
+        TrainData = tf.data.Dataset.from_tensor_slices(train)
+        TrainLA = tf.data.Dataset.from_tensor_slices(label_act_augmented)
+        TrainLU = tf.data.Dataset.from_tensor_slices(label_user_augmented)
+
+        TestData = tf.data.Dataset.from_tensor_slices(test)
+        TestLA = tf.data.Dataset.from_tensor_slices(self.test_act)
+        TestLU = tf.data.Dataset.from_tensor_slices(self.test_user)
+
+        train_data = tf.data.Dataset.zip((TrainData, TrainLA, TrainLU))
+        train_data = train_data.batch(self.batch_size, drop_remainder=True)
+        self.train_data = train_data.shuffle(
+            buffer_size=train.shape[0], reshuffle_each_iteration=True)
+
+        test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
+        self.test_data = test_data.batch(1, drop_remainder=False)
+
+        print('data before augmented {}, data after augmented {}'.format(shape_original, train_augmented.shape[0]))
+
+
+    def plot_distribution_data(self, title=''):
 
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
-        plt.title('Distribuzione dati in train e test')
+        plt.title(f'Distribuzione dati in train e test {title}')
 
-        for user in np.unique(self.TrainLU):
+        user_distributions = []
+        for user in np.unique(self.train_user):
             plt.subplot(2,2,1)
             plt.title('Train user')
-            user_distributions = []
-            number_user = len([i for i in self.TrainLU if i == user])
+            number_user = len([i for i in self.train_user if i == user])
             user_distributions.append(number_user)
 
-        plt.bar(x=np.arange(len(user_distributions)), height=user_distributions)
+        plt.bar(x=list(range(1,len(user_distributions)+1)), height=user_distributions)
 
-        for user in np.unique(self.TestLU):
+        user_distributions = []
+        for user in np.unique(self.test_user):
             plt.subplot(2,2,2)
             plt.title('Test user')
-            user_distributions = []
-            number_user = len([i for i in self.TestLU if i == user])
+            number_user = len([i for i in self.test_user if i == user])
             user_distributions.append(number_user)
 
-        plt.bar(x=np.arange(len(user_distributions)), height=user_distributions)
+        plt.bar(x=list(range(1,len(user_distributions)+1)), height=user_distributions)
 
-        for user in np.unique(self.TrainLA):
+        act_distributions = []
+        for user in np.unique(self.train_act):
             plt.subplot(2,2,3)
             plt.title('Train activity')
-            act_distributions = []
-            number_user = len([i for i in self.TrainLA if i == user])
-            act_distributions.append(number_user)
+            number_act = len([i for i in self.train_act if i == user])
+            act_distributions.append(number_act)
 
-        plt.bar(x=np.arange(len(act_distributions)), height=act_distributions)
+        plt.bar(x=list(range(1,len(act_distributions)+1)), height=act_distributions)
 
-        for user in np.unique(self.TestLA):
+        act_distributions = []
+        for user in np.unique(self.test_act):
             plt.subplot(2,2,4)
             plt.title('Test activity')
-            act_distributions = []
-            number_user = len([i for i in self.TestLA if i == user])
-            act_distributions.append(number_user)
+            number_act = len([i for i in self.test_act if i == user])
+            act_distributions.append(number_act)
 
-        plt.bar(x=np.arange(len(act_distributions)), height=act_distributions)
+        plt.bar(x=list(range(1,len(act_distributions)+1)), height=act_distributions)
 
         plt.tight_layout()
         plt.show()

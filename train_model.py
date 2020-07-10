@@ -18,14 +18,16 @@ if __name__ == '__main__':
 
     plot = True
     train = True
+    augmented_par = ['random_transformations']
+    plot_augmented = False
 
     # 10-cross validation
     for model_type in ['resnet18_2D']:
-        for dataset_name in ['sbhar']:
+        for dataset_name in ['unimib']:
             for multitask in [False]:
                 for overlap in [5.0]:
                     for magnitude in [True]:
-                        for augmented in [False]:
+                        for augmented in [True]:
                             if magnitude:
                                 outer_dir = 'OuterPartition_magnitude_prova_balance_'
                                 save_dir = 'log_magnitude'
@@ -37,21 +39,34 @@ if __name__ == '__main__':
                             for fold in [[0]]:
                                 print(
                                     f"Train on dataset {dataset_name}, with task {'multi_task' if multitask else 'single_task'}, on overlap {overlap}, on fold {fold}")
-                                model = Model(dataset_name=dataset_name, configuration_file=configuration, multi_task=multitask, lr='dynamic',
-                                            model_type=model_type, fold=fold, save_dir=save_dir, 
-                                            outer_dir=outer_dir+str(overlap)+'/', overlap=overlap, magnitude=magnitude, log=True)
+                                model = Model(dataset_name=dataset_name, 
+                                              configuration_file=configuration, 
+                                              multi_task=multitask, lr='dynamic',
+                                              model_type=model_type, 
+                                              fold=fold, 
+                                              save_dir=save_dir, 
+                                              outer_dir=outer_dir+str(overlap)+'/', 
+                                              overlap=overlap, 
+                                              magnitude=magnitude, 
+                                              log=True)
                                 model.create_dataset()
-                                
-                                if dataset_name == 'unimib_sbhar':
-                                    model.load_data_merged(augmented=augmented)
+
+                                if augmented_par != []:
+                                    model.load_data(only_acc=False, normalize=False)
                                 else:
-                                    model.load_data(augmented=augmented, only_acc=False)
+                                    model.load_data(only_acc=False, normalize=True)
 
                                 if plot:
-                                    model.plot_distribution_data()
+                                    model.plot_distribution_data(title='no augmented')
+
+                                if augmented and augmented_par != []:
+                                    model.augment_data(augmented_par, plot_augmented)
+
+                                if plot:
+                                    model.plot_distribution_data(title='augmented')
 
                                 if train:
                                     model.build_model()
                                     model.print_model_summary()
                                     model.loss_opt_metric()
-                                    model.train()
+                                    model.train_model()

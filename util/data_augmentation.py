@@ -3,6 +3,7 @@
 '''
 import os
 import numpy as np
+import math
 from tqdm import tqdm
 import sys
 
@@ -355,11 +356,29 @@ def discriminative_guided_warp(x, labels_user, labels_activity, batch_size=6, sl
     return ret
 
 
-def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, use_magnitude=True):
+def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, n_sensor=1, use_magnitude=True):
     '''
         Take orignal train data and apply randomly transformation between jitter, scaling, rotation, permutation
         magnitude warp and time warp
     '''
+
+    # calculate activity class with minor sample in train
+    distribution_activity = []
+    for act in np.unique(labels_activity):
+        samples = len([i for i in labels_activity if i == act])
+        distribution_activity.append(samples)
+
+    print('old distribution: {}'.format(distribution_activity))
+
+    min_freq = min(distribution_activity)
+    max_freq = max(distribution_activity)
+
+    to_add = [int((max_freq-freq) * 0.4) for freq in distribution_activity]
+
+    #new_distribution = [(act/freq) for act,freq in zip(to_add, distribution_activity)]
+
+    #final_distribution = [(old*new)+old for old,new in zip(distribution_activity, new_distribution)]
+
 
     number_transformation = []
     random_transformation = []
@@ -374,26 +393,43 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
         'time warp': time_warp
     }
 
-    idx, idx_flatten = compute_sub_seq(n_axis, use_magnitude)
+    idx, idx_flatten = compute_sub_seq(n_axis, n_sensor, use_magnitude)
 
     # cycle to define output data shape and improve speed augmentation
-    for i in enumerate(data):
+    for i,_ in enumerate(data):
+
         rng = np.random.default_rng()
-        number = np.random.randint(1,4,1)
-        number_transformation.append(number)
-        transformations = rng.choice(np.arange(len(functions_transformation)), number, replace=False)
-        random_transformation.append(transformations)
 
-    total_transformation = np.sum(number_transformation) 
+        added = False
 
-    transformed = np.zeros([total_transformation+len(random_transformation), data.shape[1], data.shape[2]], dtype=np.float)
-    lu = np.zeros([total_transformation+len(random_transformation)], dtype=np.int)
-    la = np.zeros([total_transformation+len(random_transformation)], dtype=np.int)
+        if to_add[labels_activity[i]] > 5:
+            number = np.random.randint(3,5)
+            to_add[labels_activity[i]] -= number + 1
+            added = True
+
+        if to_add[labels_activity[i]] > 0 and added == False:
+            number = 1
+            to_add[labels_activity[i]] -= 2
+            added = True
+
+        if added:
+            number_transformation.append(number+1)
+            transformations = rng.choice(np.arange(len(functions_transformation)), number, replace=False)
+            random_transformation.append(transformations)
+        else:
+            random_transformation.append([])
+
+    total_transformation = np.sum(number_transformation)
+    
+
+    transformed = np.zeros([total_transformation, data.shape[1], data.shape[2]], dtype=np.float)
+    lu = np.zeros([total_transformation], dtype=np.int)
+    la = np.zeros([total_transformation], dtype=np.int)
 
     past = 0
 
     for i, seq in enumerate(tqdm(data)):
-
+        applied = False
         transformations = random_transformation[i]
 
         seq = np.reshape(seq, (1, seq.shape[0], seq.shape[1]))
@@ -412,20 +448,24 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
         #function_apply = [] # list of index of function to apply
 
         for j,transformation in enumerate(transformations):
+            applied = True
             key_func = list(functions_transformation.keys())[transformation]
 
             if all_transf == []:
                 all_transf = seq # seq to apply all transformation on the same sequence
+                all_transf = functions_transformation[key_func](all_transf[:,:,idx_flatten]).reshape(1,seq.shape[1],len(idx_flatten)) # (1,100,6)
+            else:
+                all_transf = functions_transformation[key_func](all_transf).reshape(1,seq.shape[1],len(idx_flatten)) # (1,100,6)
 
-            ret = functions_transformation[key_func](seq[:,:,idx_flatten]).reshape((seq.shape[1],len(idx_flatten))) 
-            all_transf = functions_transformation[key_func](all_transf[:,:,idx_flatten]).reshape(1,seq.shape[1],len(idx_flatten)) 
-
+            # seq (1,100,axis)
+            # seq[:,:,idx_flatten] (1,100,axis-magnitude)
+            ret = functions_transformation[key_func](seq[:,:,idx_flatten]).reshape((seq.shape[1],len(idx_flatten))) # (100, axis)
             transformed[past,:,idx_flatten] = ret.transpose()
 
             if use_magnitude:
                 # calculate magnitude
                 for sensor_axis in idx:
-                    magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=0,arr=seq[0,:,sensor_axis])
+                    magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=ret[:,sensor_axis])
                     transformed[past,:,sensor_axis[-1]+1] = magnitude
             if log:
                 plt.style.use('seaborn-darkgrid')
@@ -440,18 +480,18 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
             lu[past] = labels_user[i]
 
             past += 1
+        if applied:
+            transformed[past,:,idx_flatten] = all_transf[0,:,:].transpose()
+            if use_magnitude:
+                # calculate magnitude
+                for sensor_axis in idx:
+                    magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=0,arr=all_transf[0,:,sensor_axis])
+                    transformed[past,:,sensor_axis[-1]+1] = magnitude
 
-        transformed[past,:,idx_flatten] = all_transf[:,:,0]
-        if use_magnitude:
-            # calculate magnitude
-            for sensor_axis in idx:
-                magnitude = np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=0,arr=all_transf[0,:,sensor_axis])
-                transformed[past,:,sensor_axis[-1]+1] = magnitude
-
-        la[past] = labels_activity[i]
-        lu[past] = labels_user[i]
-        past +=1
-        if log:
+            la[past] = labels_activity[i]
+            lu[past] = labels_user[i]
+            past +=1
+        if log and applied:
             plt.style.use('seaborn-darkgrid')
             plt.subplot(1, 6, len(transformations)+2)
             plt.title('all transformations on same sequence')
@@ -459,20 +499,42 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
             plt.plot(steps, all_transf[0,:,1], 'g-', label='y')
             plt.plot(steps, all_transf[0,:,2], 'r-', label='z')
             plt.legend(loc='upper left')
-        if log:
             plt.tight_layout()
             plt.show()
 
-    print('shape data augmented after radom tranformation {}'.format(transformed.shape))
+    #print('shape data augmented after radom tranformation {}'.format(transformed.shape))
+
+    final = np.concatenate((labels_activity, la), axis=0)
+
+    # calculate activity class with minor sample in train
+    distribution_activity = []
+    for act in np.unique(la):
+        samples = len([i for i in final if i == act])
+        distribution_activity.append(samples)
+
+    print('new distribution: {}'.format(distribution_activity))
+    '''
+    final = np.concatenate((labels_user, lu), axis=0)
+
+    # calculate activity class with minor sample in train
+    distribution_activity = []
+    for act in np.unique(lu):
+        samples = len([i for i in final if i == act])
+        distribution_activity.append(samples)
+
+    print('balanced user: {}'.format(distribution_activity))
+    '''
 
     return transformed, lu, la
 
-def compute_sub_seq(n_axis, use_magnitude=True):
+def compute_sub_seq(n_axis, n_sensor=1, use_magnitude=True):
     '''
         based on number of axis and using of magnitude return list of index for every sensor
     '''
     idx = []
     idx_flatten = []
+
+    print(n_axis, n_sensor)
 
     if use_magnitude:
         step = 4
@@ -480,7 +542,10 @@ def compute_sub_seq(n_axis, use_magnitude=True):
         step = 3
 
     for i in np.arange(0,n_axis,step):
-        idx.append(list(np.arange(i,i+3)))
+        #idx.append(list(np.arange(i,i+3)))
         idx_flatten.extend(list(np.arange(i,i+3)))
+
+    for i in np.arange(0,n_sensor*3, 3):
+        idx.append(list(np.arange(i, i+3)))
 
     return idx, idx_flatten

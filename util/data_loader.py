@@ -9,6 +9,7 @@ from scipy import stats
 from scipy.fftpack import fft
 from scipy.io import loadmat
 from sklearn import utils as skutils
+from configuration import config
 
 from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, random_guided_warp, random_transformation, random_guided_warp_multivariate
 
@@ -26,8 +27,12 @@ class Dataset(object):
         self._data_shape = [None, self._winlen, self._channel, 1]
         self._save_dir = save_dir
         self.outer_dir = outer_dir
+        self.augmented_fun = {
+            'random_transformations': random_transformation,
+            'random_warped': random_guided_warp_multivariate
+        }
 
-    def load_data(self, augmented=False, step=0, overlapping=0.5):
+    def load_data(self, step=0, overlapping=0.5, normalize=True):
 
         TrainData = np.empty([0, self._winlen, self._channel], dtype=np.float)
         TrainLA = np.empty([0], dtype=np.int32)
@@ -77,57 +82,62 @@ class Dataset(object):
         TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
         TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
 
-        print('train data before augmented: {}'.format(TrainData.shape))
-
-        # adding augmentation to train data if set to true
-        if augmented:
-
-            random_data_transformed = []
-            random_guided_warp_data = []
-            data_noisy = []
-
-            #data_noisy = add_gaussian_noise(TrainData)
-
-            #random_guided_warp_data, lu_warp, la_warp = random_guided_warp_multivariate(TrainData, labels_user=TrainLU, labels_activity=TrainLA, dtw_type='normal', use_window=False, magnitude=True, log=False)
-            #print('shape augmented warp ', random_guided_warp_data.shape)
-
-            random_data_transformed, lu_random, la_random = random_transformation(TrainData, TrainLU, TrainLA, n_axis=self._channel, use_magnitude=True, log=True)
-            print('shape augmented random ', random_data_transformed.shape)
-
-            if data_noisy != []:
-                TrainData = np.concatenate((TrainData, data_noisy), axis=0)
-                TrainLA = np.tile(TrainLA, 2)
-                TrainLU = np.tile(TrainLU, 2)
-
-            if random_guided_warp_data != []:
-                TrainData = np.concatenate((TrainData, random_guided_warp_data), axis=0)
-                TrainLA = np.append(TrainLA, la_warp)
-                TrainLU = np.append(TrainLU, lu_warp)
-
-            if random_data_transformed != []:
-                TrainData = np.concatenate((TrainData, random_data_transformed), axis=0)
-                TrainLA = np.append(TrainLA, la_random)
-                TrainLU = np.append(TrainLU, lu_random)
+        print('train data shape: {}'.format(TrainData.shape))
 
         TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)
         TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)
-
-        print('train data after augmented: {}'.format(TrainData.shape))
             
         # normalization
-        mean = np.mean(np.reshape(TrainData, [-1, self._channel]), axis=0)
-        std = np.std(np.reshape(TrainData, [-1, self._channel]), axis=0)
+        if normalize:
+            TrainData, TestData = self.normalize_data(TrainData, TestData)
 
-        TrainData = (TrainData - mean)/std
-        TestData = (TestData - mean)/std
+        return TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU
 
-        TrainData = np.expand_dims(TrainData, 3)
-        TestData = np.expand_dims(TestData,  3)
+    def normalize_data(self, train, test):
 
-        if self._name != 'unimib_sbhar':
-            return TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU
-        else:
-            return TrainData, TrainLU, TestData, TestLU
+        # normalization
+        mean = np.mean(np.reshape(train, [-1, self._channel]), axis=0)
+        std = np.std(np.reshape(train, [-1, self._channel]), axis=0)
+
+        train = (train - mean)/std
+        test = (test - mean)/std
+
+        train = np.expand_dims(train, 3)
+        test = np.expand_dims(test,  3)
+
+        return train, test
+
+    def augment_data(self, data, lu, la, magnitude, augmented_par, plot_augmented):
+
+        if augmented_par != []:
+            train_augmented = np.copy(data)
+            label_user_augmented = np.copy(lu)
+            label_act_augmented = np.copy(la)
+
+            for fun in augmented_par:
+                if fun == 'random_transformations':
+                    train, lu, la = self.augmented_fun[fun](data, 
+                                                            lu, 
+                                                            la,
+                                                            n_axis=self._channel,
+                                                            n_sensor=len(config[self._name]['SENSOR_DICT']),
+                                                            use_magnitude=magnitude,
+                                                            log=plot_augmented) 
+
+                if fun == 'random_warped':
+                    train, lu, la = self.augmented_fun[fun](data,
+                                                            lu,
+                                                            la,
+                                                            dtw_type='normal',
+                                                            use_window=False,
+                                                            magnitude=magnitude,
+                                                            log=plot_augmented)
+
+                train_augmented = np.concatenate((train_augmented, train), axis=0)
+                label_user_augmented = np.concatenate((label_user_augmented, lu), axis=0)
+                label_act_augmented = np.concatenate((label_act_augmented, la), axis=0)
+
+                return train_augmented, label_user_augmented, label_act_augmented
 
 def to_delete(overlapping):
     if overlapping == 5.0:
