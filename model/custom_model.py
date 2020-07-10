@@ -5,6 +5,7 @@ from sklearn import utils as skutils
 import math
 import datetime
 import json
+import matplotlib.pyplot as plt
 
 from model.resNet182D.resnet18_2D import resnet18 as resnet2D
 from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
@@ -122,20 +123,20 @@ class Model():
         print('shape train data: {}'.format(train_shape))
         print('shape test data: {}'.format(TestData.shape))
 
-        TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
-        TrainLA = tf.data.Dataset.from_tensor_slices(TrainLA)
-        TrainLU = tf.data.Dataset.from_tensor_slices(TrainLU)
+        self.TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
+        self.TrainLA = tf.data.Dataset.from_tensor_slices(TrainLA)
+        self.TrainLU = tf.data.Dataset.from_tensor_slices(TrainLU)
 
-        TestData = tf.data.Dataset.from_tensor_slices(TestData)
-        TestLA = tf.data.Dataset.from_tensor_slices(TestLA)
-        TestLU = tf.data.Dataset.from_tensor_slices(TestLU)
+        self.TestData = tf.data.Dataset.from_tensor_slices(TestData)
+        self.TestLA = tf.data.Dataset.from_tensor_slices(TestLA)
+        self.TestLU = tf.data.Dataset.from_tensor_slices(TestLU)
 
-        train_data = tf.data.Dataset.zip((TrainData, TrainLA, TrainLU))
+        train_data = tf.data.Dataset.zip((self.TrainData, self.TrainLA, self.TrainLU))
         train_data = train_data.batch(self.batch_size, drop_remainder=True)
         self.train_data = train_data.shuffle(
             buffer_size=train_shape[0], reshuffle_each_iteration=True)
 
-        test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
+        test_data = tf.data.Dataset.zip((self.TestData, self.TestLA, self.TestLU))
         self.test_data = test_data.batch(1, drop_remainder=False)
 
     def load_data_merged(self, augmented=False):
@@ -477,9 +478,48 @@ class Model():
         alpha = initAlpha * (factor ** exp)
         return float(alpha)
 
-    def analyze_train_test_data(self):
-        '''
-            TODO
-        '''
+    def plot_distribution_data(self):
 
-        return 'ok'
+        plt.figure(figsize=(12, 3))
+        plt.style.use('seaborn-darkgrid')
+        plt.title('Distribuzione dati in train e test')
+
+        for user in np.unique(self.TrainLU):
+            plt.subplot(2,2,1)
+            plt.title('Train user')
+            user_distributions = []
+            number_user = len([i for i in self.TrainLU if i == user])
+            user_distributions.append(number_user)
+
+        plt.bar(x=np.arange(len(user_distributions)), height=user_distributions)
+
+        for user in np.unique(self.TestLU):
+            plt.subplot(2,2,2)
+            plt.title('Test user')
+            user_distributions = []
+            number_user = len([i for i in self.TestLU if i == user])
+            user_distributions.append(number_user)
+
+        plt.bar(x=np.arange(len(user_distributions)), height=user_distributions)
+
+        for user in np.unique(self.TrainLA):
+            plt.subplot(2,2,3)
+            plt.title('Train activity')
+            act_distributions = []
+            number_user = len([i for i in self.TrainLA if i == user])
+            act_distributions.append(number_user)
+
+        plt.bar(x=np.arange(len(act_distributions)), height=act_distributions)
+
+        for user in np.unique(self.TestLA):
+            plt.subplot(2,2,4)
+            plt.title('Test activity')
+            act_distributions = []
+            number_user = len([i for i in self.TestLA if i == user])
+            act_distributions.append(number_user)
+
+        plt.bar(x=np.arange(len(act_distributions)), height=act_distributions)
+
+        plt.tight_layout()
+        plt.show()
+

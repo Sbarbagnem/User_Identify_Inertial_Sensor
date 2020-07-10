@@ -8,6 +8,7 @@ import numpy as np
 from scipy import stats
 from scipy.io import loadmat
 from sklearn import utils as skutils
+import matplotlib.pyplot as plt
 
 from sliding_window import sliding_window
 
@@ -239,7 +240,7 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
     root_path = path + 'SBHAR'
     raw_data_path = root_path + '/RawData/'
     if magnitude:
-        processed_path = path_out + 'OuterPartition_magnitude_{}'.format(str(size_overlapping*10))
+        processed_path = path_out + 'OuterPartition_magnitude_prova_balance_{}'.format(str(size_overlapping*10))
     else:
         processed_path = path_out + 'OuterPartition_{}'.format(str(size_overlapping*10))
 
@@ -357,6 +358,12 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
     if not os.path.exists(processed_path + '/'):
         os.mkdir(processed_path + '/')
 
+    indexes = split_balanced_data(lu, la, folders=10)
+
+    plt_user_distribution(indexes, lu)
+
+    plt_act_distribution(indexes, la)
+
     # partition
     for i in range(10):
 
@@ -365,7 +372,8 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
             shutil.rmtree(processed_path+'/fold{}'.format(i))
         os.mkdir(processed_path+'/fold{}'.format(i))
 
-        idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
+        #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
+        idx = indexes[str(i)]
         np.save(processed_path+'/fold{}/data'.format(i),       data[idx])
         np.save(processed_path+'/fold{}/user_label'.format(i), lu[idx])
         np.save(processed_path+'/fold{}/act_label'.format(i),  la[idx])
@@ -378,7 +386,7 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
     root_path = path + 'unimib_dataset'
     raw_data_path = root_path + '/data/'
     if magnitude:
-        processed_path = path_out + 'OuterPartition_magnitude_{}'.format(str(size_overlapping*10))
+        processed_path = path_out + 'OuterPartition_magnitude_prova_balance_{}'.format(str(size_overlapping*10))
     else:
         processed_path = path_out + 'OuterPartition_{}'.format(str(size_overlapping*10))
     win_len = 100   # 50 Hz * 2 seconds
@@ -440,7 +448,12 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
         os.mkdir(processed_path + '/')
 
     # split balanced data, return array (10, indexes_folder)
-    #indexes = split_balanced_data(lu, 10)
+    indexes = split_balanced_data(lu, la, folders=10)
+
+    plt_user_distribution(indexes, lu)
+
+    plt_act_distribution(indexes, la)
+
 
     # create dir partition
     for i in range(10):
@@ -450,42 +463,41 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
             shutil.rmtree(processed_path+'/fold{}'.format(i))
         os.mkdir(processed_path+'/fold{}'.format(i))
 
-        idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
-        #idx = indexes[str(i)]
+        #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
+        idx = indexes[str(i)]
         np.save(processed_path+'/fold{}/data'.format(i),       data[idx])
         np.save(processed_path+'/fold{}/user_label'.format(i), lu[idx])
         np.save(processed_path+'/fold{}/act_label'.format(i),  la[idx])
         np.save(processed_path+'/fold{}/id'.format(i),         ID[idx])
 
-def split_balanced_data(labels, folders):
+def split_balanced_data(lu, la, folders=10):
 
-    print('Numero totale di esempi: {}'.format(len(labels)))
+    print('Numero totale di esempi: {}'.format(len(lu)))
 
-    indexes = {
-        '0': [],
-        '1': [],
-        '2': [],
-        '3': [],
-        '4': [],
-        '5': [],
-        '6': [],
-        '7': [],
-        '8': [],
-        '9': [],
-    }
+    # dict to save indexes' example for every folder
+    indexes = {}
+    for i in np.arange(folders):
+        indexes[str(i)] = []
 
-    # for every label
-    for label in np.unique(labels):
-        temp_index_label = [index for index,x in enumerate(labels) if x==label] 
-        samples_for_label = int(len(temp_index_label)/folders)
-        #print(f'samples for label {label}: {samples_for_label}')
-        for folder in range(folders):
-            if (folder*samples_for_label)+samples_for_label > len(temp_index_label) or folder==9:
-                indexes[str(folder)].extend(temp_index_label[folder*samples_for_label:])
-            else:
-                indexes[str(folder)].extend(temp_index_label[folder*samples_for_label:(folder*samples_for_label)+samples_for_label])
-    #for key in indexes.keys():
-        #print(f'Numero campioni nel folder {key}: {len(indexes[key])}')
+    # balance split label user-activity in every folders 
+    for user in np.unique(lu): # specific user
+        temp_index_label_user = [index for index,x in enumerate(lu) if x==user] # index of specific user
+
+        for act in np.unique(la): # specific activity
+            temp_index_label_act = [index for index,x in enumerate(la) if x==act and index in temp_index_label_user] # index of specific activity of user
+
+            while(len(temp_index_label_act)>0):
+                for folder in range(folders):
+                    if len(temp_index_label_act) > 0 :
+                        indexes[str(folder)].append(temp_index_label_act[0])
+                        del temp_index_label_act[0]
+                    else:
+                        continue
+                
+
+    for key in indexes.keys():
+        print(f'Numero campioni nel folder {key}: {len(indexes[key])}')
+
     for folder1,l1 in zip(indexes.keys(),indexes.values()):
         for folder2,l2 in zip(indexes.keys(),indexes.values()):
             if folder1 != folder2:
@@ -494,6 +506,44 @@ def split_balanced_data(labels, folders):
                     print('duplicates elements in different folder')
                     exit()
     return indexes
+
+
+def plt_user_distribution(dict_indexes, lu):
+
+    plt.figure(figsize=(12, 3))
+    plt.style.use('seaborn-darkgrid')
+
+    for folder in np.arange(len(dict_indexes)):
+        plt.subplot(2,5,folder+1)
+        plt.title('folder {}'.format(folder+1))
+        folder_index = dict_indexes[str(folder)]
+        user_distributions = []
+        for user in np.unique(lu):
+            number_user = len([i for index,i in enumerate(lu) if i == user and index in folder_index])
+            user_distributions.append(number_user)
+
+        plt.bar(x=np.arange(len(user_distributions)), height=user_distributions)
+    plt.tight_layout()
+    plt.show()
+
+def plt_act_distribution(dict_indexes, la):
+
+    plt.figure(figsize=(12, 3))
+    plt.style.use('seaborn-darkgrid')
+
+    for folder in np.arange(len(dict_indexes)):
+        plt.subplot(2,5,folder+1)
+        plt.title('folder {}'.format(folder+1))
+        folder_index = dict_indexes[str(folder)]
+        act_distributions = []
+        for act in np.unique(la):
+            number_act = len([i for index,i in enumerate(la) if i == act and index in folder_index])
+            act_distributions.append(number_act)
+
+        plt.bar(x=np.arange(len(act_distributions)), height=act_distributions)
+    plt.tight_layout()
+    plt.show()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
