@@ -219,6 +219,12 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
     data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
     data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
 
+    indexes = split_balanced_data(lu, la, folders=10)
+
+    plt_user_distribution(indexes, lu)
+
+    plt_act_distribution(indexes, la)
+
     # partition
     for i in range(10):
 
@@ -227,7 +233,8 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
             shutil.rmtree(processed_path+'/fold{}'.format(i))
         os.mkdir(processed_path+'/fold{}'.format(i))
 
-        idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
+        #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
+        idx = indexes[str(i)]
         np.save(processed_path+'/fold{}/data'.format(i),       data[idx])
         np.save(processed_path+'/fold{}/user_label'.format(i), lu[idx])
         np.save(processed_path+'/fold{}/act_label'.format(i),  la[idx])

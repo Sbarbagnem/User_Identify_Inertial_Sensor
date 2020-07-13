@@ -13,7 +13,7 @@ from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
 from model.resNet18LSTM_parallel.resnet_18_lstm import resnet18_lstm as parallel
 from model.resNet18LSTM_consecutive.resnet_18_lstm import resnet18_lstm as consecutive
 from model.resNet181D.resnet18_1D import resnet18 as resnet1D
-from util.data_loader import Dataset
+from util.dataset import Dataset
 from util.tf_metrics import custom_metrics
 from util.data_augmentation import random_transformation
 from util.data_augmentation import random_guided_warp_multivariate
@@ -148,6 +148,36 @@ class Model():
 
         test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
         self.test_data = test_data.batch(1, drop_remainder=False)
+
+    def augment_data(self, augmented_par = [], plot_augmented=False):
+
+        shape_original = self.train.shape[0]
+
+        train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(self.train, self.train_user, self.train_act, self.magnitude, augmented_par, plot_augmented)
+
+        train, test = self.dataset.normalize_data(train_augmented, self.test)
+
+        self.train = train_augmented
+        self.train_user = label_user_augmented
+        self.train_act = label_act_augmented
+
+        TrainData = tf.data.Dataset.from_tensor_slices(train)
+        TrainLA = tf.data.Dataset.from_tensor_slices(label_act_augmented)
+        TrainLU = tf.data.Dataset.from_tensor_slices(label_user_augmented)
+
+        TestData = tf.data.Dataset.from_tensor_slices(test)
+        TestLA = tf.data.Dataset.from_tensor_slices(self.test_act)
+        TestLU = tf.data.Dataset.from_tensor_slices(self.test_user)
+
+        train_data = tf.data.Dataset.zip((TrainData, TrainLA, TrainLU))
+        train_data = train_data.batch(self.batch_size, drop_remainder=True)
+        self.train_data = train_data.shuffle(
+            buffer_size=train.shape[0], reshuffle_each_iteration=True)
+
+        test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
+        self.test_data = test_data.batch(1, drop_remainder=False)
+
+        print('data before augmented {}, data after augmented {}'.format(shape_original, train_augmented.shape[0]))
 
     def build_model(self):
         # create model
@@ -463,37 +493,6 @@ class Model():
         exp = np.floor((1 + epoch) / dropEvery)
         alpha = initLR * (factor ** exp)
         return float(alpha)
-
-    def augment_data(self, augmented_par = [], plot_augmented=False):
-
-        shape_original = self.train.shape[0]
-
-        train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(self.train, self.train_user, self.train_act, self.magnitude, augmented_par, plot_augmented)
-
-        train, test = self.dataset.normalize_data(train_augmented, self.test)
-
-        self.train = train_augmented
-        self.train_user = label_user_augmented
-        self.train_act = label_act_augmented
-
-        TrainData = tf.data.Dataset.from_tensor_slices(train)
-        TrainLA = tf.data.Dataset.from_tensor_slices(label_act_augmented)
-        TrainLU = tf.data.Dataset.from_tensor_slices(label_user_augmented)
-
-        TestData = tf.data.Dataset.from_tensor_slices(test)
-        TestLA = tf.data.Dataset.from_tensor_slices(self.test_act)
-        TestLU = tf.data.Dataset.from_tensor_slices(self.test_user)
-
-        train_data = tf.data.Dataset.zip((TrainData, TrainLA, TrainLU))
-        train_data = train_data.batch(self.batch_size, drop_remainder=True)
-        self.train_data = train_data.shuffle(
-            buffer_size=train.shape[0], reshuffle_each_iteration=True)
-
-        test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
-        self.test_data = test_data.batch(1, drop_remainder=False)
-
-        print('data before augmented {}, data after augmented {}'.format(shape_original, train_augmented.shape[0]))
-
 
     def plot_distribution_data(self, title=''):
 
