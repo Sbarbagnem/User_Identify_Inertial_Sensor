@@ -20,10 +20,10 @@ def preprocessing(dataset, path, path_out, save_dir="", sensors_type='all', posi
     elif dataset == 'sbhar':
         sbhar_process(path, path_out, magnitude, size_overlapping)
     elif dataset == 'realdisp':
-        realdisp_process(path, path_out, save_dir, sensors_type, positions)
+        realdisp_process(path, path_out, save_dir, sensors_type, positions, magnitude, size_overlapping)
 
 
-def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='all'):
+def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='all', magnitude=True, size_overlapping=0.5):
     '''
         positions:  list of positions sensor to consider in preprocessing.
                     If "all" parameter is passed no filter to position will
@@ -45,7 +45,10 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
 
     root_path = path + 'REALDISP'
     raw_data_path = root_path + '/'
-    processed_path = path_out + 'OuterPartition/' + save_dir
+    if magnitude:
+        processed_path = path_out + 'OuterPartition_magnitude_prova_balance_{}'.format(str(size_overlapping*10))
+    else:
+        processed_path = path_out + 'OuterPartition_{}'.format(str(size_overlapping*10))
 
     win_len = 100
     channel = 3
@@ -149,8 +152,14 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
                     acc = temp[:, 1+(offset*step):(step*offset)+4]
                     gyro = temp[:, 4+(offset*step):(step*offset)+7]
 
+                    if magnitude:
+                        acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=acc).reshape(-1,1)), axis=1)
+                        gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=gyro).reshape(-1,1)), axis=1)
+
                     if sensors_type == 'acc_gyro_magn':
                         magn = temp[:, 7+(offset*step):(step*offset)+10]
+                        if magnitude:
+                            magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=magn).reshape(-1,1)), axis=1)
 
                     try:
                         _data_windows_acc = sliding_window(
@@ -203,6 +212,8 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
                     data = np.concatenate((data, temp_sensor), axis=0)
                     ID = np.concatenate((ID,   _id), axis=0)
                     ID_generater = ID_generater + len(temp_sensor) + 10
+                
+                #ID_generater = ID_generater + len(temp_sensor) + 10
 
                 # update la
                 # label activity for every window
@@ -575,6 +586,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     for magnitude in [True]:
         for overlap in [0.5]:
-            preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
-            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
-            #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "acc_gyro_magn", 'acc_gyro_magn', "all", magnitude=False)
+            #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
+            #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
+            preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn", 
+                          save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)
