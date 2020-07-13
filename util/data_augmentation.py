@@ -191,9 +191,13 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
 
     
 def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmetric", use_window=True, dtw_type="normal", idx_prototype=None, log=False):
+
     import util.dtw as dtw
 
-    ret_idx_prototype = []
+    if idx_prototype != None:
+        ret_idx_prototype = idx_prototype
+    else:
+        ret_idx_prototype = []
     
     if use_window:
         window = np.ceil(x.shape[1] / 10.).astype(int)
@@ -274,10 +278,12 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
 
             else:
                 print("There is only one pattern of class user  {} and class activity {}, skipping timewarping".format(lu[i], la[i]))
-                ret_idx_prototype.append(-1)
-                #ret[i,:] = np.zeros_like(pat)
+                if idx_prototype == None:
+                    ret_idx_prototype.append(-1)
         else:
-            ret_idx_prototype.append(-1)
+            if idx_prototype == None:
+                ret_idx_prototype.append(-1)
+
     return ret, ret_idx_prototype
 
 def discriminative_guided_warp(x, labels_user, labels_activity, batch_size=6, slope_constraint="symmetric", use_window=True, dtw_type="normal", use_variable_slice=True):
@@ -370,15 +376,9 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
     print('old distribution: {}'.format(distribution_activity))
 
-    min_freq = min(distribution_activity)
     max_freq = max(distribution_activity)
 
-    to_add = [int((max_freq-freq) * 0.4) for freq in distribution_activity]
-
-    #new_distribution = [(act/freq) for act,freq in zip(to_add, distribution_activity)]
-
-    #final_distribution = [(old*new)+old for old,new in zip(distribution_activity, new_distribution)]
-
+    to_add = [int((max_freq-freq)) for freq in distribution_activity]
 
     number_transformation = []
     random_transformation = []
@@ -403,7 +403,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
         added = False
 
         if to_add[labels_activity[i]] > 5:
-            number = np.random.randint(3,5)
+            number = np.random.randint(2,4,1)
             to_add[labels_activity[i]] -= number + 1
             added = True
 
@@ -419,8 +419,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
         else:
             random_transformation.append([])
 
-    total_transformation = np.sum(number_transformation)
-    
+    total_transformation = np.sum(number_transformation)[0]
 
     transformed = np.zeros([total_transformation, data.shape[1], data.shape[2]], dtype=np.float)
     lu = np.zeros([total_transformation], dtype=np.int)
@@ -513,17 +512,6 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
         distribution_activity.append(samples)
 
     print('new distribution: {}'.format(distribution_activity))
-    '''
-    final = np.concatenate((labels_user, lu), axis=0)
-
-    # calculate activity class with minor sample in train
-    distribution_activity = []
-    for act in np.unique(lu):
-        samples = len([i for i in final if i == act])
-        distribution_activity.append(samples)
-
-    print('balanced user: {}'.format(distribution_activity))
-    '''
 
     return transformed, lu, la
 
@@ -533,8 +521,6 @@ def compute_sub_seq(n_axis, n_sensor=1, use_magnitude=True):
     '''
     idx = []
     idx_flatten = []
-
-    print(n_axis, n_sensor)
 
     if use_magnitude:
         step = 4

@@ -16,14 +16,14 @@ if __name__ == '__main__':
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
 
-    plot = True
-    train = True
-    augmented_par = ['random_transformations']
-    plot_augmented = False
+    plot_distribution = True # plot distribution user/act for train and test
+    train = False
+    augmented_par = ['random_transformations', 'random_warped']
+    plot_augmented = False # plot samples of augmented signals
 
     # 10-cross validation
     for model_type in ['resnet18_2D']:
-        for dataset_name in ['unimib']:
+        for dataset_name in ['sbhar']:
             for multitask in [False]:
                 for overlap in [5.0]:
                     for magnitude in [True]:
@@ -34,7 +34,6 @@ if __name__ == '__main__':
                             else:
                                 outer_dir = 'OuterPartition_'
                                 save_dir = 'log_no_magnitude'
-                            #save_dir = 'log_merged_unimib_sbhar/augmented' if augmented else 'log_merged_unimib_sbhar/no_augmented'
                             save_dir = 'log_prove_balanced'
                             for fold in [[0]]:
                                 print(
@@ -56,13 +55,13 @@ if __name__ == '__main__':
                                 else:
                                     model.load_data(only_acc=False, normalize=True)
 
-                                if plot:
+                                if plot_distribution:
                                     model.plot_distribution_data(title='no augmented')
 
                                 if augmented and augmented_par != []:
                                     model.augment_data(augmented_par, plot_augmented)
 
-                                if plot:
+                                if plot_distribution and augmented_par != []:
                                     model.plot_distribution_data(title='augmented')
 
                                 if train:

@@ -11,7 +11,9 @@ from scipy.io import loadmat
 from sklearn import utils as skutils
 from configuration import config
 
-from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, random_guided_warp, random_transformation, random_guided_warp_multivariate
+#from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, random_guided_warp, random_transformation, random_guided_warp_multivariate
+from util.data_augmentation import random_transformation, random_guided_warp_multivariate
+
 
 class Dataset(object):
 
@@ -116,7 +118,7 @@ class Dataset(object):
 
             for fun in augmented_par:
                 if fun == 'random_transformations':
-                    train, lu, la = self.augmented_fun[fun](data, 
+                    train, lu_temp, la_temp = self.augmented_fun[fun](data, 
                                                             lu, 
                                                             la,
                                                             n_axis=self._channel,
@@ -125,19 +127,19 @@ class Dataset(object):
                                                             log=plot_augmented) 
 
                 if fun == 'random_warped':
-                    train, lu, la = self.augmented_fun[fun](data,
-                                                            lu,
-                                                            la,
+                    train, lu_temp, la_temp = self.augmented_fun[fun](train_augmented,
+                                                            label_user_augmented,
+                                                            label_act_augmented,
                                                             dtw_type='normal',
                                                             use_window=False,
                                                             magnitude=magnitude,
                                                             log=plot_augmented)
 
                 train_augmented = np.concatenate((train_augmented, train), axis=0)
-                label_user_augmented = np.concatenate((label_user_augmented, lu), axis=0)
-                label_act_augmented = np.concatenate((label_act_augmented, la), axis=0)
+                label_user_augmented = np.concatenate((label_user_augmented, lu_temp), axis=0)
+                label_act_augmented = np.concatenate((label_act_augmented, la_temp), axis=0)
 
-                return train_augmented, label_user_augmented, label_act_augmented
+            return train_augmented, label_user_augmented, label_act_augmented
 
 def to_delete(overlapping):
     if overlapping == 5.0:
