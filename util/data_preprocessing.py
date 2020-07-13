@@ -486,21 +486,30 @@ def split_balanced_data(lu, la, folders=10):
     for i in np.arange(folders):
         indexes[str(i)] = []
 
+    #distribution_act = [0 for _ in range(0,np.unique(la).shape[0])]
+    #print(len(distribution_act))
+
+    last_folder = 0
+
     # balance split label user-activity in every folders 
     for user in np.unique(lu): # specific user
         temp_index_label_user = [index for index,x in enumerate(lu) if x==user] # index of specific user
 
         for act in np.unique(la): # specific activity
             temp_index_label_act = [index for index,x in enumerate(la) if x==act and index in temp_index_label_user] # index of specific activity of user
+            #distribution_act[act] += len(temp_index_label_act)
 
             while(len(temp_index_label_act)>0):
-                for folder in range(folders):
+                for folder in range(last_folder, folders):
                     if len(temp_index_label_act) > 0 :
                         indexes[str(folder)].append(temp_index_label_act[0])
                         del temp_index_label_act[0]
+                        if folder == folders-1:
+                            last_folder = 0
+                        else:
+                            last_folder = folder
                     else:
                         continue
-                
 
     for key in indexes.keys():
         print(f'Numero campioni nel folder {key}: {len(indexes[key])}')
@@ -566,6 +575,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     for magnitude in [True]:
         for overlap in [0.5]:
-            #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
+            preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
             preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
             #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "acc_gyro_magn", 'acc_gyro_magn', "all", magnitude=False)

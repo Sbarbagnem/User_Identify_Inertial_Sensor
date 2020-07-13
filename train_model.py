@@ -18,12 +18,13 @@ if __name__ == '__main__':
 
     plot = True
     train = True
-    augmented_par = ['random_transformations']
+    augmented_par = ['random_warped']
+    #augmented_par = []
     plot_augmented = False
 
     # 10-cross validation
     for model_type in ['resnet18_2D']:
-        for dataset_name in ['unimib']:
+        for dataset_name in ['sbhar']:
             for multitask in [False]:
                 for overlap in [5.0]:
                     for magnitude in [True]:
@@ -62,7 +63,7 @@ if __name__ == '__main__':
                                 if augmented and augmented_par != []:
                                     model.augment_data(augmented_par, plot_augmented)
 
-                                if plot:
+                                if plot and augmented_par != []:
                                     model.plot_distribution_data(title='augmented')
 
                                 if train:
