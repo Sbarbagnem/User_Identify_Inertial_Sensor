@@ -16,18 +16,18 @@ if __name__ == '__main__':
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
 
-    plot_distribution = True # plot distribution user/act for train and test
-    train = False
-    augmented_par = ['random_transformations', 'random_warped']
-    plot_augmented = False # plot samples of augmented signals
+    plot = True
+    train = True
+    augmented_par = ['random_transformations']
+    #augmented_par = []
+    plot_augmented = False
 
-    # 10-cross validation
-    for model_type in ['resnet18_2D']:
-        for dataset_name in ['sbhar']:
+    for model_type in ['resnet18_lstm_parallel']:
+        for dataset_name in ['unimib']:
             for multitask in [False]:
                 for overlap in [5.0]:
                     for magnitude in [True]:
-                        for augmented in [True]:
+                        for augmented in [False]:
                             if magnitude:
                                 outer_dir = 'OuterPartition_magnitude_prova_balance_'
                                 save_dir = 'log_magnitude'
@@ -50,18 +50,18 @@ if __name__ == '__main__':
                                               log=True)
                                 model.create_dataset()
 
-                                if augmented_par != []:
+                                if augmented_par != [] and augmented:
                                     model.load_data(only_acc=False, normalize=False)
                                 else:
                                     model.load_data(only_acc=False, normalize=True)
 
-                                if plot_distribution:
+                                if plot:
                                     model.plot_distribution_data(title='no augmented')
 
                                 if augmented and augmented_par != []:
                                     model.augment_data(augmented_par, plot_augmented)
 
-                                if plot_distribution and augmented_par != []:
+                                if plot and augmented_par != []:
                                     model.plot_distribution_data(title='augmented')
 
                                 if train:

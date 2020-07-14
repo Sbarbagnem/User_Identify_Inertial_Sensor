@@ -100,8 +100,7 @@ class Model():
                                    winlen=100,
                                    user_num=17,
                                    act_num=33,
-                                   outer_dir=self.outer_dir,
-                                   save_dir='acc_gyro_magn/')
+                                   outer_dir=self.outer_dir)
         elif self.dataset_name == 'unimib_sbhar':
              self.dataset = Dataset(path='data/datasets/merged_unimib_sbhar/',
                                    name=self.dataset_name,
@@ -490,9 +489,12 @@ class Model():
             '''
 
     def decay_lr(self, initLR=0.001, factor=0.25, dropEvery=20, epoch=0):
+       
         exp = np.floor((1 + epoch) / dropEvery)
         alpha = initLR * (factor ** exp)
         return float(alpha)
+
+        
 
     def plot_distribution_data(self, title=''):
 

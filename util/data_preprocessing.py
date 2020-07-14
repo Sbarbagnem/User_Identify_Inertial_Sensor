@@ -20,10 +20,10 @@ def preprocessing(dataset, path, path_out, save_dir="", sensors_type='all', posi
     elif dataset == 'sbhar':
         sbhar_process(path, path_out, magnitude, size_overlapping)
     elif dataset == 'realdisp':
-        realdisp_process(path, path_out, save_dir, sensors_type, positions)
+        realdisp_process(path, path_out, save_dir, sensors_type, positions, magnitude, size_overlapping)
 
 
-def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='all'):
+def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='all', magnitude=True, size_overlapping=0.5):
     '''
         positions:  list of positions sensor to consider in preprocessing.
                     If "all" parameter is passed no filter to position will
@@ -45,7 +45,10 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
 
     root_path = path + 'REALDISP'
     raw_data_path = root_path + '/'
-    processed_path = path_out + 'OuterPartition/' + save_dir
+    if magnitude:
+        processed_path = path_out + 'OuterPartition_magnitude_prova_balance_{}'.format(str(size_overlapping*10))
+    else:
+        processed_path = path_out + 'OuterPartition_{}'.format(str(size_overlapping*10))
 
     win_len = 100
     channel = 3
@@ -149,8 +152,14 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
                     acc = temp[:, 1+(offset*step):(step*offset)+4]
                     gyro = temp[:, 4+(offset*step):(step*offset)+7]
 
+                    if magnitude:
+                        acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=acc).reshape(-1,1)), axis=1)
+                        gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=gyro).reshape(-1,1)), axis=1)
+
                     if sensors_type == 'acc_gyro_magn':
                         magn = temp[:, 7+(offset*step):(step*offset)+10]
+                        if magnitude:
+                            magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=magn).reshape(-1,1)), axis=1)
 
                     try:
                         _data_windows_acc = sliding_window(
@@ -203,6 +212,8 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
                     data = np.concatenate((data, temp_sensor), axis=0)
                     ID = np.concatenate((ID,   _id), axis=0)
                     ID_generater = ID_generater + len(temp_sensor) + 10
+                
+                #ID_generater = ID_generater + len(temp_sensor) + 10
 
                 # update la
                 # label activity for every window
@@ -486,21 +497,30 @@ def split_balanced_data(lu, la, folders=10):
     for i in np.arange(folders):
         indexes[str(i)] = []
 
+    #distribution_act = [0 for _ in range(0,np.unique(la).shape[0])]
+    #print(len(distribution_act))
+
+    last_folder = 0
+
     # balance split label user-activity in every folders 
     for user in np.unique(lu): # specific user
         temp_index_label_user = [index for index,x in enumerate(lu) if x==user] # index of specific user
 
         for act in np.unique(la): # specific activity
             temp_index_label_act = [index for index,x in enumerate(la) if x==act and index in temp_index_label_user] # index of specific activity of user
+            #distribution_act[act] += len(temp_index_label_act)
 
             while(len(temp_index_label_act)>0):
-                for folder in range(folders):
+                for folder in range(last_folder, folders):
                     if len(temp_index_label_act) > 0 :
                         indexes[str(folder)].append(temp_index_label_act[0])
                         del temp_index_label_act[0]
+                        if folder == folders-1:
+                            last_folder = 0
+                        else:
+                            last_folder = folder
                     else:
                         continue
-                
 
     for key in indexes.keys():
         print(f'Numero campioni nel folder {key}: {len(indexes[key])}')
@@ -566,6 +586,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     for magnitude in [True]:
         for overlap in [0.5]:
-            #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
-            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
-            #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", "acc_gyro_magn", 'acc_gyro_magn', "all", magnitude=False)
+            preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
+            #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
+            #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn", 
+                          #save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)
