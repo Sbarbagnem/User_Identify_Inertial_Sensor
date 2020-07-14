@@ -370,15 +370,9 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
     print('old distribution: {}'.format(distribution_activity))
 
-    min_freq = min(distribution_activity)
     max_freq = max(distribution_activity)
 
-    to_add = [int((max_freq-freq) * 0.4) for freq in distribution_activity]
-
-    #new_distribution = [(act/freq) for act,freq in zip(to_add, distribution_activity)]
-
-    #final_distribution = [(old*new)+old for old,new in zip(distribution_activity, new_distribution)]
-
+    to_add = [int((max_freq-freq)) for freq in distribution_activity]
 
     number_transformation = []
     random_transformation = []

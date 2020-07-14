@@ -489,14 +489,12 @@ class Model():
             '''
 
     def decay_lr(self, initLR=0.001, factor=0.25, dropEvery=20, epoch=0):
-        
+       
         exp = np.floor((1 + epoch) / dropEvery)
         alpha = initLR * (factor ** exp)
         return float(alpha)
-        '''
-        decay = 0.3
-        return initLR * (1.0 / (1.0 + decay * epoch))
-        '''
+
+        
 
     def plot_distribution_data(self, title=''):
 
