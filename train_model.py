@@ -17,17 +17,17 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(gpu, True)
 
     plot = True
-    train = True
+    train = False
     augmented_par = ['random_transformations']
     #augmented_par = []
-    plot_augmented = False
+    plot_augmented = True
 
-    for model_type in ['resnet18_lstm_parallel']:
+    for model_type in ['resnet18_2D']:
         for dataset_name in ['unimib']:
             for multitask in [False]:
                 for overlap in [5.0]:
                     for magnitude in [True]:
-                        for augmented in [False]:
+                        for augmented in [True]:
                             if magnitude:
                                 outer_dir = 'OuterPartition_magnitude_prova_balance_'
                                 save_dir = 'log_magnitude'

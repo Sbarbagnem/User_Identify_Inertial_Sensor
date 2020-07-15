@@ -351,7 +351,7 @@ class Model():
                     cm_batch = self.valid_step(batch, None, label_user, self.dataset._user_num)
                     cm = cm + cm_batch
             else:
-                for batch, label_user in self.test_data:
+                for batch, _, label_user in self.test_data:
                     cm_batch = self.valid_step(batch, None, label_user, self.dataset._user_num)
                     cm = cm + cm_batch              
             metrics = custom_metrics(cm)
@@ -502,9 +502,11 @@ class Model():
         plt.style.use('seaborn-darkgrid')
         plt.title(f'Distribuzione dati in train e test {title}')
 
+        ### distribution user ###
+
         user_distributions = []
         for user in np.unique(self.train_user):
-            plt.subplot(2,2,1)
+            plt.subplot(3,2,1)
             plt.title('Train user')
             number_user = len([i for i in self.train_user if i == user])
             user_distributions.append(number_user)
@@ -513,30 +515,71 @@ class Model():
 
         user_distributions = []
         for user in np.unique(self.test_user):
-            plt.subplot(2,2,2)
+            plt.subplot(3,2,2)
             plt.title('Test user')
             number_user = len([i for i in self.test_user if i == user])
             user_distributions.append(number_user)
 
         plt.bar(x=list(range(1,len(user_distributions)+1)), height=user_distributions)
 
+        ### distribution activity ###
+
         act_distributions = []
-        for user in np.unique(self.train_act):
-            plt.subplot(2,2,3)
+        for act in np.unique(self.train_act):
+            plt.subplot(3,2,3)
             plt.title('Train activity')
-            number_act = len([i for i in self.train_act if i == user])
+            number_act = len([i for i in self.train_act if i == act])
             act_distributions.append(number_act)
 
         plt.bar(x=list(range(1,len(act_distributions)+1)), height=act_distributions)
 
         act_distributions = []
-        for user in np.unique(self.test_act):
-            plt.subplot(2,2,4)
+        for act in np.unique(self.test_act):
+            plt.subplot(3,2,4)
             plt.title('Test activity')
-            number_act = len([i for i in self.test_act if i == user])
+            number_act = len([i for i in self.test_act if i == act])
             act_distributions.append(number_act)
 
         plt.bar(x=list(range(1,len(act_distributions)+1)), height=act_distributions)
+
+        ### distribution activity for user ###
+        user_category = np.unique(self.train_user)
+
+        results = {}
+
+        for act in np.unique(self.train_act):
+            results[str(act)] = [[] for _ in range(0, self.dataset._user_num)]
+            for user in np.unique(self.train_user):
+                index_act = set(np.where(self.train_act == act)[0])
+                index_user = set(np.where(self.train_user == user)[0])
+                index = set.intersection(index_act, index_user)
+                results[str(act)][user] = len(index) 
+
+        labels = list(results.keys())
+        data = np.array(list(results.values()))
+        data_cum = data.cumsum(axis=1)
+        category_colors = plt.get_cmap('RdYlGn')(
+            np.linspace(0.15, 0.85, data.shape[1]))
+
+        _, ax = plt.subplots(figsize=(9.2, 5), )
+        ax.invert_yaxis()
+        ax.xaxis.set_visible(False)
+        ax.set_xlim(0, np.sum(data, axis=1).max())
+
+        for i, (colname, color) in enumerate(zip(user_category, category_colors)):
+            widths = data[:, i]
+            starts = data_cum[:, i] - widths
+            ax.barh(labels, widths, left=starts, height=0.5,
+                    label=colname, color=color)
+            xcenters = starts + widths / 2
+
+            r, g, b, _ = color
+            text_color = 'white' if r * g * b < 0.5 else 'darkgrey'
+            for y, (x, c) in enumerate(zip(xcenters, widths)):
+                ax.text(x, y, str(int(c)), ha='center', va='center',
+                        color=text_color)
+        ax.legend(ncol=len(user_category), bbox_to_anchor=(0, 1),
+                loc='lower left', fontsize='small')
 
         plt.tight_layout()
         plt.show()
