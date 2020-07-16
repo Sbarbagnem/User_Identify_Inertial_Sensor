@@ -300,7 +300,7 @@ class Model():
         # calculate precision, recall and f1 from confusion matrix
         cm = tf.math.confusion_matrix(label_user, tf.math.argmax(predictions_user, axis=1), num_classes=num_user)
 
-        return cm
+        return cm, tf.math.argmax(predictions_user, axis=1)
         
     def train_model(self):
         if self.multi_task:
@@ -309,6 +309,8 @@ class Model():
             self.train_single_task()
 
     def train_single_task(self):
+        self.final_pred_right = [0 for _ in np.arange(0,self.num_act)]
+        self.final_pred_wrong = [0 for _ in np.arange(0,self.num_act)]
         for epoch in range(1, self.epochs + 1):
             cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
             if self.dataset_name != 'unimib_sbhar':
@@ -346,14 +348,19 @@ class Model():
             
             cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
 
-            if self.dataset_name != 'unimib_sbhar':
+            if self.dataset_name == 'unimib_sbhar':
                 for batch, _, label_user in self.test_data:
                     cm_batch = self.valid_step(batch, None, label_user, self.dataset._user_num)
                     cm = cm + cm_batch
             else:
-                for batch, _, label_user in self.test_data:
-                    cm_batch = self.valid_step(batch, None, label_user, self.dataset._user_num)
-                    cm = cm + cm_batch              
+                for batch, label_act, label_user in self.test_data:
+                    if epoch == self.epochs:
+                        cm_batch, predictions_user = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
+                        cm = cm + cm_batch  
+                        self.update_pred_based_on_act(predictions_user, label_user, label_act)
+                    else:
+                        cm_batch, _ = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
+                        cm = cm + cm_batch                                     
             metrics = custom_metrics(cm)
             if self.log:
                 print(
@@ -436,8 +443,13 @@ class Model():
                 cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
 
                 for batch, label_act, label_user in self.test_data:
-                    cm_batch = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
-                    cm = cm + cm_batch
+                    if epoch == self.epochs:
+                        cm_batch, predictions_user = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
+                        cm = cm + cm_batch  
+                        self.update_pred_based_on_act(predictions_user, label_user, label_act)
+                    else:
+                        cm_batch, _ = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
+                        cm = cm + cm_batch  
                 metrics = custom_metrics(cm)
                 with self.val_writer.as_default():
                     tf.summary.scalar(
@@ -494,8 +506,6 @@ class Model():
         alpha = initLR * (factor ** exp)
         return float(alpha)
 
-        
-
     def plot_distribution_data(self, title=''):
 
         plt.figure(figsize=(12, 3))
@@ -539,48 +549,61 @@ class Model():
             plt.title('Test activity')
             number_act = len([i for i in self.test_act if i == act])
             act_distributions.append(number_act)
-
         plt.bar(x=list(range(1,len(act_distributions)+1)), height=act_distributions)
 
-        ### distribution activity for user ###
-        user_category = np.unique(self.train_user)
+        ### distribution activity for user for train ###
+        distribution = [] # list of user and activity for user
+        for user in set(self.train_user):
+            distribution.append([])
+            for act in set(self.train_act):
+                samples = len([ i for i,(u,a) in enumerate(zip(self.train_user,self.train_act)) if a == act and u == user ])
+                distribution[user].append(samples)
 
-        results = {}
+        plt.figure()
+        plt.title('Distribution act for user in train set')
+        plt.xlabel('User id')
+        plt.ylabel('Act id')
+        _ = sn.heatmap(np.transpose(distribution), linewidths=0.3, cmap='YlGnBu', annot=True)
+        #plt.tight_layout()
+        plt.show()
 
-        for act in np.unique(self.train_act):
-            results[str(act)] = [[] for _ in range(0, self.dataset._user_num)]
-            for user in np.unique(self.train_user):
-                index_act = set(np.where(self.train_act == act)[0])
-                index_user = set(np.where(self.train_user == user)[0])
-                index = set.intersection(index_act, index_user)
-                results[str(act)][user] = len(index) 
+        ### distribution activity for user for train ###
+        distribution = [] # list of user and activity for user
+        for user in set(self.test_user):
+            distribution.append([])
+            for act in set(self.test_act):
+                samples = len([ i for i,(u,a) in enumerate(zip(self.test_user,self.test_act)) if a == act and u == user ])
+                distribution[user].append(samples)
 
-        labels = list(results.keys())
-        data = np.array(list(results.values()))
-        data_cum = data.cumsum(axis=1)
-        category_colors = plt.get_cmap('RdYlGn')(
-            np.linspace(0.15, 0.85, data.shape[1]))
+        plt.figure()
+        plt.title('Distribution act for user in test set')
+        plt.xlabel('User id')
+        plt.ylabel('Act id')
+        _ = sn.heatmap(np.transpose(distribution), linewidths=0.3, cmap='YlGnBu', annot=True)
+        #plt.tight_layout()
+        plt.show()
 
-        _, ax = plt.subplots(figsize=(9.2, 5), )
-        ax.invert_yaxis()
-        ax.xaxis.set_visible(False)
-        ax.set_xlim(0, np.sum(data, axis=1).max())
 
-        for i, (colname, color) in enumerate(zip(user_category, category_colors)):
-            widths = data[:, i]
-            starts = data_cum[:, i] - widths
-            ax.barh(labels, widths, left=starts, height=0.5,
-                    label=colname, color=color)
-            xcenters = starts + widths / 2
+    def update_pred_based_on_act(self, predictions_user, label_user, label_activity):
 
-            r, g, b, _ = color
-            text_color = 'white' if r * g * b < 0.5 else 'darkgrey'
-            for y, (x, c) in enumerate(zip(xcenters, widths)):
-                ax.text(x, y, str(int(c)), ha='center', va='center',
-                        color=text_color)
-        ax.legend(ncol=len(user_category), bbox_to_anchor=(0, 1),
-                loc='lower left', fontsize='small')
+        if predictions_user.numpy()[0] == label_user.numpy()[0]:
+            self.final_pred_right[label_activity.numpy()[0]] += 1
+        else:
+            self.final_pred_wrong[label_activity.numpy()[0]] += 1
 
+    def plot_pred_based_act(self):
+        plt.figure()
+        plt.title('Plot correct and wrong prediction based on activity')
+        plt.xlabel('Activity')
+        plt.ylabel('Accuracy')
+        step = np.arange(0,self.num_act)
+        pred_right = np.asarray(self.final_pred_right)/np.sum(self.final_pred_right)
+        pred_wrong = np.asarray(self.final_pred_wrong)/np.sum(self.final_pred_wrong)
+        plt.plot(step, pred_right, 'g', label='Correct pred')
+        plt.plot(step, pred_wrong, 'r', label='Wrong pred')
+        plt.legend(loc='upper left')
         plt.tight_layout()
         plt.show()
+
+
 

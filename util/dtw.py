@@ -128,24 +128,24 @@ def shape_dtw(prototype, sample, return_flag = RETURN_VALUE, slope_constraint="a
     if window is None:
         window = s
         
-    p_feature_len = np.clip(np.round(p * descr_ratio), 5, 100).astype(int)
-    s_feature_len = np.clip(np.round(s * descr_ratio), 5, 100).astype(int)
+    p_feature_len = np.clip(np.round(p * descr_ratio), 5, 100).astype(int) # 5
+    s_feature_len = np.clip(np.round(s * descr_ratio), 5, 100).astype(int) # 5
     
     # padding
-    p_pad_front = (np.ceil(p_feature_len / 2.)).astype(int)
-    p_pad_back = (np.floor(p_feature_len / 2.)).astype(int)
-    s_pad_front = (np.ceil(s_feature_len / 2.)).astype(int)
-    s_pad_back = (np.floor(s_feature_len / 2.)).astype(int)
+    p_pad_front = (np.ceil(p_feature_len / 2.)).astype(int) # 3
+    p_pad_back = (np.floor(p_feature_len / 2.)).astype(int) # 2
+    s_pad_front = (np.ceil(s_feature_len / 2.)).astype(int) # 3
+    s_pad_back = (np.floor(s_feature_len / 2.)).astype(int) # 2
     
     prototype_pad = np.pad(prototype, ((p_pad_front, p_pad_back), (0, 0)), mode="edge") 
     sample_pad = np.pad(sample, ((s_pad_front, s_pad_back), (0, 0)), mode="edge") 
-    p_p = prototype_pad.shape[0]
-    s_p = sample_pad.shape[0]
+    p_p = prototype_pad.shape[0] #(105, 3)
+    s_p = sample_pad.shape[0]    #(105, 3)
         
-    cost = np.full((p, s), np.inf)
+    cost = np.full((p, s), np.inf) #(100, 100)
     for i in range(p):
         for j in range(max(0, i-window), min(s, i+window)):
-            cost[i, j] = np.linalg.norm(sample_pad[j:j+s_feature_len] - prototype_pad[i:i+p_feature_len])
+            cost[i, j] = np.linalg.norm(sample_pad[j:j+s_feature_len] - prototype_pad[i:i+p_feature_len]) # distance window sample and window prototype
             
     DTW = _cummulative_matrix(cost, slope_constraint=slope_constraint, window=window)
 

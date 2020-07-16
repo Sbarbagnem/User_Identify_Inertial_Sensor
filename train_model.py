@@ -16,18 +16,19 @@ if __name__ == '__main__':
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
 
-    plot = True
-    train = False
-    augmented_par = ['random_transformations']
+    plot = False
+    train = True
+    augmented_par = ['random_transformations', 'random_warped']
     #augmented_par = []
-    plot_augmented = True
+    plot_augmented = False
+    plot_pred_base_act = True
 
     for model_type in ['resnet18_2D']:
         for dataset_name in ['unimib']:
             for multitask in [False]:
                 for overlap in [5.0]:
                     for magnitude in [True]:
-                        for augmented in [True]:
+                        for augmented in [False]:
                             if magnitude:
                                 outer_dir = 'OuterPartition_magnitude_prova_balance_'
                                 save_dir = 'log_magnitude'
@@ -54,10 +55,10 @@ if __name__ == '__main__':
                                     model.load_data(only_acc=False, normalize=False)
                                 else:
                                     model.load_data(only_acc=False, normalize=True)
-
+                                
                                 if plot:
                                     model.plot_distribution_data(title='no augmented')
-
+                            
                                 if augmented and augmented_par != []:
                                     model.augment_data(augmented_par, plot_augmented)
 
@@ -69,3 +70,5 @@ if __name__ == '__main__':
                                     model.print_model_summary()
                                     model.loss_opt_metric()
                                     model.train_model()
+                                    if plot_pred_base_act:
+                                        model.plot_pred_based_act()

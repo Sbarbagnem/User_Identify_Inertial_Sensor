@@ -50,7 +50,7 @@ class Dataset(object):
             Data = np.load(self._path + self.outer_dir +
                            self._save_dir + 'fold{}/data.npy'.format(i))
             LA = np.load(self._path + self.outer_dir +
-                        self._save_dir + 'fold{}/act_label.npy'.format(i))
+                         self._save_dir + 'fold{}/act_label.npy'.format(i))
             LU = np.load(self._path + self.outer_dir +
                          self._save_dir + 'fold{}/user_label.npy'.format(i))
             ID = np.load(self._path + self.outer_dir +
@@ -74,7 +74,8 @@ class Dataset(object):
         print('distance to delete: ', distances_to_delete)
         overlap_ID = np.empty([0], dtype=np.int32)
         for distance in distances_to_delete:
-            overlap_ID = np.concatenate((overlap_ID, TestID+distance, TestID-distance))
+            overlap_ID = np.concatenate(
+                (overlap_ID, TestID+distance, TestID-distance))
         overlap_ID = np.unique(overlap_ID)
         invalid_idx = np.array([i for i in np.arange(
             len(TrainID)) if TrainID[i] in overlap_ID])
@@ -86,9 +87,11 @@ class Dataset(object):
 
         print('train data shape: {}'.format(TrainData.shape))
 
-        TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)
-        TrainData, TrainLA, TrainLU = skutils.shuffle(TrainData, TrainLA, TrainLU)
-            
+        TrainData, TrainLA, TrainLU = skutils.shuffle(
+            TrainData, TrainLA, TrainLU)
+        TrainData, TrainLA, TrainLU = skutils.shuffle(
+            TrainData, TrainLA, TrainLU)
+
         # normalization
         if normalize:
             TrainData, TestData = self.normalize_data(TrainData, TestData)
@@ -116,39 +119,68 @@ class Dataset(object):
             label_user_augmented = np.copy(lu)
             label_act_augmented = np.copy(la)
 
-            for fun in augmented_par:
-                if fun == 'random_transformations':
-                    train, lu_temp, la_temp = self.augmented_fun[fun](data, 
-                                                            lu, 
-                                                            la,
-                                                            n_axis=self._channel,
-                                                            n_sensor=len(config[self._name]['SENSOR_DICT']),
-                                                            use_magnitude=magnitude,
-                                                            log=plot_augmented) 
+            if len(augmented_par) == 1:
+                if augmented_par[0] == 'random_transformations':
+                    train, lu_temp, la_temp = self.augmented_fun['random_transformations'](data,
+                                                                                           lu,
+                                                                                           la,
+                                                                                           n_axis=self._channel,
+                                                                                           n_sensor=len(
+                                                                                               config[self._name]['SENSOR_DICT']),
+                                                                                           use_magnitude=magnitude,
+                                                                                           log=plot_augmented)
 
-                if fun == 'random_warped':
-                    train, lu_temp, la_temp = self.augmented_fun[fun](train_augmented,
-                                                            label_user_augmented,
-                                                            label_act_augmented,
-                                                            dtw_type='normal',
-                                                            use_window=False,
-                                                            magnitude=magnitude,
-                                                            log=plot_augmented)
+                if augmented_par[0] == 'random_warped':
+                    train, lu_temp, la_temp = self.augmented_fun['random_warped'](data,
+                                                                                  lu,
+                                                                                  la,
+                                                                                  dtw_type='normal',
+                                                                                  use_window=False,
+                                                                                  magnitude=magnitude,
+                                                                                  log=plot_augmented)
+
+            else:
+                train, lu_temp, la_temp = self.augmented_fun['random_warped'](data,
+                                                                              lu,
+                                                                              la,
+                                                                              dtw_type='normal',
+                                                                              use_window=False,
+                                                                              magnitude=magnitude,
+                                                                              log=plot_augmented)
 
                 train_augmented = np.concatenate((train_augmented, train), axis=0)
-                label_user_augmented = np.concatenate((label_user_augmented, lu_temp), axis=0)
-                label_act_augmented = np.concatenate((label_act_augmented, la_temp), axis=0)
+                label_user_augmented = np.concatenate(
+                    (label_user_augmented, lu_temp), axis=0)
+                label_act_augmented = np.concatenate(
+                    (label_act_augmented, la_temp), axis=0)
+
+                train, lu_temp, la_temp = self.augmented_fun['random_transformations'](train_augmented,
+                                                                                       label_user_augmented,
+                                                                                       label_act_augmented,
+                                                                                       n_axis=self._channel,
+                                                                                       n_sensor=len(
+                                                                                           config[self._name]['SENSOR_DICT']),
+                                                                                       use_magnitude=magnitude,
+                                                                                       log=plot_augmented,
+                                                                                       ratio=0.7)
+
+            train_augmented = np.concatenate((train_augmented, train), axis=0)
+            label_user_augmented = np.concatenate(
+                (label_user_augmented, lu_temp), axis=0)
+            label_act_augmented = np.concatenate(
+                (label_act_augmented, la_temp), axis=0)
 
             return train_augmented, label_user_augmented, label_act_augmented
+
 
 def to_delete(overlapping):
     if overlapping == 5.0:
         return [1]
     if overlapping == 6.0:
-        return [1,2]
+        return [1, 2]
     if overlapping == 7.0:
-        return [1,2,3]
+        return [1, 2, 3]
     if overlapping == 8.0:
-        return [1,2,3,4]
+        return [1, 2, 3, 4]
     if overlapping == 9.0:
-        return [1,2,3,4,5,6,7,8,9]
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9]
