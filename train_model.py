@@ -21,9 +21,9 @@ if __name__ == '__main__':
     augmented_par = ['random_transformations', 'random_warped']
     #augmented_par = []
     plot_augmented = False
-    plot_pred_base_act = True
+    plot_pred_base_act = False
 
-    for model_type in ['resnet18_2D']:
+    for model_type in ['resnet18_multi_branch']:
         for dataset_name in ['unimib']:
             for multitask in [False]:
                 for overlap in [5.0]:
