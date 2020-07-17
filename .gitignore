@@ -13,3 +13,4 @@ data/datasets/SBHAR_processed/OuterPartition*
 data/datasets/UNIMIBDataset/OuterPartition*
 data/parameters/
 log*
+prova_lr.py

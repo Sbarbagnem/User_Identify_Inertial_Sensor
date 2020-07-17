@@ -5,6 +5,7 @@ from sklearn import utils as skutils
 import matplotlib.pyplot as plt
 
 from configuration import config
+from data_preprocessing import split_balanced_data, plt_user_distribution, plt_act_distribution
 
 
 def merge_data(dataset_a, dataset_b):
@@ -72,22 +73,27 @@ def save_mergede_dataset(path_to_save, data, lu, la, idx):
 
     lu = np.asarray(lu)
     la = np.asarray(la)
-    idx = np.asarray(idx)
+    ID = np.asarray(idx)
 
-    # create dir partition
+    indexes = split_balanced_data(lu, la, folders=10)
+
+    plt_user_distribution(indexes, lu)
+
+    plt_act_distribution(indexes, la)
+
+    # partition
     for i in range(10):
 
         # clear dir
         if os.path.exists(path_to_save+'/fold{}'.format(i)):
             shutil.rmtree(path_to_save+'/fold{}'.format(i))
         os.mkdir(path_to_save+'/fold{}'.format(i))
-
-        idx_temp = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
-        #idx = indexes[str(i)]
-        np.save(path_to_save+'/fold{}/data'.format(i),       data[idx_temp])
-        np.save(path_to_save+'/fold{}/user_label'.format(i), lu[idx_temp])
-        np.save(path_to_save+'/fold{}/id'.format(i),         idx[idx_temp])
-        np.save(path_to_save+'/fold{}/act_label'.format(i),  la[idx_temp])
+        
+        idx = indexes[str(i)]
+        np.save(path_to_save+'/fold{}/data'.format(i),       data[idx])
+        np.save(path_to_save+'/fold{}/user_label'.format(i), lu[idx])
+        np.save(path_to_save+'/fold{}/act_label'.format(i),  la[idx])
+        np.save(path_to_save+'/fold{}/id'.format(i),         ID[idx])
 
 def balance_dataset(data, label, idx):
 

@@ -2,6 +2,8 @@ import os
 import shutil
 import zipfile
 import sys
+from tqdm import tqdm
+import pprint
 
 import numpy as np
 from absl import app, flags
@@ -34,7 +36,7 @@ class Dataset(object):
             'random_warped': random_guided_warp_multivariate
         }
 
-    def load_data(self, step=0, overlapping=0.5, normalize=True):
+    def load_data(self, step=0, overlapping=0.5, normalize=True, delete=True):
 
         TrainData = np.empty([0, self._winlen, self._channel], dtype=np.float)
         TrainLA = np.empty([0], dtype=np.int32)
@@ -67,25 +69,24 @@ class Dataset(object):
                 TrainLU = np.concatenate((TrainLU, LU), axis=0)
                 TrainID = np.concatenate((TrainID, ID), axis=0)
 
-        print('before delete: ', TrainData.shape)
-
         # delete overlap samples form training_data, based on overlap percentage
-        distances_to_delete = to_delete(overlapping)
-        print('distance to delete: ', distances_to_delete)
-        overlap_ID = np.empty([0], dtype=np.int32)
-        for distance in distances_to_delete:
-            overlap_ID = np.concatenate(
-                (overlap_ID, TestID+distance, TestID-distance))
-        overlap_ID = np.unique(overlap_ID)
-        invalid_idx = np.array([i for i in np.arange(
-            len(TrainID)) if TrainID[i] in overlap_ID])
+        if delete:
+            print('before delete: ', TrainData.shape)
+            distances_to_delete = to_delete(overlapping)
+            print('distance to delete: ', distances_to_delete)
+            overlap_ID = np.empty([0], dtype=np.int32)
+            for distance in distances_to_delete:
+                overlap_ID = np.concatenate(
+                    (overlap_ID, TestID+distance, TestID-distance))
+            overlap_ID = np.unique(overlap_ID)
+            invalid_idx = np.array([i for i in np.arange(
+                len(TrainID)) if TrainID[i] in overlap_ID])
 
-        TrainData = np.delete(TrainData, invalid_idx, axis=0)
-        print('after delete: ', TrainData.shape)
-        TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
-        TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
+            TrainData = np.delete(TrainData, invalid_idx, axis=0)
+            TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
+            TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
 
-        print('train data shape: {}'.format(TrainData.shape))
+            print('after delete: ', TrainData.shape)
 
         TrainData, TrainLA, TrainLU = skutils.shuffle(
             TrainData, TrainLA, TrainLU)
@@ -148,7 +149,8 @@ class Dataset(object):
                                                                               magnitude=magnitude,
                                                                               log=plot_augmented)
 
-                train_augmented = np.concatenate((train_augmented, train), axis=0)
+                train_augmented = np.concatenate(
+                    (train_augmented, train), axis=0)
                 label_user_augmented = np.concatenate(
                     (label_user_augmented, lu_temp), axis=0)
                 label_act_augmented = np.concatenate(
@@ -171,8 +173,7 @@ class Dataset(object):
                 (label_act_augmented, la_temp), axis=0)
 
             return train_augmented, label_user_augmented, label_act_augmented
-
-
+    
 def to_delete(overlapping):
     if overlapping == 5.0:
         return [1]

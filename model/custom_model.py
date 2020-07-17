@@ -7,6 +7,7 @@ import datetime
 import json
 import matplotlib.pyplot as plt
 import sys
+import pprint
 
 from model.resNet182D.resnet18_2D import resnet18 as resnet2D
 from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
@@ -17,9 +18,11 @@ from util.dataset import Dataset
 from util.tf_metrics import custom_metrics
 from util.data_augmentation import random_transformation
 from util.data_augmentation import random_guided_warp_multivariate
+from util.utils import samples_to_down
 import seaborn as sn
 import matplotlib.pyplot as plt
 import pandas as pd
+
 
 class Model():
     def __init__(self, dataset_name, configuration_file, multi_task, lr, model_type, fold=0, save_dir='log', outer_dir='OuterPartition/', overlap=5.0, magnitude=False, log=False):
@@ -36,7 +39,7 @@ class Model():
         self.model_type = model_type
         self.sensor_dict = configuration_file.config[dataset_name]['SENSOR_DICT']
         self.fold = fold
-        self.log  = log
+        self.log = log
         self.magnitude = magnitude
         if magnitude:
             self.axes = self.configuration.config[self.dataset_name]['WINDOW_AXES'] + len(
@@ -51,23 +54,24 @@ class Model():
         self.outer_dir = outer_dir
         self.magnitude = magnitude
         self.train_log_dir = "{}/{}/{}/{}/batch_{}/lr_{}/over_{}/fold_{}/{}/train".format(save_dir,
-                                                                                  self.model_type,
-                                                                                  self.dataset_name,
-                                                                                  'multi_task' if self.multi_task else 'single_task',
-                                                                                  self.batch_size,
-                                                                                  self.lr,
-                                                                                  str(overlap),
-                                                                                  self.fold[0],
-                                                                                  datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+                                                                                          self.model_type,
+                                                                                          self.dataset_name,
+                                                                                          'multi_task' if self.multi_task else 'single_task',
+                                                                                          self.batch_size,
+                                                                                          self.lr,
+                                                                                          str(
+                                                                                              overlap),
+                                                                                          self.fold[0],
+                                                                                          datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         self.val_log_dir = "{}/{}/{}/{}/batch_{}/lr_{}/over_{}/fold_{}/{}/val".format(save_dir,
-                                                                              self.model_type,
-                                                                              self.dataset_name,
-                                                                              'multi_task' if self.multi_task else 'single_task',
-                                                                              self.batch_size,
-                                                                              self.lr,
-                                                                              str(overlap),
-                                                                              self.fold[0],
-                                                                              datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+                                                                                      self.model_type,
+                                                                                      self.dataset_name,
+                                                                                      'multi_task' if self.multi_task else 'single_task',
+                                                                                      self.batch_size,
+                                                                                      self.lr,
+                                                                                      str(overlap),
+                                                                                      self.fold[0],
+                                                                                      datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         self.train_writer = tf.summary.create_file_writer(self.train_log_dir)
         self.val_writer = tf.summary.create_file_writer(self.val_log_dir)
 
@@ -102,18 +106,18 @@ class Model():
                                    act_num=33,
                                    outer_dir=self.outer_dir)
         elif self.dataset_name == 'unimib_sbhar':
-             self.dataset = Dataset(path='data/datasets/merged_unimib_sbhar/',
+            self.dataset = Dataset(path='data/datasets/merged_unimib_sbhar/',
                                    name=self.dataset_name,
                                    channel=channel,
                                    winlen=100,
                                    user_num=60,
                                    act_num=-1,
-                                   outer_dir=self.outer_dir)       
+                                   outer_dir=self.outer_dir)
 
-    def load_data(self, only_acc=False, normalize=True):
+    def load_data(self, only_acc=False, normalize=True, delete=True):
         # gat data [examples, window_samples, axes, channel]
         TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU = self.dataset.load_data(
-            step=self.fold, overlapping=self.overlap, normalize=normalize)
+            step=self.fold, overlapping=self.overlap, normalize=normalize, delete=delete)
 
         train_shape = TrainData.shape
 
@@ -125,8 +129,8 @@ class Model():
         self.test_act = TestLA
 
         if only_acc:
-            TrainData = TrainData[:,:,[0,1,2,3]]
-            TestData = TestData[:,:,[0,1,2,3]]
+            TrainData = TrainData[:, :, [0, 1, 2, 3]]
+            TestData = TestData[:, :, [0, 1, 2, 3]]
             self.axes = 4
 
         print('shape train data: {}'.format(train_shape))
@@ -148,11 +152,12 @@ class Model():
         test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
         self.test_data = test_data.batch(1, drop_remainder=False)
 
-    def augment_data(self, augmented_par = [], plot_augmented=False):
+    def augment_data(self, augmented_par=[], plot_augmented=False):
 
         shape_original = self.train.shape[0]
 
-        train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(self.train, self.train_user, self.train_act, self.magnitude, augmented_par, plot_augmented)
+        train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(
+            self.train, self.train_user, self.train_act, self.magnitude, augmented_par, plot_augmented)
 
         train, test = self.dataset.normalize_data(train_augmented, self.test)
 
@@ -176,7 +181,8 @@ class Model():
         test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
         self.test_data = test_data.batch(1, drop_remainder=False)
 
-        print('data before augmented {}, data after augmented {}'.format(shape_original, train_augmented.shape[0]))
+        print('data before augmented {}, data after augmented {}'.format(
+            shape_original, train_augmented.shape[0]))
 
     def build_model(self):
         # create model
@@ -211,7 +217,6 @@ class Model():
         # define loss and optimizer
         self.loss_act = tf.keras.losses.SparseCategoricalCrossentropy()
         self.loss_user = tf.keras.losses.SparseCategoricalCrossentropy()
-        #self.optimizer = tf.keras.optimizers.SGD(learning_rate=0.1, momentum=0.9) # simile ad Adam con lr 0.001 e dynamic, sgd con static
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
         # performance on train
@@ -248,14 +253,14 @@ class Model():
                 loss_u = self.loss_user(
                     y_true=label_user,
                     y_pred=predictions_user)
-                #penality = sum(tf.nn.l2_loss(tf_var)
+                # penality = sum(tf.nn.l2_loss(tf_var)
                 #               for tf_var in self.model.trainable_variables)
                 loss_global = loss_a + loss_u
             else:
                 predictions_user = self.model(batch, training=True)
                 loss_u = self.loss_user(
                     y_true=label_user, y_pred=predictions_user)
-                #penality = sum(tf.nn.l2_loss(tf_var)
+                # penality = sum(tf.nn.l2_loss(tf_var)
                 #               for tf_var in self.model.trainable_variables)
                 loss_global = loss_u
 
@@ -273,11 +278,10 @@ class Model():
             y_true=label_user, y_pred=predictions_user)
 
         # confusion matrix on batch
-        cm = tf.math.confusion_matrix(label_user, tf.math.argmax(predictions_user, axis=1), num_classes=num_user)
+        cm = tf.math.confusion_matrix(label_user, tf.math.argmax(
+            predictions_user, axis=1), num_classes=num_user)
 
         return cm
-
-
 
     @tf.function
     def valid_step(self, batch, label_activity, label_user, num_user):
@@ -298,10 +302,11 @@ class Model():
             y_true=label_user, y_pred=predictions_user)
 
         # calculate precision, recall and f1 from confusion matrix
-        cm = tf.math.confusion_matrix(label_user, tf.math.argmax(predictions_user, axis=1), num_classes=num_user)
+        cm = tf.math.confusion_matrix(label_user, tf.math.argmax(
+            predictions_user, axis=1), num_classes=num_user)
 
         return cm, tf.math.argmax(predictions_user, axis=1)
-        
+
     def train_model(self):
         if self.multi_task:
             self.train_multi_task()
@@ -309,29 +314,27 @@ class Model():
             self.train_single_task()
 
     def train_single_task(self):
-        self.final_pred_right = [0 for _ in np.arange(0,self.num_act)]
-        self.final_pred_wrong = [0 for _ in np.arange(0,self.num_act)]
+        self.final_pred_right = [0 for _ in np.arange(0, self.num_act)]
+        self.final_pred_wrong = [0 for _ in np.arange(0, self.num_act)]
         for epoch in range(1, self.epochs + 1):
-            cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
-            if self.dataset_name != 'unimib_sbhar':
-                for batch, _, label_user in self.train_data:
-                    cm_batch = self.train_step(batch, None, label_user, self.dataset._user_num)
-                    cm = cm + cm_batch
-            else:
-                 for batch, label_user in self.train_data:
-                    cm_batch = self.train_step(batch, None, label_user, self.dataset._user_num)
-                    cm = cm + cm_batch               
+            cm = tf.zeros(shape=(self.dataset._user_num,
+                                 self.dataset._user_num), dtype=tf.int32)
+
+            for batch, _, label_user in self.train_data:
+                cm_batch = self.train_step(
+                    batch, None, label_user, self.dataset._user_num)
+                cm = cm + cm_batch
             metrics = custom_metrics(cm)
             if self.log:
                 print("TRAIN: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
-                        epoch,
-                        self.epochs,
-                        self.train_loss_user.result().numpy(),
-                        self.train_accuracy_user.result().numpy(),
-                        metrics['macro_precision'],
-                        metrics['macro_recall'],
-                        metrics['macro_f1']))
-                        
+                    epoch,
+                    self.epochs,
+                    self.train_loss_user.result().numpy(),
+                    self.train_accuracy_user.result().numpy(),
+                    metrics['macro_precision'],
+                    metrics['macro_recall'],
+                    metrics['macro_f1']))
+
             with self.train_writer.as_default():
                 tf.summary.scalar(
                     'loss_user', self.train_loss_user.result(), step=epoch)
@@ -345,33 +348,32 @@ class Model():
                     'macro_f1_user', metrics['macro_f1'], step=epoch)
             self.train_loss_user.reset_states()
             self.train_accuracy_user.reset_states()
-            
-            cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
 
-            if self.dataset_name == 'unimib_sbhar':
-                for batch, _, label_user in self.test_data:
-                    cm_batch = self.valid_step(batch, None, label_user, self.dataset._user_num)
+            cm = tf.zeros(shape=(self.dataset._user_num,
+                                 self.dataset._user_num), dtype=tf.int32)
+
+            for batch, label_act, label_user in self.test_data:
+                if epoch == self.epochs:
+                    cm_batch, predictions_user = self.valid_step(
+                        batch, label_act, label_user, self.dataset._user_num)
                     cm = cm + cm_batch
-            else:
-                for batch, label_act, label_user in self.test_data:
-                    if epoch == self.epochs:
-                        cm_batch, predictions_user = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
-                        cm = cm + cm_batch  
-                        self.update_pred_based_on_act(predictions_user, label_user, label_act)
-                    else:
-                        cm_batch, _ = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
-                        cm = cm + cm_batch                                     
+                    self.update_pred_based_on_act(
+                        predictions_user, label_user, label_act)
+                else:
+                    cm_batch, _ = self.valid_step(
+                        batch, label_act, label_user, self.dataset._user_num)
+                    cm = cm + cm_batch
             metrics = custom_metrics(cm)
             if self.log:
                 print(
                     "VALIDATION: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
-                    epoch,
-                    self.epochs,
-                    self.valid_loss_user.result().numpy(),
-                    self.valid_accuracy_user.result().numpy(),
-                    metrics['macro_precision'],
-                    metrics['macro_recall'],
-                    metrics['macro_f1']))
+                        epoch,
+                        self.epochs,
+                        self.valid_loss_user.result().numpy(),
+                        self.valid_accuracy_user.result().numpy(),
+                        metrics['macro_precision'],
+                        metrics['macro_recall'],
+                        metrics['macro_f1']))
             with self.val_writer.as_default():
                 tf.summary.scalar(
                     'loss_user', self.valid_loss_user.result(), step=epoch)
@@ -399,13 +401,15 @@ class Model():
                 sn.heatmap(df_cm, annot=True)
                 plt.show()
             '''
-            
+
     def train_multi_task(self):
         for epoch in range(1, self.epochs + 1):
-            cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
+            cm = tf.zeros(shape=(self.dataset._user_num,
+                                 self.dataset._user_num), dtype=tf.int32)
             if self.multi_task:
                 for batch, label_act, label_user in self.train_data:
-                    cm_batch = self.train_step(batch, label_act, label_user, self.dataset._user_num)
+                    cm_batch = self.train_step(
+                        batch, label_act, label_user, self.dataset._user_num)
                     cm = cm + cm_batch
                 metrics = custom_metrics(cm)
                 if self.log:
@@ -440,16 +444,20 @@ class Model():
                 self.train_loss_user.reset_states()
                 self.train_accuracy_activity.reset_states()
                 self.train_accuracy_user.reset_states()
-                cm = tf.zeros(shape=(self.dataset._user_num, self.dataset._user_num), dtype=tf.int32)
+                cm = tf.zeros(shape=(self.dataset._user_num,
+                                     self.dataset._user_num), dtype=tf.int32)
 
                 for batch, label_act, label_user in self.test_data:
                     if epoch == self.epochs:
-                        cm_batch, predictions_user = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
-                        cm = cm + cm_batch  
-                        self.update_pred_based_on_act(predictions_user, label_user, label_act)
+                        cm_batch, predictions_user = self.valid_step(
+                            batch, label_act, label_user, self.dataset._user_num)
+                        cm = cm + cm_batch
+                        self.update_pred_based_on_act(
+                            predictions_user, label_user, label_act)
                     else:
-                        cm_batch, _ = self.valid_step(batch, label_act, label_user, self.dataset._user_num)
-                        cm = cm + cm_batch  
+                        cm_batch, _ = self.valid_step(
+                            batch, label_act, label_user, self.dataset._user_num)
+                        cm = cm + cm_batch
                 metrics = custom_metrics(cm)
                 with self.val_writer.as_default():
                     tf.summary.scalar(
@@ -489,7 +497,7 @@ class Model():
                     self.optimizer.learning_rate.assign(new_lr)
                     with self.train_writer.as_default():
                         tf.summary.scalar("learning_rate", new_lr, step=epoch)
-            #plot confusion matrix
+            # plot confusion matrix
             '''
             if epoch == 50:
                 print(cm.numpy())
@@ -500,10 +508,10 @@ class Model():
                 plt.show()
             '''
 
-    def decay_lr(self, initLR=0.001, factor=0.25, dropEvery=20, epoch=0):
-       
-        exp = np.floor((1 + epoch) / dropEvery)
-        alpha = initLR * (factor ** exp)
+    def decay_lr(self, init_lr=0.001, drop_factor=0.25, drops_epoch=20, epoch=0):
+
+        exp = np.floor((1 + epoch) / drops_epoch)
+        alpha = init_lr * (drop_factor ** exp)
         return float(alpha)
 
     def plot_distribution_data(self, title=''):
@@ -516,73 +524,80 @@ class Model():
 
         user_distributions = []
         for user in np.unique(self.train_user):
-            plt.subplot(3,2,1)
+            plt.subplot(3, 2, 1)
             plt.title('Train user')
             number_user = len([i for i in self.train_user if i == user])
             user_distributions.append(number_user)
 
-        plt.bar(x=list(range(1,len(user_distributions)+1)), height=user_distributions)
+        plt.bar(x=list(range(1, len(user_distributions)+1)),
+                height=user_distributions)
 
         user_distributions = []
         for user in np.unique(self.test_user):
-            plt.subplot(3,2,2)
+            plt.subplot(3, 2, 2)
             plt.title('Test user')
             number_user = len([i for i in self.test_user if i == user])
             user_distributions.append(number_user)
 
-        plt.bar(x=list(range(1,len(user_distributions)+1)), height=user_distributions)
+        plt.bar(x=list(range(1, len(user_distributions)+1)),
+                height=user_distributions)
 
         ### distribution activity ###
 
         act_distributions = []
         for act in np.unique(self.train_act):
-            plt.subplot(3,2,3)
+            plt.subplot(3, 2, 3)
             plt.title('Train activity')
             number_act = len([i for i in self.train_act if i == act])
             act_distributions.append(number_act)
 
-        plt.bar(x=list(range(1,len(act_distributions)+1)), height=act_distributions)
+        plt.bar(x=list(range(1, len(act_distributions)+1)),
+                height=act_distributions)
 
         act_distributions = []
         for act in np.unique(self.test_act):
-            plt.subplot(3,2,4)
+            plt.subplot(3, 2, 4)
             plt.title('Test activity')
             number_act = len([i for i in self.test_act if i == act])
             act_distributions.append(number_act)
-        plt.bar(x=list(range(1,len(act_distributions)+1)), height=act_distributions)
+        plt.bar(x=list(range(1, len(act_distributions)+1)),
+                height=act_distributions)
 
         ### distribution activity for user for train ###
-        distribution = [] # list of user and activity for user
+        distribution = []  # list of user and activity for user
         for user in set(self.train_user):
             distribution.append([])
             for act in set(self.train_act):
-                samples = len([ i for i,(u,a) in enumerate(zip(self.train_user,self.train_act)) if a == act and u == user ])
+                samples = len([i for i, (u, a) in enumerate(
+                    zip(self.train_user, self.train_act)) if a == act and u == user])
                 distribution[user].append(samples)
 
         plt.figure()
         plt.title('Distribution act for user in train set')
         plt.xlabel('User id')
         plt.ylabel('Act id')
-        _ = sn.heatmap(np.transpose(distribution), linewidths=0.3, cmap='YlGnBu', annot=True)
-        #plt.tight_layout()
+        _ = sn.heatmap(np.transpose(distribution),
+                       linewidths=0.3, cmap='YlGnBu', annot=True)
+        # plt.tight_layout()
         plt.show()
 
         ### distribution activity for user for train ###
-        distribution = [] # list of user and activity for user
+        distribution = []  # list of user and activity for user
         for user in set(self.test_user):
             distribution.append([])
             for act in set(self.test_act):
-                samples = len([ i for i,(u,a) in enumerate(zip(self.test_user,self.test_act)) if a == act and u == user ])
+                samples = len([i for i, (u, a) in enumerate(
+                    zip(self.test_user, self.test_act)) if a == act and u == user])
                 distribution[user].append(samples)
 
         plt.figure()
         plt.title('Distribution act for user in test set')
         plt.xlabel('User id')
         plt.ylabel('Act id')
-        _ = sn.heatmap(np.transpose(distribution), linewidths=0.3, cmap='YlGnBu', annot=True)
-        #plt.tight_layout()
+        _ = sn.heatmap(np.transpose(distribution),
+                       linewidths=0.3, cmap='YlGnBu', annot=True)
+        # plt.tight_layout()
         plt.show()
-
 
     def update_pred_based_on_act(self, predictions_user, label_user, label_activity):
 
@@ -591,19 +606,27 @@ class Model():
         else:
             self.final_pred_wrong[label_activity.numpy()[0]] += 1
 
+    def total_sample_for_act(self):
+        total_for_act = [0 for _ in np.arange(0, self.num_act)]
+        for act in np.arange(0, self.num_act):
+            total_for_act[act] += len(self.test[np.where(self.test_act == act)])
+        return total_for_act
+
     def plot_pred_based_act(self):
         plt.figure()
         plt.title('Plot correct and wrong prediction based on activity')
         plt.xlabel('Activity')
         plt.ylabel('Accuracy')
-        step = np.arange(0,self.num_act)
-        pred_right = np.asarray(self.final_pred_right)/np.sum(self.final_pred_right)
-        pred_wrong = np.asarray(self.final_pred_wrong)/np.sum(self.final_pred_wrong)
+        step = np.arange(0, self.num_act)
+        total_for_act = self.total_sample_for_act()
+        #pred_right = np.asarray(self.final_pred_right)/np.sum(self.final_pred_right)
+        #pred_wrong = np.asarray(self.final_pred_wrong)/np.sum(self.final_pred_wrong)
+        pred_right = np.asarray(self.final_pred_right) / \
+            np.asarray(total_for_act)
+        pred_wrong = np.asarray(self.final_pred_wrong) / \
+            np.asarray(total_for_act)
         plt.plot(step, pred_right, 'g', label='Correct pred')
         plt.plot(step, pred_wrong, 'r', label='Wrong pred')
         plt.legend(loc='upper left')
         plt.tight_layout()
         plt.show()
-
-
-

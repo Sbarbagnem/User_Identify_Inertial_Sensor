@@ -20,7 +20,8 @@ def preprocessing(dataset, path, path_out, save_dir="", sensors_type='all', posi
     elif dataset == 'sbhar':
         sbhar_process(path, path_out, magnitude, size_overlapping)
     elif dataset == 'realdisp':
-        realdisp_process(path, path_out, save_dir, sensors_type, positions, magnitude, size_overlapping)
+        realdisp_process(path, path_out, save_dir, sensors_type,
+                         positions, magnitude, size_overlapping)
 
 
 def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='all', magnitude=True, size_overlapping=0.5):
@@ -46,9 +47,12 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
     root_path = path + 'REALDISP'
     raw_data_path = root_path + '/'
     if magnitude:
-        processed_path = path_out + 'OuterPartition_magnitude_prova_balance_{}'.format(str(size_overlapping*10))
+        processed_path = path_out + \
+            'OuterPartition_magnitude_prova_balance_{}'.format(
+                str(size_overlapping*10))
     else:
-        processed_path = path_out + 'OuterPartition_{}'.format(str(size_overlapping*10))
+        processed_path = path_out + \
+            'OuterPartition_{}'.format(str(size_overlapping*10))
 
     win_len = 100
     channel = 3
@@ -68,7 +72,7 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
 
     for fl in os.listdir(raw_data_path):
         if fl.startswith('subject'):
-            #print("Leggo log file ", fl)
+            print("Leggo log file ", fl)
             log_file = np.loadtxt(fname=raw_data_path + fl)
             id_user = int(fl.split('_')[0].split('subject')[1])
             # print(id_user)
@@ -153,13 +157,16 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
                     gyro = temp[:, 4+(offset*step):(step*offset)+7]
 
                     if magnitude:
-                        acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=acc).reshape(-1,1)), axis=1)
-                        gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=gyro).reshape(-1,1)), axis=1)
+                        acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
+                            np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)
+                        gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
+                            np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
 
                     if sensors_type == 'acc_gyro_magn':
                         magn = temp[:, 7+(offset*step):(step*offset)+10]
                         if magnitude:
-                            magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=magn).reshape(-1,1)), axis=1)
+                            magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(
+                                np.sum(np.power(x, 2))), axis=1, arr=magn).reshape(-1, 1)), axis=1)
 
                     try:
                         _data_windows_acc = sliding_window(
@@ -212,7 +219,7 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
                     data = np.concatenate((data, temp_sensor), axis=0)
                     ID = np.concatenate((ID,   _id), axis=0)
                     ID_generater = ID_generater + len(temp_sensor) + 10
-                
+
                 #ID_generater = ID_generater + len(temp_sensor) + 10
 
                 # update la
@@ -258,9 +265,12 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
     root_path = path + 'SBHAR'
     raw_data_path = root_path + '/RawData/'
     if magnitude:
-        processed_path = path_out + 'OuterPartition_magnitude_prova_balance_{}'.format(str(size_overlapping*10))
+        processed_path = path_out + \
+            'OuterPartition_magnitude_prova_balance_{}'.format(
+                str(size_overlapping*10))
     else:
-        processed_path = path_out + 'OuterPartition_{}'.format(str(size_overlapping*10))
+        processed_path = path_out + \
+            'OuterPartition_{}'.format(str(size_overlapping*10))
 
     win_len = 100
     if magnitude:
@@ -321,10 +331,12 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
                         (acc, file_acc[int(start):int(stop), :]), axis=0)
                     gyro = np.concatenate(
                         (gyro, file_gyro[int(start):int(stop), :]), axis=0)
-                
+
             if magnitude:
-                acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=acc).reshape(-1,1)), axis=1)
-                gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(np.sum(np.power(x,2))),axis=1,arr=gyro).reshape(-1,1)), axis=1)
+                acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
+                    np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)
+                gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
+                    np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
 
             # sliding window
             try:
@@ -404,9 +416,12 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
     root_path = path + 'unimib_dataset'
     raw_data_path = root_path + '/data/'
     if magnitude:
-        processed_path = path_out + 'OuterPartition_magnitude_prova_balance_{}'.format(str(size_overlapping*10))
+        processed_path = path_out + \
+            'OuterPartition_magnitude_prova_balance_{}'.format(
+                str(size_overlapping*10))
     else:
-        processed_path = path_out + 'OuterPartition_{}'.format(str(size_overlapping*10))
+        processed_path = path_out + \
+            'OuterPartition_{}'.format(str(size_overlapping*10))
     win_len = 100   # 50 Hz * 2 seconds
     if magnitude:
         channel = 4
@@ -472,7 +487,6 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
 
     plt_act_distribution(indexes, la)
 
-
     # create dir partition
     for i in range(10):
 
@@ -488,6 +502,7 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
         np.save(processed_path+'/fold{}/act_label'.format(i),  la[idx])
         np.save(processed_path+'/fold{}/id'.format(i),         ID[idx])
 
+
 def split_balanced_data(lu, la, folders=10):
 
     print('Numero totale di esempi: {}'.format(len(lu)))
@@ -498,21 +513,23 @@ def split_balanced_data(lu, la, folders=10):
         indexes[str(i)] = []
 
     #distribution_act = [0 for _ in range(0,np.unique(la).shape[0])]
-    #print(len(distribution_act))
+    # print(len(distribution_act))
 
     last_folder = 0
 
-    # balance split label user-activity in every folders 
-    for user in np.unique(lu): # specific user
-        temp_index_label_user = [index for index,x in enumerate(lu) if x==user] # index of specific user
+    # balance split label user-activity in every folders
+    for user in np.unique(lu):  # specific user
+        temp_index_label_user = [index for index, x in enumerate(
+            lu) if x == user]  # index of specific user
 
-        for act in np.unique(la): # specific activity
-            temp_index_label_act = [index for index,x in enumerate(la) if x==act and index in temp_index_label_user] # index of specific activity of user
+        for act in np.unique(la):  # specific activity
+            temp_index_label_act = [index for index, x in enumerate(
+                la) if x == act and index in temp_index_label_user]  # index of specific activity of user
             #distribution_act[act] += len(temp_index_label_act)
 
-            while(len(temp_index_label_act)>0):
+            while(len(temp_index_label_act) > 0):
                 for folder in range(last_folder, folders):
-                    if len(temp_index_label_act) > 0 :
+                    if len(temp_index_label_act) > 0:
                         indexes[str(folder)].append(temp_index_label_act[0])
                         del temp_index_label_act[0]
                         if folder == folders-1:
@@ -525,10 +542,10 @@ def split_balanced_data(lu, la, folders=10):
     for key in indexes.keys():
         print(f'Numero campioni nel folder {key}: {len(indexes[key])}')
 
-    for folder1,l1 in zip(indexes.keys(),indexes.values()):
-        for folder2,l2 in zip(indexes.keys(),indexes.values()):
+    for folder1, l1 in zip(indexes.keys(), indexes.values()):
+        for folder2, l2 in zip(indexes.keys(), indexes.values()):
             if folder1 != folder2:
-                a = [el1 for el1 in l1 if any(el2==el1 for el2 in l2)]
+                a = [el1 for el1 in l1 if any(el2 == el1 for el2 in l2)]
                 if a != []:
                     print('duplicates elements in different folder')
                     exit()
@@ -541,17 +558,20 @@ def plt_user_distribution(dict_indexes, lu):
     plt.style.use('seaborn-darkgrid')
 
     for folder in np.arange(len(dict_indexes)):
-        plt.subplot(2,5,folder+1)
+        plt.subplot(2, 5, folder+1)
         plt.title('folder {}'.format(folder+1))
         folder_index = dict_indexes[str(folder)]
         user_distributions = []
         for user in np.unique(lu):
-            number_user = len([i for index,i in enumerate(lu) if i == user and index in folder_index])
+            number_user = len([i for index, i in enumerate(
+                lu) if i == user and index in folder_index])
             user_distributions.append(number_user)
 
-        plt.bar(x=np.arange(len(user_distributions)), height=user_distributions)
+        plt.bar(x=np.arange(len(user_distributions)),
+                height=user_distributions)
     plt.tight_layout()
     plt.show()
+
 
 def plt_act_distribution(dict_indexes, la):
 
@@ -559,12 +579,13 @@ def plt_act_distribution(dict_indexes, la):
     plt.style.use('seaborn-darkgrid')
 
     for folder in np.arange(len(dict_indexes)):
-        plt.subplot(2,5,folder+1)
+        plt.subplot(2, 5, folder+1)
         plt.title('folder {}'.format(folder+1))
         folder_index = dict_indexes[str(folder)]
         act_distributions = []
         for act in np.unique(la):
-            number_act = len([i for index,i in enumerate(la) if i == act and index in folder_index])
+            number_act = len([i for index, i in enumerate(
+                la) if i == act and index in folder_index])
             act_distributions.append(number_act)
 
         plt.bar(x=np.arange(len(act_distributions)), height=act_distributions)
@@ -586,7 +607,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     for magnitude in [True]:
         for overlap in [0.5]:
-            preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
+            #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
             #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
-            #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn", 
-                          #save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)
+            preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn",
+                          save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)

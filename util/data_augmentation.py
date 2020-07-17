@@ -187,12 +187,8 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
     to_add = samples_to_add(labels_user, labels_activity, 0.30)
     total_sample_to_add = np.sum(to_add)
 
-    #data_aug = np.zeros_like(x)
     data_aug = np.zeros([total_sample_to_add, x.shape[1],
                          x.shape[2]], dtype=np.float)
-
-    print(data_aug.shape)
-    #print('shape input {}'.format(data_aug.shape))
 
     first = True
 
@@ -203,19 +199,13 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
         step = 3
         offset = 2
 
-    print(x.shape)
-
     for i, idx in enumerate(np.arange(0, x.shape[2], step)):
         idx_sensor = np.arange(i+(offset*i), idx+step)
         print(idx_sensor)
-        #print('idx scelti: {}'.format(idx_sensor))
-        '''
         ret, idx_prototype, la, lu, first = random_guided_warp(
-            x[:, :, idx_sensor], labels_user, labels_activity, slope_constraint, use_window, dtw_type, idx_prototype, first, to_add, log)
-        #print('shape sensor\' data augmented {}'.format(ret.shape))
+            x[:, :, idx_sensor], labels_user, labels_activity, total_sample_to_add, slope_constraint, use_window, dtw_type, idx_prototype, first, to_add, log)
+        print('shape sensor data augmented {}'.format(ret.shape))
         data_aug[:, :, idx_sensor] = ret
-        '''
-    sys.exit(0)
 
     idx_to_del = []
 
@@ -225,13 +215,13 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
             idx_to_del.append(i)
 
     data_aug = np.delete(data_aug, idx_to_del, 0)
-    labels_user = np.asarray(lu)
-    labels_activity = np.asarray(la)
+    labels_user = np.delete(lu, idx_to_del, 0)
+    labels_activity = np.delete(la, idx_to_del, 0)
 
     return data_aug, labels_user, labels_activity
 
 
-def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmetric", use_window=True, dtw_type="normal", idx_prototype=None, first=True, to_add=[], log=False):
+def random_guided_warp(x, labels_user, labels_activity, sample_to_add=0, slope_constraint="symmetric", use_window=True, dtw_type="normal", idx_prototype=None, first=True, to_add=[], log=False):
 
     import util.dtw as dtw
 
@@ -253,10 +243,10 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
 
     la_ret = []
     lu_ret = []
+    ret = np.zeros([np.sum(sample_to_add), x.shape[1], x.shape[2]], dtype=np.float)
 
-    #ret = np.zeros_like(x)
     last_index = 0
-    ret = np.zeros([np.sum(to_add), x.shape[1], x.shape[2]], dtype=np.float)
+    
     for i, pat in enumerate(tqdm(x)):
         user = lu[i]
         activity = la[i]
@@ -279,7 +269,7 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
             choices = [a for u in temp_u for a in temp_a if a == u and a != i]
             if len(choices) > 0:
                 # pick random intra-class pattern
-                if idx_prototype == None:
+                if first:
                     idx = np.random.choice(choices)
                     random_prototype = x[idx]
                     # ret_idx_prototype.append(idx)
@@ -332,7 +322,6 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
                 to_add[user][activity] -= 1
                 la_ret.append(activity)
                 lu_ret.append(user)
-                last_index += 1
 
                 if log:
                     plt.subplot(1, 3, 3)
@@ -345,20 +334,13 @@ def random_guided_warp(x, labels_user, labels_activity, slope_constraint="symmet
                         orig_steps, ret[last_index, :, 2], 'r-', label='z')
                     plt.legend(loc='upper left')
                     plt.show()
+                
+                last_index += 1
+
             else:
                 print("There is only one pattern of class user  {} and class activity {}, skipping timewarping".format(
                     lu[i], la[i]))
-            '''
-            else:
-                print("There is only one pattern of class user  {} and class activity {}, skipping timewarping".format(lu[i], la[i]))
-                if idx_prototype == None:
-                    ret_idx_prototype.append(-1)
-            '''
-        '''
-        else:
-            if idx_prototype == None:
-                ret_idx_prototype.append(-1)
-        '''
+    
     first = False
 
     return ret, ret_idx_prototype, la_ret, lu_ret, first
@@ -383,12 +365,14 @@ def discriminative_guided_warp(x, labels_user, labels_activity, batch_size=6, sl
     ret = np.zeros_like(x)
     warp_amount = np.zeros(x.shape[0])
     for i, pat in enumerate(tqdm(x)):
+        user = lu[i]
+        act = la[i]
         # guarentees that same one isnt selected
-        choices = np.delete(np.arange(x.shape[0]), i)
+        #choices = np.delete(np.arange(x.shape[0]), i)
 
         # remove ones of different classes
-        positive = np.where(lu[choices] == lu[i])[0]
-        positive = np.where(la[positive] == la[i])[0]
+        positive_user = np.where(lu[choices] == lu[i])[0]
+        positive_act = np.where(la[positive] == la[i])[0]
         negative = np.where(lu[choices] != lu[i])[0]
         negative = np.where(la[negative] == la[i])[
             0]  # altri utenti ma stessa azione
