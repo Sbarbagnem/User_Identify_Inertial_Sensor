@@ -70,7 +70,7 @@ class Dataset(object):
                 TrainID = np.concatenate((TrainID, ID), axis=0)
 
         # delete overlap samples form training_data, based on overlap percentage
-        if delete:
+        if delete == 'delete':
             print('before delete: ', TrainData.shape)
             distances_to_delete = to_delete(overlapping)
             overlap_ID = np.empty([0], dtype=np.int32)
@@ -90,8 +90,8 @@ class Dataset(object):
             print('after delete: ', TrainData.shape)
 
         # don't delete overlap between train and test, but add noise to overlap train
-        else:
-            print('don\'t delete overlap sample between train and test')
+        elif delete == 'noise':
+            print('don\'t delete overlap sample between train and test, but add noise')
             distances_to_delete = to_delete(overlapping)
             overlap_ID = np.empty([0], dtype=np.int32)
             for distance in distances_to_delete:
@@ -104,11 +104,13 @@ class Dataset(object):
                 config[self._name]['SENSOR_DICT']), use_magnitude=magnitude)
             for i, _ in enumerate(TrainData):
                 if i in invalid_idx:
-                    TrainData[i, :, flatten] = jitter(TrainData[i, :, flatten])
+                    TrainData[i, :, flatten] = jitter(TrainData[i, :, flatten], sigma=0.01)
                     if magnitude:
                         for sensor_idx in idx:
                             TrainData[i, :, sensor_idx[-1]+1] = np.apply_along_axis(lambda x: np.sqrt(
                                 np.sum(np.power(x, 2))), axis=0, arr=TrainData[i, :, sensor_idx])
+        else:
+            print('don\'t delete overlapping sequence between train and test')
 
         TrainData, TrainLA, TrainLU = skutils.shuffle(
             TrainData, TrainLA, TrainLU)
