@@ -117,7 +117,7 @@ class Model():
     def load_data(self, only_acc=False, normalize=True, delete=True):
         # gat data [examples, window_samples, axes, channel]
         TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU = self.dataset.load_data(
-            step=self.fold, overlapping=self.overlap, normalize=normalize, delete=delete)
+            step=self.fold, overlapping=self.overlap, normalize=normalize, delete=delete, magnitude=self.magnitude)
 
         train_shape = TrainData.shape
 

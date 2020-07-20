@@ -14,7 +14,7 @@ from sklearn import utils as skutils
 from configuration import config
 
 #from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, random_guided_warp, random_transformation, random_guided_warp_multivariate
-from util.data_augmentation import random_transformation, random_guided_warp_multivariate
+from util.data_augmentation import random_transformation, random_guided_warp_multivariate, jitter, compute_sub_seq
 
 
 class Dataset(object):
@@ -36,7 +36,7 @@ class Dataset(object):
             'random_warped': random_guided_warp_multivariate
         }
 
-    def load_data(self, step=0, overlapping=0.5, normalize=True, delete=True):
+    def load_data(self, step=0, overlapping=0.5, normalize=True, delete=True, magnitude=True):
 
         TrainData = np.empty([0, self._winlen, self._channel], dtype=np.float)
         TrainLA = np.empty([0], dtype=np.int32)
@@ -73,11 +73,12 @@ class Dataset(object):
         if delete:
             print('before delete: ', TrainData.shape)
             distances_to_delete = to_delete(overlapping)
-            print('distance to delete: ', distances_to_delete)
             overlap_ID = np.empty([0], dtype=np.int32)
+
             for distance in distances_to_delete:
                 overlap_ID = np.concatenate(
                     (overlap_ID, TestID+distance, TestID-distance))
+
             overlap_ID = np.unique(overlap_ID)
             invalid_idx = np.array([i for i in np.arange(
                 len(TrainID)) if TrainID[i] in overlap_ID])
@@ -87,6 +88,27 @@ class Dataset(object):
             TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
 
             print('after delete: ', TrainData.shape)
+
+        # don't delete overlap between train and test, but add noise to overlap train
+        else:
+            print('don\'t delete overlap sample between train and test')
+            distances_to_delete = to_delete(overlapping)
+            overlap_ID = np.empty([0], dtype=np.int32)
+            for distance in distances_to_delete:
+                overlap_ID = np.concatenate(
+                    (overlap_ID, TestID+distance, TestID-distance))
+            overlap_ID = np.unique(overlap_ID)
+            invalid_idx = np.array([i for i in np.arange(
+                len(TrainID)) if TrainID[i] in overlap_ID])
+            idx, flatten = compute_sub_seq(self._channel, n_sensor=len(
+                config[self._name]['SENSOR_DICT']), use_magnitude=magnitude)
+            for i, _ in enumerate(TrainData):
+                if i in invalid_idx:
+                    TrainData[i, :, flatten] = jitter(TrainData[i, :, flatten])
+                    if magnitude:
+                        for sensor_idx in idx:
+                            TrainData[i, :, sensor_idx[-1]+1] = np.apply_along_axis(lambda x: np.sqrt(
+                                np.sum(np.power(x, 2))), axis=0, arr=TrainData[i, :, sensor_idx])
 
         TrainData, TrainLA, TrainLU = skutils.shuffle(
             TrainData, TrainLA, TrainLU)
@@ -173,7 +195,8 @@ class Dataset(object):
                 (label_act_augmented, la_temp), axis=0)
 
             return train_augmented, label_user_augmented, label_act_augmented
-    
+
+
 def to_delete(overlapping):
     if overlapping == 5.0:
         return [1]
