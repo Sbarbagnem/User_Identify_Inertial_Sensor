@@ -371,6 +371,10 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
     to_add = samples_to_add(labels_user, labels_activity, ratio)
 
+    max_to_add = int(np.max(np.asarray(to_add)) / 2)
+
+    print(max_to_add)
+
     steps = np.arange(data.shape[1])
 
     sensor_dict = {'0': 'accelerometer', '1': 'gyrscope', '2': 'magnetometer'}
@@ -392,7 +396,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
     lu_final = np.empty([0], dtype=np.int)
     la_final = np.empty([0], dtype=np.int)
 
-    max_cycle = 10
+    max_cycle = 5
 
     while max_cycle > 0:
         data, labels_user, labels_activity = skutils.shuffle(
@@ -407,18 +411,18 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
             prob_augmentation = np.random.random()
 
-            if to_add[labels_user[i]][labels_activity[i]] > 5 and prob_augmentation > 0.5:
+            if to_add[labels_user[i]][labels_activity[i]] >= max_to_add  and prob_augmentation > 0.5:
                 number = np.random.randint(1, 3, 1)[0]
                 to_add[labels_user[i]][labels_activity[i]] -= number + 1
                 added = True
                 number_transformation.append(number+1)
-
-            if to_add[labels_user[i]][labels_activity[i]] > 0 and added == False and prob_augmentation > 0.5:
+            '''
+            if to_add[labels_user[i]][labels_activity[i]] >  and added == False and prob_augmentation > 0.5:
                 number = 1
                 to_add[labels_user[i]][labels_activity[i]] -= number
                 added = True
                 number_transformation.append(number)
-
+            '''
             if added:
                 transformations = rng.choice(
                     np.arange(len(functions_transformation)), number, replace=False)
@@ -446,6 +450,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
             if log and len(transformations) > 0:
                 plt.figure(figsize=(12, 3))
                 for j, sensor_axis in enumerate(idx):
+                    print(sensor_axis[0]+j, sensor_axis[1]+j, sensor_axis[2]+j)
                     plt.style.use('seaborn-darkgrid')
                     plt.subplot(len(idx), 5, 1+5*(j))
                     plt.title(

@@ -581,7 +581,7 @@ class Model():
         # plt.tight_layout()
         plt.show()
 
-        ### distribution activity for user for train ###
+        ### distribution activity for user for test ###
         distribution = []  # list of user and activity for user
         for user in set(self.test_user):
             distribution.append([])

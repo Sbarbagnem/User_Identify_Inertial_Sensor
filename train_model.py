@@ -23,7 +23,7 @@ if __name__ == '__main__':
     plot_augmented = True  # if true plot original and augmented samples
     # if true plot at the end of train % of correct and wrong pred based on act
     plot_pred_base_act = False
-    delete_overlap = True  # if true delete overlap sequence between train and test
+    delete_overlap = False  # if true delete overlap sequence between train and test
     augmented = True
 
     for model_type in ['resnet18_2D']:
