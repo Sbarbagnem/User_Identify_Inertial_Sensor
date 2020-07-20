@@ -73,7 +73,9 @@ class Model():
                                                                                       self.fold[0],
                                                                                       datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         self.train_writer = tf.summary.create_file_writer(self.train_log_dir)
-        self.val_writer = tf.summary.create_file_writer(self.val_log_dir)
+        self.val_writer = tf.summary.create_file_writer(self.val_log_dir)        
+        self.final_pred_right = [0 for _ in np.arange(0, self.num_act)]
+        self.final_pred_wrong = [0 for _ in np.arange(0, self.num_act)]
 
     def create_dataset(self):
         if self.magnitude:
@@ -314,8 +316,6 @@ class Model():
             self.train_single_task()
 
     def train_single_task(self):
-        self.final_pred_right = [0 for _ in np.arange(0, self.num_act)]
-        self.final_pred_wrong = [0 for _ in np.arange(0, self.num_act)]
         for epoch in range(1, self.epochs + 1):
             cm = tf.zeros(shape=(self.dataset._user_num,
                                  self.dataset._user_num), dtype=tf.int32)

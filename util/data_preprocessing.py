@@ -266,7 +266,7 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
     raw_data_path = root_path + '/RawData/'
     if magnitude:
         processed_path = path_out + \
-            'OuterPartition_magnitude_prova_balance_{}'.format(
+            'OuterPartition_magnitude_{}'.format(
                 str(size_overlapping*10))
     else:
         processed_path = path_out + \
@@ -390,9 +390,9 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
 
     indexes = split_balanced_data(lu, la, folders=10)
 
-    plt_user_distribution(indexes, lu)
+    #plt_user_distribution(indexes, lu)
 
-    plt_act_distribution(indexes, la)
+    #plt_act_distribution(indexes, la)
 
     # partition
     for i in range(10):
@@ -417,7 +417,7 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
     raw_data_path = root_path + '/data/'
     if magnitude:
         processed_path = path_out + \
-            'OuterPartition_magnitude_prova_balance_{}'.format(
+            'OuterPartition_magnitude_{}'.format(
                 str(size_overlapping*10))
     else:
         processed_path = path_out + \
@@ -483,9 +483,9 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
     # split balanced data, return array (10, indexes_folder)
     indexes = split_balanced_data(lu, la, folders=10)
 
-    plt_user_distribution(indexes, lu)
+    #plt_user_distribution(indexes, lu)
 
-    plt_act_distribution(indexes, la)
+    #plt_act_distribution(indexes, la)
 
     # create dir partition
     for i in range(10):
@@ -605,9 +605,9 @@ if __name__ == '__main__':
                         help='path to store data preprocessed')
 
     args = parser.parse_args()
-    for magnitude in [True]:
-        for overlap in [0.5]:
-            #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
-            #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
-            preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn",
-                          save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)
+    for magnitude in [False, True]:
+        for overlap in [0.5, 0.6, 0.7, 0.8, 0.9]:
+            preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
+            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
+            #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn",
+            #              save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)
