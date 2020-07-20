@@ -373,8 +373,6 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
     max_to_add = int(np.max(np.asarray(to_add)) / 2)
 
-    print(max_to_add)
-
     steps = np.arange(data.shape[1])
 
     sensor_dict = {'0': 'accelerometer', '1': 'gyrscope', '2': 'magnetometer'}
@@ -450,7 +448,6 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
             if log and len(transformations) > 0:
                 plt.figure(figsize=(12, 3))
                 for j, sensor_axis in enumerate(idx):
-                    print(sensor_axis[0]+j, sensor_axis[1]+j, sensor_axis[2]+j)
                     plt.style.use('seaborn-darkgrid')
                     plt.subplot(len(idx), 5, 1+5*(j))
                     plt.title(
