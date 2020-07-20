@@ -18,9 +18,9 @@ if __name__ == '__main__':
 
     plot = False  # if true plot distribution of data with a heatmap of activity-subjects train and test
     train = False
-    augmented_par = ['random_warped']
+    augmented_par = ['random_transformations']
     #augmented_par = []
-    plot_augmented = False  # if true plot original and augmented samples
+    plot_augmented = True  # if true plot original and augmented samples
     # if true plot at the end of train % of correct and wrong pred based on act
     plot_pred_base_act = False
     delete_overlap = True  # if true delete overlap sequence between train and test

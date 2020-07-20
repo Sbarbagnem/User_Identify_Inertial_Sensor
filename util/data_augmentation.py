@@ -345,99 +345,6 @@ def random_guided_warp(x, labels_user, labels_activity, sample_to_add=0, slope_c
 
     return ret, ret_idx_prototype, la_ret, lu_ret, first
 
-
-def discriminative_guided_warp(x, labels_user, labels_activity, batch_size=6, slope_constraint="symmetric", use_window=True, dtw_type="normal", use_variable_slice=True):
-    import util.dtw as dtw
-
-    if use_window:
-        window = np.ceil(x.shape[1] / 10.).astype(int)
-    else:
-        window = None
-    orig_steps = np.arange(x.shape[1])
-    lu = np.argmax(
-        labels_user, axis=1) if labels_user.ndim > 1 else labels_user
-    la = np.argmax(labels_activity,
-                   axis=1) if labels_activity.ndim > 1 else labels_activity
-
-    positive_batch = np.ceil(batch_size / 2).astype(int)
-    negative_batch = np.floor(batch_size / 2).astype(int)
-
-    ret = np.zeros_like(x)
-    warp_amount = np.zeros(x.shape[0])
-    for i, pat in enumerate(tqdm(x)):
-        user = lu[i]
-        act = la[i]
-        # guarentees that same one isnt selected
-        #choices = np.delete(np.arange(x.shape[0]), i)
-
-        # remove ones of different classes
-        positive_user = np.where(lu[choices] == lu[i])[0]
-        positive_act = np.where(la[positive] == la[i])[0]
-        negative = np.where(lu[choices] != lu[i])[0]
-        negative = np.where(la[negative] == la[i])[
-            0]  # altri utenti ma stessa azione
-
-        if positive.size > 0 and negative.size > 0:
-            pos_k = min(positive.size, positive_batch)
-            neg_k = min(negative.size, negative_batch)
-            positive_prototypes = x[np.random.choice(
-                positive, pos_k, replace=False)]
-            negative_prototypes = x[np.random.choice(
-                negative, neg_k, replace=False)]
-
-            # vector embedding and nearest prototype in one
-            pos_aves = np.zeros((pos_k))
-            neg_aves = np.zeros((pos_k))
-            if dtw_type == "shape":
-                for p, pos_prot in enumerate(positive_prototypes):
-                    for ps, pos_samp in enumerate(positive_prototypes):
-                        if p != ps:
-                            pos_aves[p] += (1./(pos_k-1.))*dtw.shape_dtw(pos_prot, pos_samp,
-                                                                         dtw.RETURN_VALUE, slope_constraint=slope_constraint, window=window)
-                    for ns, neg_samp in enumerate(negative_prototypes):
-                        neg_aves[p] += (1./neg_k)*dtw.shape_dtw(pos_prot, neg_samp,
-                                                                dtw.RETURN_VALUE, slope_constraint=slope_constraint, window=window)
-                selected_id = np.argmax(neg_aves - pos_aves)
-                path = dtw.shape_dtw(
-                    positive_prototypes[selected_id], pat, dtw.RETURN_PATH, slope_constraint=slope_constraint, window=window)
-            else:
-                for p, pos_prot in enumerate(positive_prototypes):
-                    for ps, pos_samp in enumerate(positive_prototypes):
-                        if p != ps:
-                            pos_aves[p] += (1./(pos_k-1.))*dtw.dtw(pos_prot, pos_samp,
-                                                                   dtw.RETURN_VALUE, slope_constraint=slope_constraint, window=window)
-                    for ns, neg_samp in enumerate(negative_prototypes):
-                        neg_aves[p] += (1./neg_k)*dtw.dtw(pos_prot, neg_samp, dtw.RETURN_VALUE,
-                                                          slope_constraint=slope_constraint, window=window)
-                selected_id = np.argmax(neg_aves - pos_aves)
-                path = dtw.dtw(positive_prototypes[selected_id], pat, dtw.RETURN_PATH,
-                               slope_constraint=slope_constraint, window=window)
-
-            # Time warp
-            warped = pat[path[1]]
-            warp_path_interp = np.interp(orig_steps, np.linspace(
-                0, x.shape[1]-1., num=warped.shape[0]), path[1])
-            warp_amount[i] = np.sum(np.abs(orig_steps-warp_path_interp))
-            for dim in range(x.shape[2]):
-                ret[i, :, dim] = np.interp(orig_steps, np.linspace(
-                    0, x.shape[1]-1., num=warped.shape[0]), warped[:, dim]).T
-        else:
-            #print("There is only one pattern of class %d"%l[i])
-            ret[i, :] = pat
-            warp_amount[i] = 0.
-    if use_variable_slice:
-        max_warp = np.max(warp_amount)
-        if max_warp == 0:
-            # unchanged
-            ret = window_slice(ret, reduce_ratio=0.95)
-        else:
-            for i, pat in enumerate(ret):
-                # Variable Sllicing
-                ret[i] = window_slice(
-                    pat[np.newaxis, :, :], reduce_ratio=0.95+0.05*warp_amount[i]/max_warp)[0]
-    return ret
-
-
 def samples_to_add(labels_user, labels_activity, ratio=0.3):
 
     # distribution act for user
@@ -456,7 +363,6 @@ def samples_to_add(labels_user, labels_activity, ratio=0.3):
 
     return to_add
 
-
 def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, n_sensor=1, use_magnitude=True, ratio=0.5):
     '''
         Take orignal train data and apply randomly transformation between jitter, scaling, rotation, permutation
@@ -473,7 +379,8 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
         'jitter': jitter,
         'window slice': window_slice,
         'permutation': permutation,
-        'rotation': rotation,
+        #'rotation': rotation,
+        'window warp': window_warp,
         'magnitude warp': magnitude_warp,
         'time warp': time_warp
     }
