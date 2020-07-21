@@ -16,7 +16,7 @@ if __name__ == '__main__':
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
 
-    plot = False  # if true plot distribution of data with a heatmap of activity-subjects train and test
+    plot = True  # if true plot distribution of data with a heatmap of activity-subjects train and test
 
     train = True
 
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     # if 'noise' add gaussian noise to overlapping sequence and don't delete it
     delete_overlap = 'delete'  
 
-    augmented = True
+    augmented = False
 
     for model_type in ['resnet18_2D']:
         for dataset_name in ['unimib']:
@@ -41,12 +41,12 @@ if __name__ == '__main__':
                     for magnitude in [True]:
                         # for augmented in [False]:
                         if magnitude:
-                            outer_dir = 'OuterPartition_magnitude_'
+                            outer_dir = 'OuterPartition_magnitude_75w_'
                             save_dir = 'log_magnitude'
                         else:
                             outer_dir = 'OuterPartition_'
                             save_dir = 'log_no_magnitude'
-                        save_dir = 'log_random_warped_transformations'
+                        save_dir = 'log_window_75'
                         for fold in [[0]]:
                             print(
                                 f"Train on dataset {dataset_name}, with task {'multi_task' if multitask else 'single_task'}, on overlap {overlap}, on fold {fold}")
