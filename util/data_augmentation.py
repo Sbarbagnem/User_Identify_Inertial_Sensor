@@ -381,7 +381,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
         'jitter': jitter,
         'window slice': window_slice,
         'permutation': permutation,
-        #'rotation': rotation,
+        'rotation': rotation,
         'window warp': window_warp,
         'magnitude warp': magnitude_warp,
         'time warp': time_warp
