@@ -411,16 +411,14 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
             if to_add[labels_user[i]][labels_activity[i]] >= max_to_add  and prob_augmentation > 0.5:
                 number = np.random.randint(1, 3, 1)[0]
-                to_add[labels_user[i]][labels_activity[i]] -= number + 1
+                if number > 1:
+                    to_add[labels_user[i]][labels_activity[i]] -= number + 1
+                    number_transformation.append(number+1)
+                elif number == 1:
+                    to_add[labels_user[i]][labels_activity[i]] -= number 
+                    number_transformation.append(1)
                 added = True
-                number_transformation.append(number+1)
-            '''
-            if to_add[labels_user[i]][labels_activity[i]] >  and added == False and prob_augmentation > 0.5:
-                number = 1
-                to_add[labels_user[i]][labels_activity[i]] -= number
-                added = True
-                number_transformation.append(number)
-            '''
+
             if added:
                 transformations = rng.choice(
                     np.arange(len(functions_transformation)), number, replace=False)
