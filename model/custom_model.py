@@ -14,6 +14,7 @@ from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
 from model.resNet18LSTM_parallel.resnet_18_lstm import resnet18_lstm as parallel
 from model.resNet18LSTM_consecutive.resnet_18_lstm import resnet18_lstm as consecutive
 from model.resNet181D.resnet18_1D import resnet18 as resnet1D
+from model.resnet182D_multitask.resnet182D_multitask import resne18MultiTask
 from util.dataset import Dataset
 from util.tf_metrics import custom_metrics
 from util.data_augmentation import random_transformation
@@ -208,6 +209,10 @@ class Model():
             self.model = resnet1D(
                 self.multi_task, self.num_act, self.num_user, self.axes
             )
+        if self.model_type == 'resnet18_2D_multitask':
+            self.model = resne18MultiTask(
+                self.num_act, self.num_user
+            )
 
         samples = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
         self.model.build(input_shape=(None, samples, self.axes, 1))
@@ -310,7 +315,9 @@ class Model():
         return cm, tf.math.argmax(predictions_user, axis=1)
 
     def train_model(self):
-        if self.multi_task:
+        if self.model_type == 'resnet18_2D_multitask':
+            self.train_multi_task()
+        elif self.multi_task:
             self.train_multi_task()
         else:
             self.train_single_task()
