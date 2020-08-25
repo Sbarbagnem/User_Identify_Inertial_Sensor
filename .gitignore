@@ -10,7 +10,13 @@ data/datasets/SBHAR
 data/datasets/unimib_dataset
 data/datasets/REALDISP_processed/OuterPartition*
 data/datasets/SBHAR_processed/OuterPartition*
-data/datasets/UNIMIBDataset/OuterPartition*
+# data/datasets/UNIMIBDataset/OuterPartition*
 data/parameters/
 log*
 prova_lr.py
+exp.txt
+mean_cross_validation.py
+save_show_plot.py
+test_metrics.py
+metrics_original_unimib.pickle
+*.png

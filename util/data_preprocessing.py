@@ -3,6 +3,7 @@ import shutil
 import zipfile
 import argparse
 import sys
+from tqdm import tqdm
 
 import numpy as np
 from scipy import stats
@@ -13,7 +14,7 @@ import matplotlib.pyplot as plt
 from sliding_window import sliding_window
 
 
-def preprocessing(dataset, path, path_out, save_dir="", sensors_type='all', positions='all', magnitude=False, size_overlapping=0.5):
+def preprocessing(dataset, path, path_out, save_dir="", sensors_type='acc_gyro_magn', positions='all', magnitude=False, size_overlapping=0.5):
 
     if dataset == 'unimib':
         unimib_process(path, path_out, magnitude, size_overlapping)
@@ -24,7 +25,7 @@ def preprocessing(dataset, path, path_out, save_dir="", sensors_type='all', posi
                          positions, magnitude, size_overlapping)
 
 
-def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='all', magnitude=True, size_overlapping=0.5):
+def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', positions='all', magnitude=True, size_overlapping=0.5):
     '''
         positions:  list of positions sensor to consider in preprocessing.
                     If "all" parameter is passed no filter to position will
@@ -48,41 +49,42 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
     raw_data_path = root_path + '/'
     if magnitude:
         processed_path = path_out + \
-            'OuterPartition_magnitude_prova_balance_{}'.format(
-                str(size_overlapping*10))
+            'OuterPartition_magnitude_{}_{}'.format(
+                sensors_type, str(size_overlapping*10))
     else:
         processed_path = path_out + \
-            'OuterPartition_{}'.format(str(size_overlapping*10))
+            'OuterPartition_{}_{}'.format(
+                sensors_type, str(size_overlapping*10))
 
     win_len = 100
     channel = 3
     ID_generater = 1
+
+    if magnitude:
+        channel = 4
+
     if sensors_type == 'acc_gyro_magn':
         number_sensor = 3
     else:
         number_sensor = 2
 
-    data = np.empty([0, win_len, channel*number_sensor], dtype=np.float)
-    la = np.empty([0], dtype=np.int32)
-    lu = np.empty([0], dtype=np.int32)
-    ID = np.empty([0], dtype=np.int32)
+    data = []
+    la = []
+    lu = []
+    ID = []
 
     if not os.path.exists(processed_path):
         os.makedirs(processed_path)
 
-    for fl in os.listdir(raw_data_path):
+    for fl in tqdm(os.listdir(raw_data_path)):
         if fl.startswith('subject'):
-            print("Leggo log file ", fl)
             log_file = np.loadtxt(fname=raw_data_path + fl)
             id_user = int(fl.split('_')[0].split('subject')[1])
-            # print(id_user)
 
             # take only acc and gyro data
-            sensors = log_file[:, 2:119]
+            sensors = log_file[:, 2:-1]
             activities = log_file[:, -1].astype('int32')
             activities = activities.reshape(sensors.shape[0], 1)
-            trials = log_file[:, 0].astype('int32')
-            trials = trials.reshape(sensors.shape[0], 1)
 
             step = 0
 
@@ -90,10 +92,12 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
             if sensors_type == 'acc_gyro':
                 offset = 6
                 to_del = 7
+            # take magnetometer too
             elif sensors_type == 'acc_gyro_magn':
                 offset = 9
                 to_del = 4
 
+            # delete orientation quaternion
             for _ in range(9):
                 sensors = np.delete(sensors, np.arange(
                     (offset*step) + offset, (offset*step) + offset + to_del), axis=1)
@@ -138,110 +142,95 @@ def realdisp_process(path, path_out, save_dir, sensors_type='all', positions='al
                 if 'LC' not in positions:
                     acc_gyro = acc_gyro[:, step*offset:]
 
-            sensors = np.concatenate((trials, sensors, activities), axis=1)
+            sensors = np.concatenate((sensors, activities), axis=1)
 
             # delete record with unknown activity label
             sensors = np.delete(sensors, np.where(sensors[:, -1] == 0), axis=0)
+            activities = np.delete(np.unique(activities),
+                                   np.where(np.unique(activities) == 0))
+
+            use_magn = True if sensors_type == 'acc_gyro_magn' else False
 
             # cycle on activity
-            for id_act in np.unique(sensors[:, -1]):
-                # print(int(id_act))
+            for id_act in activities:
+
                 step = 0
 
-                temp = sensors[np.where(sensors[:, -1] == int(id_act))]
+                temp = sensors[np.where(sensors[:, -1] == int(id_act))][:, :-1]
 
                 # sliding window on every of 9 sensor
-                for _ in range(9):
+                for i in range(9):
 
-                    acc = temp[:, 1+(offset*step):(step*offset)+4]
-                    gyro = temp[:, 4+(offset*step):(step*offset)+7]
+                    acc = temp[:, offset*step:(step*offset)+3]
+                    gyro = temp[:, 3+(offset*step):(step*offset)+6]
+
+                    if use_magn:
+                        magn = temp[:, 6+(offset*step):(step*offset)+9]
 
                     if magnitude:
                         acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
                             np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)
                         gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
                             np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
-
-                    if sensors_type == 'acc_gyro_magn':
-                        magn = temp[:, 7+(offset*step):(step*offset)+10]
-                        if magnitude:
+                        if use_magn:
                             magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(
                                 np.sum(np.power(x, 2))), axis=1, arr=magn).reshape(-1, 1)), axis=1)
 
-                    try:
-                        _data_windows_acc = sliding_window(
-                            acc, (win_len, channel), (int(win_len/2), 1))
-                    except:
-                        print("Not enough data for sliding window")
-                    invalid_idx = np.where(np.any(
-                        np.isnan(np.reshape(_data_windows_acc, [-1, win_len*channel])), axis=1))[0]
-                    _data_windows_acc = np.delete(
-                        _data_windows_acc, invalid_idx, axis=0)
-
-                    _data_windows_gyro = sliding_window(
-                        gyro, (win_len, channel), (int(win_len/2), 1))
-                    invalid_idx = np.where(np.any(
-                        np.isnan(np.reshape(_data_windows_gyro, [-1, win_len*channel])), axis=1))[0]
-                    _data_windows_gyro = np.delete(
-                        _data_windows_gyro, invalid_idx, axis=0)
-
-                    if sensors_type == 'acc_gyro_magn':
-                        _data_windows_magn = sliding_window(
-                            magn, (win_len, channel), (int(win_len/2), 1))
-                        invalid_idx = np.where(np.any(
-                            np.isnan(np.reshape(_data_windows_magn, [-1, win_len*channel])), axis=1))[0]
-                        _data_windows_magn = np.delete(
-                            _data_windows_magn, invalid_idx, axis=0)
-
-                    try:
-                        if sensors_type == 'all':
-                            temp_sensor = np.concatenate(
-                                (_data_windows_acc, _data_windows_gyro), axis=2)
-                        temp_sensor = np.concatenate(
-                            (_data_windows_acc, _data_windows_gyro, _data_windows_magn), axis=2)
-                    except:
-                        print("There is only one sliding window")
-                        if sensors_type == 'all':
-                            temp_sensor = np.concatenate(
-                                (_data_windows_acc, _data_windows_gyro), axis=1)
-                        else:
-                            temp_sensor = np.concatenate(
-                                (_data_windows_acc, _data_windows_gyro, _data_windows_magn), axis=1)
-                        temp_sensor = temp_sensor.reshape(
-                            (1, temp_sensor.shape[0], temp_sensor.shape[1]))
-
-                    step += 1
+                    # concat sensor and sliding only one time
+                    merge_sensor = np.concatenate(
+                        (acc, gyro), axis=1) if not use_magn else np.concatenate((acc, gyro, magn), axis=1)
+                    _data_windows = sliding_window(
+                        merge_sensor, (win_len, merge_sensor.shape[1]), (int(win_len/2), 1))
 
                     # id for every window
                     _id = np.arange(
-                        ID_generater, ID_generater+len(temp_sensor))
+                        ID_generater, ID_generater+len(_data_windows))
                     # concat verticaly every window
-                    data = np.concatenate((data, temp_sensor), axis=0)
-                    ID = np.concatenate((ID,   _id), axis=0)
-                    ID_generater = ID_generater + len(temp_sensor) + 10
+                    data.append(_data_windows)
+                    ID.extend(_id)
 
-                #ID_generater = ID_generater + len(temp_sensor) + 10
+                    step += 1
+
+                # same id for same signal of 9 sensors
+                ID_generater = ID_generater + len(_data_windows) + 10
 
                 # update la
-                # label activity for every window
-                _la = np.full(len(data)-len(la),
-                              int(id_act) - 1, dtype=np.int32)
-                la = np.concatenate((la, _la), axis=0)
+                _la = [int(id_act)-1] * (len(ID)-len(la))
+                la.extend(_la)
 
             # update gloabl variabel lu
-            _lu = np.full(len(data)-len(lu), int(id_user) - 1,
-                          dtype=np.int32)  # label user for every window
-            lu = np.concatenate((lu, _lu), axis=0)
+            _lu = [int(id_user)-1] * (len(ID)-len(lu))
+            lu.extend(_lu)
+
+    # define array dimension for data and labels
+    data_array = np.zeros(
+        [len(lu), win_len, channel*number_sensor], dtype=np.float)
+    la_array = np.zeros([len(lu)], dtype=np.int32)
+    lu_array = np.zeros([len(lu)], dtype=np.int32)
+    ID_array = np.zeros([len(lu)], dtype=np.int32)
+
+    idx = 0
+    for i, el in enumerate(data):
+        n = el.shape[0]
+        ID_array[idx:idx + n] = ID[idx:idx + n]
+        lu_array[idx:idx + n] = lu[idx:idx + n]
+        la_array[idx:idx + n] = la[idx:idx + n]
+        data_array[idx:idx + n, :, :] = el
+        idx += n
 
     # shuffle
-    data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
-    data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
+    data, la, lu, ID = skutils.shuffle(
+        data_array, la_array, lu_array, ID_array)
+    data, la, lu, ID = skutils.shuffle(
+        data_array, la_array, lu_array, ID_array)
+
+    print(f'shape data {data.shape}')
 
     indexes = split_balanced_data(lu, la, folders=10)
 
-    plt_user_distribution(indexes, lu)
+    #plt_user_distribution(indexes, lu)
 
-    plt_act_distribution(indexes, la)
+    #plt_act_distribution(indexes, la)
 
     # partition
     for i in range(10):
@@ -266,7 +255,7 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
     raw_data_path = root_path + '/RawData/'
     if magnitude:
         processed_path = path_out + \
-            'OuterPartition_magnitude_{}'.format(
+            'OuterPartition_magnitude_sbhar_six_adl_{}'.format(
                 str(size_overlapping*10))
     else:
         processed_path = path_out + \
@@ -385,6 +374,11 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
     data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
     data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
 
+    idx_to_del = np.where(la > 5)
+    data = np.delete(data, idx_to_del, axis=0)
+    la = np.delete(la, idx_to_del, axis=0)
+    lu = np.delete(lu, idx_to_del, axis=0)
+
     if not os.path.exists(processed_path + '/'):
         os.mkdir(processed_path + '/')
 
@@ -422,7 +416,7 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
     else:
         processed_path = path_out + \
             'OuterPartition_{}'.format(str(size_overlapping*10))
-    win_len = 100   # 50 Hz * 2 seconds
+    win_len = 100 # 50 Hz * 2 seconds
     if magnitude:
         channel = 4
     else:
@@ -444,7 +438,7 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
         # id activity
         for aid in range(9):
             act = activity_table[aid]
-            trials = (signal[sid, 0][0, 0][act].shape)[0]
+            trials = (signal[sid, 0][0, 0][act].shape)[0]      
             # id trial
             for tid in range(trials):
                 if magnitude:
@@ -455,7 +449,7 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
                 _data_windows = sliding_window(
                     _data, (win_len, channel), (int(win_len*(1-size_overlapping)), 1))
                 invalid_idx = np.where(
-                    np.any(np.isnan(np.reshape(_data_windows, [-1, win_len*channel])), axis=1))[0]
+                    np.any(np.isnan(np.reshape(_data_windows, [-1, win_len*channel])), axis=1))[0] # delete window with NaN sample
                 _data_windows = np.delete(_data_windows, invalid_idx, axis=0)
                 _id = np.arange(ID_generater, ID_generater +
                                 len(_data_windows))  # id for every window
@@ -472,13 +466,13 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
         # label user for every window
         _lu = np.full(len(data)-len(lu), sid, dtype=np.int32)
         lu = np.concatenate((lu, _lu), axis=0)
-
+        
     # shuffle
     data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
     data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
 
     if not os.path.exists(processed_path + '/'):
-        os.mkdir(processed_path + '/')
+        os.makedirs(processed_path + '/')
 
     # split balanced data, return array (10, indexes_folder)
     indexes = split_balanced_data(lu, la, folders=10)
@@ -512,9 +506,6 @@ def split_balanced_data(lu, la, folders=10):
     for i in np.arange(folders):
         indexes[str(i)] = []
 
-    #distribution_act = [0 for _ in range(0,np.unique(la).shape[0])]
-    # print(len(distribution_act))
-
     last_folder = 0
 
     # balance split label user-activity in every folders
@@ -525,8 +516,8 @@ def split_balanced_data(lu, la, folders=10):
         for act in np.unique(la):  # specific activity
             temp_index_label_act = [index for index, x in enumerate(
                 la) if x == act and index in temp_index_label_user]  # index of specific activity of user
-            #distribution_act[act] += len(temp_index_label_act)
 
+            # same percentage data in every folder
             while(len(temp_index_label_act) > 0):
                 for folder in range(last_folder, folders):
                     if len(temp_index_label_act) > 0:
@@ -542,13 +533,6 @@ def split_balanced_data(lu, la, folders=10):
     for key in indexes.keys():
         print(f'Numero campioni nel folder {key}: {len(indexes[key])}')
 
-    for folder1, l1 in zip(indexes.keys(), indexes.values()):
-        for folder2, l2 in zip(indexes.keys(), indexes.values()):
-            if folder1 != folder2:
-                a = [el1 for el1 in l1 if any(el2 == el1 for el2 in l2)]
-                if a != []:
-                    print('duplicates elements in different folder')
-                    exit()
     return indexes
 
 
@@ -605,9 +589,9 @@ if __name__ == '__main__':
                         help='path to store data preprocessed')
 
     args = parser.parse_args()
-    for magnitude in [False, True]:
-        for overlap in [0.5, 0.6, 0.7, 0.8, 0.9]:
+    for magnitude in [True]:
+        for overlap in [0.5]:
             preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
-            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
+            #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
             #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn",
             #              save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)

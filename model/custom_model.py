@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 import tensorflow as tf
+import tensorflow_datasets as tfds
 import numpy as np
 from sklearn import utils as skutils
 import math
@@ -8,6 +9,9 @@ import json
 import matplotlib.pyplot as plt
 import sys
 import pprint
+import pickle
+from sklearn import utils as skutils
+from sklearn.utils import class_weight
 
 from model.resNet182D.resnet18_2D import resnet18 as resnet2D
 from model.resnet18_multibranch.resnet_18_multibranch import resnet18MultiBranch
@@ -26,7 +30,7 @@ import pandas as pd
 
 
 class Model():
-    def __init__(self, dataset_name, configuration_file, multi_task, lr, model_type, fold=0, save_dir='log', outer_dir='OuterPartition/', overlap=5.0, magnitude=False, log=False):
+    def __init__(self, dataset_name, configuration_file, multi_task, lr, model_type, fold_test=0, fold_val=None, save_dir='log', outer_dir='OuterPartition/', overlap=5.0, magnitude=False, log=False):
         self.dataset_name = dataset_name
         self.configuration = configuration_file
         self.multi_task = multi_task
@@ -37,9 +41,12 @@ class Model():
         self.num_act = configuration_file.config[dataset_name]['NUM_CLASSES_ACTIVITY']
         self.num_user = configuration_file.config[dataset_name]['NUM_CLASSES_USER']
         self.batch_size = configuration_file.BATCH_SIZE
+        self.latent_dim = configuration_file.LATENT_DIM
+        self.epochs_gan = configuration_file.EPOCHS_GAN
         self.model_type = model_type
         self.sensor_dict = configuration_file.config[dataset_name]['SENSOR_DICT']
-        self.fold = fold
+        self.fold_test = fold_test
+        self.fold_val = fold_val
         self.log = log
         self.magnitude = magnitude
         if magnitude:
@@ -62,7 +69,7 @@ class Model():
                                                                                           self.lr,
                                                                                           str(
                                                                                               overlap),
-                                                                                          self.fold[0],
+                                                                                          self.fold_test,
                                                                                           datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         self.val_log_dir = "{}/{}/{}/{}/batch_{}/lr_{}/over_{}/fold_{}/{}/val".format(save_dir,
                                                                                       self.model_type,
@@ -71,12 +78,14 @@ class Model():
                                                                                       self.batch_size,
                                                                                       self.lr,
                                                                                       str(overlap),
-                                                                                      self.fold[0],
+                                                                                      self.fold_test,
                                                                                       datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         self.train_writer = tf.summary.create_file_writer(self.train_log_dir)
-        self.val_writer = tf.summary.create_file_writer(self.val_log_dir)        
-        self.final_pred_right = [0 for _ in np.arange(0, self.num_act)]
-        self.final_pred_wrong = [0 for _ in np.arange(0, self.num_act)]
+        self.val_writer = tf.summary.create_file_writer(self.val_log_dir)
+        self.final_pred_right_act = [0 for _ in np.arange(0, self.num_act)]
+        self.final_pred_wrong_act = [0 for _ in np.arange(0, self.num_act)]
+        self.final_pred_right_user = [0 for _ in np.arange(0, self.num_user)]
+        self.final_pred_wrong_user = [0 for _ in np.arange(0, self.num_user)]
 
     def create_dataset(self):
         if self.magnitude:
@@ -84,45 +93,35 @@ class Model():
                 list(self.configuration.config[self.dataset_name]['SENSOR_DICT'].keys()))
         else:
             channel = self.configuration.config[self.dataset_name]['WINDOW_AXES']
-        if self.dataset_name == 'unimib':
-            self.dataset = Dataset(path='data/datasets/UNIMIBDataset/',
-                                   name=self.dataset_name,
-                                   channel=channel,
-                                   winlen=self.configuration.config[self.dataset_name]['WINDOW_SAMPLES'],
-                                   user_num=30,
-                                   act_num=9,
-                                   outer_dir=self.outer_dir)
-        elif self.dataset_name == 'sbhar':
-            self.dataset = Dataset(path='data/datasets/SBHAR_processed/',
-                                   name=self.dataset_name,
-                                   channel=channel,
-                                   winlen=100,
-                                   user_num=30,
-                                   act_num=12,
-                                   outer_dir=self.outer_dir)
-        elif self.dataset_name == 'realdisp':
-            self.dataset = Dataset(path='data/datasets/REALDISP_processed/',
-                                   name=self.dataset_name,
-                                   channel=channel,
-                                   winlen=100,
-                                   user_num=17,
-                                   act_num=33,
-                                   outer_dir=self.outer_dir)
-        elif self.dataset_name == 'unimib_sbhar':
-            self.dataset = Dataset(path='data/datasets/merged_unimib_sbhar/',
-                                   name=self.dataset_name,
-                                   channel=channel,
-                                   winlen=100,
-                                   user_num=60,
-                                   act_num=-1,
-                                   outer_dir=self.outer_dir)
 
-    def load_data(self, only_acc=False, normalize=True, delete=True):
+        self.dataset = Dataset(path=self.configuration.config[self.dataset_name]['PATH_OUTER_PARTITION'],
+                                name=self.dataset_name,
+                                channel=channel,
+                                winlen=self.configuration.config[self.dataset_name]['WINDOW_SAMPLES'],
+                                user_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_USER'],
+                                act_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_ACTIVITY'],
+                                outer_dir=self.outer_dir,
+                                config_file=self.configuration)
+
+    def load_data(self, only_acc=False, normalize=True, delete='delete'):
         # gat data [examples, window_samples, axes, channel]
-        TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU = self.dataset.load_data(
-            step=self.fold, overlapping=self.overlap, normalize=normalize, delete=delete, magnitude=self.magnitude)
+        TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU, ValidData, ValidLA, ValidLU = self.dataset.load_data(
+            step_test=self.fold_test, step_val=self.fold_val, overlapping=self.overlap, delete=delete, magnitude=self.magnitude)
 
-        train_shape = TrainData.shape
+        if only_acc:
+            if self.magnitude:
+                TrainData = TrainData[:, :, [0, 1, 2, 3]]
+                TestData = TestData[:, :, [0, 1, 2, 3]]
+                if ValidData is not None:
+                    ValidData = ValidData[:, :, [0, 1, 2, 3]]
+                self.axes = 4
+            else:
+                TrainData = TrainData[:, :, [0, 1, 2]]
+                TestData = TestData[:, :, [0, 1, 2]]
+                if ValidData is not None:
+                    ValidData = ValidData[:, :, [0, 1, 2]]
+                self.axes = 3
+        self.dataset._channel = self.axes
 
         self.train = TrainData
         self.train_user = TrainLU
@@ -131,29 +130,90 @@ class Model():
         self.test_user = TestLU
         self.test_act = TestLA
 
-        if only_acc:
-            TrainData = TrainData[:, :, [0, 1, 2, 3]]
-            TestData = TestData[:, :, [0, 1, 2, 3]]
-            self.axes = 4
+        if ValidData is not None:
+            self.val = ValidData
+            self.val_user = ValidLU
+            self.val_act = ValidLA
+        else:
+            self.val = None
+            self.val_user = None
+            self.val_act = None
 
-        print('shape train data: {}'.format(train_shape))
-        print('shape test data: {}'.format(TestData.shape))
+    def normalize_data(self):
+        # normalize data
+        self.train, self.test, self.val = self.dataset.normalize_data(
+            self.train, self.test, self.val)
 
-        TrainData = tf.data.Dataset.from_tensor_slices(TrainData)
-        TrainLA = tf.data.Dataset.from_tensor_slices(TrainLA)
-        TrainLU = tf.data.Dataset.from_tensor_slices(TrainLU)
+    def tf_dataset(self, weighted=False):
 
-        TestData = tf.data.Dataset.from_tensor_slices(TestData)
-        TestLA = tf.data.Dataset.from_tensor_slices(TestLA)
-        TestLU = tf.data.Dataset.from_tensor_slices(TestLU)
+        if not weighted:
+            self.create_tensorflow_dataset()
+        else:
+            datasets, weights = self.create_dataset_for_act()
+            dataset_weighted = tf.data.experimental.sample_from_datasets(
+                datasets, weights)
+            dataset_weighted = dataset_weighted.shuffle(
+                buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
+            dataset_weighted = dataset_weighted.batch(
+                self.batch_size, drop_remainder=True)
+            self.train_data = dataset_weighted
 
-        train_data = tf.data.Dataset.zip((TrainData, TrainLA, TrainLU))
-        train_data = train_data.batch(self.batch_size, drop_remainder=True)
-        self.train_data = train_data.shuffle(
-            buffer_size=train_shape[0], reshuffle_each_iteration=True)
-
+        TestData = tf.data.Dataset.from_tensor_slices(self.test)
+        TestLA = tf.data.Dataset.from_tensor_slices(self.test_act)
+        TestLU = tf.data.Dataset.from_tensor_slices(self.test_user)
         test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
-        self.test_data = test_data.batch(1, drop_remainder=False)
+        self.test_data = test_data.batch(1)
+
+        if self.val is not None:
+            ValData = tf.data.Dataset.from_tensor_slices(self.val)
+            ValLA = tf.data.Dataset.from_tensor_slices(self.val_act)
+            ValLU = tf.data.Dataset.from_tensor_slices(self.val_user)
+            test_data = tf.data.Dataset.zip((ValData, ValLA, ValLU))
+            self.val_data = test_data.batch(1)
+
+    def create_tensorflow_dataset(self):
+
+        TrainData = tf.data.Dataset.from_tensor_slices(self.train)
+        TrainLA = tf.data.Dataset.from_tensor_slices(self.train_act)
+        TrainLU = tf.data.Dataset.from_tensor_slices(self.train_user)
+        train_data = tf.data.Dataset.zip((TrainData, TrainLA, TrainLU))
+        train_data = train_data.shuffle(
+            buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
+        train_data = train_data.batch(self.batch_size, drop_remainder=True)
+        self.train_data = train_data
+
+    def create_dataset_for_act(self):
+        '''
+            Weight samples in dataset based on inverse activity frequency
+        '''
+        datasets = []
+
+        for act in np.unique(self.train_act):
+            idx = np.where(self.train_act == act)
+            temp_d = self.train[idx]
+            temp_a = self.train_act[idx]
+            temp_u = self.train_user[idx]
+            dataset = tf.data.Dataset.from_tensor_slices(
+                (temp_d, temp_a, temp_u))
+            datasets.append(dataset)
+
+        # Compute samples weight to have batch sample distribution like train set
+        activities_sample_count = [np.where(self.train_act == act)[
+            0].shape[0] for act in np.unique(self.train_act)]
+
+        # to have balance samples in batch
+        weights = np.repeat(1., len(activities_sample_count)
+                           ) / activities_sample_count
+
+        # for have the same distribution of train in every batch 
+        '''
+        n = np.sum(activities_sample_count)
+        weights = activities_sample_count / np.repeat(n, len(activities_sample_count))
+        '''
+        
+        print(f'Weight samples based on activity:  {weights}')
+
+        return datasets, weights
 
     def augment_data(self, augmented_par=[], plot_augmented=False):
 
@@ -162,27 +222,9 @@ class Model():
         train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(
             self.train, self.train_user, self.train_act, self.magnitude, augmented_par, plot_augmented)
 
-        train, test = self.dataset.normalize_data(train_augmented, self.test)
-
         self.train = train_augmented
         self.train_user = label_user_augmented
         self.train_act = label_act_augmented
-
-        TrainData = tf.data.Dataset.from_tensor_slices(train)
-        TrainLA = tf.data.Dataset.from_tensor_slices(label_act_augmented)
-        TrainLU = tf.data.Dataset.from_tensor_slices(label_user_augmented)
-
-        TestData = tf.data.Dataset.from_tensor_slices(test)
-        TestLA = tf.data.Dataset.from_tensor_slices(self.test_act)
-        TestLU = tf.data.Dataset.from_tensor_slices(self.test_user)
-
-        train_data = tf.data.Dataset.zip((TrainData, TrainLA, TrainLU))
-        train_data = train_data.batch(self.batch_size, drop_remainder=True)
-        self.train_data = train_data.shuffle(
-            buffer_size=train.shape[0], reshuffle_each_iteration=True)
-
-        test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
-        self.test_data = test_data.batch(1, drop_remainder=False)
 
         print('data before augmented {}, data after augmented {}'.format(
             shape_original, train_augmented.shape[0]))
@@ -260,16 +302,16 @@ class Model():
                 loss_u = self.loss_user(
                     y_true=label_user,
                     y_pred=predictions_user)
-                # penality = sum(tf.nn.l2_loss(tf_var)
-                #               for tf_var in self.model.trainable_variables)
-                loss_global = loss_a + loss_u
+                penality = sum(tf.nn.l2_loss(tf_var)
+                               for tf_var in self.model.trainable_variables)
+                loss_global = loss_a + loss_u #+ 0.003*penality
             else:
                 predictions_user = self.model(batch, training=True)
                 loss_u = self.loss_user(
                     y_true=label_user, y_pred=predictions_user)
-                # penality = sum(tf.nn.l2_loss(tf_var)
-                #               for tf_var in self.model.trainable_variables)
-                loss_global = loss_u
+                penality = sum(tf.nn.l2_loss(tf_var)
+                               for tf_var in self.model.trainable_variables)
+                loss_global = loss_u #+ 0.003*penality
 
         gradients = tape.gradient(loss_global, self.model.trainable_variables)
         self.optimizer.apply_gradients(
@@ -314,6 +356,10 @@ class Model():
 
         return cm, tf.math.argmax(predictions_user, axis=1)
 
+    def distribution_act_on_batch(self, label_act):
+        distribution = {act: np.count_nonzero(label_act == act) for act in np.unique(label_act)}
+        pprint.pprint(distribution)
+
     def train_model(self):
         if self.model_type == 'resnet18_2D_multitask':
             self.train_multi_task()
@@ -327,7 +373,10 @@ class Model():
             cm = tf.zeros(shape=(self.dataset._user_num,
                                  self.dataset._user_num), dtype=tf.int32)
 
-            for batch, _, label_user in self.train_data:
+            ### PERFORMANCE ON TRAIN AFTER EACH EPOCH ###
+
+            for batch, label_act, label_user in self.train_data:
+                #self.distribution_act_on_batch(label_act)
                 cm_batch = self.train_step(
                     batch, None, label_user, self.dataset._user_num)
                 cm = cm + cm_batch
@@ -359,13 +408,18 @@ class Model():
             cm = tf.zeros(shape=(self.dataset._user_num,
                                  self.dataset._user_num), dtype=tf.int32)
 
+            ### PERFORMANCE ON VALIDATION AFTER EACH EPOCH ###
+
             for batch, label_act, label_user in self.test_data:
                 if epoch == self.epochs:
                     cm_batch, predictions_user = self.valid_step(
                         batch, label_act, label_user, self.dataset._user_num)
                     cm = cm + cm_batch
-                    self.update_pred_based_on_act(
-                        predictions_user, label_user, label_act)
+                    if self.val is None:
+                        self.update_pred_based_on_act(
+                            predictions_user, label_user, label_act)
+                        self.update_pred_based_on_user(
+                            predictions_user, label_user)
                 else:
                     cm_batch, _ = self.valid_step(
                         batch, label_act, label_user, self.dataset._user_num)
@@ -400,14 +454,47 @@ class Model():
                 self.optimizer.learning_rate.assign(new_lr)
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
-            '''
-            if epoch == 50:
-                df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
-                                columns = [str(i) for i in range(0,self.dataset._user_num)])
-                plt.figure(figsize = (30,21))
-                sn.heatmap(df_cm, annot=True)
-                plt.show()
-            '''
+
+        ### PERFORMANCE ON TEST AFTER EPOCHS LOOP ###
+        if self.val is not None:
+            cm = tf.zeros(shape=(self.dataset._user_num,
+                                 self.dataset._user_num), dtype=tf.int32)
+            for batch, label_act, label_user in self.val_data:
+                if epoch == self.epochs:
+                    cm_batch, predictions_user = self.valid_step(
+                        batch, label_act, label_user, self.dataset._user_num)
+                    cm = cm + cm_batch
+                    self.update_pred_based_on_act(
+                        predictions_user, label_user, label_act)
+                    self.update_pred_based_on_user(
+                        predictions_user, label_user)
+                else:
+                    cm_batch, _ = self.valid_step(
+                        batch, label_act, label_user, self.dataset._user_num)
+                    cm = cm + cm_batch
+            metrics = custom_metrics(cm)
+            if self.log:
+                print(
+                    "\nTEST FINAL: epoch: {}/{}, loss_user: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
+                        epoch,
+                        self.epochs,
+                        self.valid_loss_user.result().numpy(),
+                        self.valid_accuracy_user.result().numpy(),
+                        metrics['macro_precision'],
+                        metrics['macro_recall'],
+                        metrics['macro_f1']))
+
+        ### CONFUSION MATRIX ON TEST ###
+        df_cm = pd.DataFrame(cm.numpy(), index=[str(i) for i in range(0, self.dataset._user_num)],
+                             columns=[str(i) for i in range(0, self.dataset._user_num)])
+        plt.figure(figsize=(30, 21))
+        sn.heatmap(df_cm, annot=True)
+        plt.show()
+
+        # save dict metrics object
+        with open('metrics_original_unimib.pickle', 'wb+') as f:
+            # Pickle the 'data' dictionary using the highest protocol available.
+            pickle.dump(metrics, f, pickle.HIGHEST_PROTOCOL)
 
     def train_multi_task(self):
         for epoch in range(1, self.epochs + 1):
@@ -504,24 +591,20 @@ class Model():
                     self.optimizer.learning_rate.assign(new_lr)
                     with self.train_writer.as_default():
                         tf.summary.scalar("learning_rate", new_lr, step=epoch)
-            # plot confusion matrix
-            '''
-            if epoch == 50:
-                print(cm.numpy())
-                df_cm = pd.DataFrame(cm.numpy(), index = [str(i) for i in range(0,self.dataset._user_num) ],
-                                columns = [str(i) for i in range(0,self.dataset._user_num)])
-                plt.figure(figsize = (30,21))
-                sn.heatmap(df_cm, annot=True)
-                plt.show()
-            '''
 
-    def decay_lr(self, init_lr=0.001, drop_factor=0.25, drops_epoch=20, epoch=0):
+    def decay_lr(self, init_lr=0.001, drop_factor=0.50, drops_epoch=15, epoch=0):
 
         exp = np.floor((1 + epoch) / drops_epoch)
         alpha = init_lr * (drop_factor ** exp)
         return float(alpha)
 
-    def plot_distribution_data(self, title=''):
+    def plot_distribution_data(self, test=True, title=''):
+
+        if test:
+            r = 3
+        else:
+            r = 1
+        c = 2
 
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
@@ -530,8 +613,8 @@ class Model():
         ### distribution user ###
 
         user_distributions = []
-        for user in np.unique(self.train_user):
-            plt.subplot(3, 2, 1)
+        for user in np.arange(self.num_user):
+            plt.subplot(r, c, 1)
             plt.title('Train user')
             number_user = len([i for i in self.train_user if i == user])
             user_distributions.append(number_user)
@@ -539,42 +622,46 @@ class Model():
         plt.bar(x=list(range(1, len(user_distributions)+1)),
                 height=user_distributions)
 
-        user_distributions = []
-        for user in np.unique(self.test_user):
-            plt.subplot(3, 2, 2)
-            plt.title('Test user')
-            number_user = len([i for i in self.test_user if i == user])
-            user_distributions.append(number_user)
+        if test:
+            user_distributions = []
+            for user in np.arange(self.num_user):
+                plt.subplot(r, c, 2)
+                plt.title('Test user')
+                number_user = len([i for i in self.test_user if i == user])
+                user_distributions.append(number_user)
 
-        plt.bar(x=list(range(1, len(user_distributions)+1)),
-                height=user_distributions)
+            plt.bar(x=list(range(1, len(user_distributions)+1)),
+                    height=user_distributions)
 
         ### distribution activity ###
 
         act_distributions = []
-        for act in np.unique(self.train_act):
-            plt.subplot(3, 2, 3)
+        for act in np.arange(self.num_act):
+            if test:
+                plt.subplot(r, c, 3)
+            else:
+                plt.subplot(r, c, 2)
             plt.title('Train activity')
             number_act = len([i for i in self.train_act if i == act])
             act_distributions.append(number_act)
-
         plt.bar(x=list(range(1, len(act_distributions)+1)),
                 height=act_distributions)
 
-        act_distributions = []
-        for act in np.unique(self.test_act):
-            plt.subplot(3, 2, 4)
-            plt.title('Test activity')
-            number_act = len([i for i in self.test_act if i == act])
-            act_distributions.append(number_act)
-        plt.bar(x=list(range(1, len(act_distributions)+1)),
-                height=act_distributions)
+        if test:
+            act_distributions = []
+            for act in np.arange(self.num_act):
+                plt.subplot(r, c, 4)
+                plt.title('Test activity')
+                number_act = len([i for i in self.test_act if i == act])
+                act_distributions.append(number_act)
+            plt.bar(x=list(range(1, len(act_distributions)+1)),
+                    height=act_distributions)
 
         ### distribution activity for user for train ###
         distribution = []  # list of user and activity for user
-        for user in set(self.train_user):
+        for user in np.arange(self.num_user):
             distribution.append([])
-            for act in set(self.train_act):
+            for act in np.arange(self.num_act):
                 samples = len([i for i, (u, a) in enumerate(
                     zip(self.train_user, self.train_act)) if a == act and u == user])
                 distribution[user].append(samples)
@@ -588,52 +675,95 @@ class Model():
         # plt.tight_layout()
         plt.show()
 
-        ### distribution activity for user for test ###
-        distribution = []  # list of user and activity for user
-        for user in set(self.test_user):
-            distribution.append([])
-            for act in set(self.test_act):
-                samples = len([i for i, (u, a) in enumerate(
-                    zip(self.test_user, self.test_act)) if a == act and u == user])
-                distribution[user].append(samples)
+        if test:
+            ### distribution activity for user for test ###
+            distribution = []  # list of user and activity for user
+            for user in np.arange(self.num_user):
+                distribution.append([])
+                for act in np.arange(self.num_act):
+                    samples = len([i for i, (u, a) in enumerate(
+                        zip(self.test_user, self.test_act)) if a == act and u == user])
+                    distribution[user].append(samples)
 
-        plt.figure()
-        plt.title('Distribution act for user in test set')
-        plt.xlabel('User id')
-        plt.ylabel('Act id')
-        _ = sn.heatmap(np.transpose(distribution),
-                       linewidths=0.3, cmap='YlGnBu', annot=True)
-        # plt.tight_layout()
-        plt.show()
+            plt.figure()
+            plt.title('Distribution act for user in test set')
+            plt.xlabel('User id')
+            plt.ylabel('Act id')
+            _ = sn.heatmap(np.transpose(distribution),
+                           linewidths=0.3, cmap='YlGnBu', annot=True)
+            # plt.tight_layout()
+            plt.show()
 
     def update_pred_based_on_act(self, predictions_user, label_user, label_activity):
 
         if predictions_user.numpy()[0] == label_user.numpy()[0]:
-            self.final_pred_right[label_activity.numpy()[0]] += 1
+            self.final_pred_right_act[label_activity.numpy()[0]] += 1
         else:
-            self.final_pred_wrong[label_activity.numpy()[0]] += 1
+            self.final_pred_wrong_act[label_activity.numpy()[0]] += 1
+
+    def update_pred_based_on_user(self, predictions_user, label_user):
+
+        if predictions_user.numpy()[0] == label_user.numpy()[0]:
+            self.final_pred_right_user[label_user.numpy()[0]] += 1
+        else:
+            self.final_pred_wrong_user[label_user.numpy()[0]] += 1
 
     def total_sample_for_act(self):
         total_for_act = [0 for _ in np.arange(0, self.num_act)]
         for act in np.arange(0, self.num_act):
-            total_for_act[act] += len(self.test[np.where(self.test_act == act)])
+            total_for_act[act] += np.unique(self.test_act, return_counts=True)[1][act]
         return total_for_act
 
     def plot_pred_based_act(self):
         plt.figure()
         plt.title('Plot correct and wrong prediction based on activity')
         plt.xlabel('Activity')
-        plt.ylabel('Accuracy')
+        plt.ylabel('%')
         step = np.arange(0, self.num_act)
         total_for_act = self.total_sample_for_act()
-        #pred_right = np.asarray(self.final_pred_right)/np.sum(self.final_pred_right)
-        #pred_wrong = np.asarray(self.final_pred_wrong)/np.sum(self.final_pred_wrong)
-        pred_right = np.asarray(self.final_pred_right) / \
+        # pred_right = np.asarray(self.final_pred_right)/np.sum(self.final_pred_right)
+        # pred_wrong = np.asarray(self.final_pred_wrong)/np.sum(self.final_pred_wrong)
+        pred_right = np.asarray(self.final_pred_right_act) / \
             np.asarray(total_for_act)
-        pred_wrong = np.asarray(self.final_pred_wrong) / \
+        pred_wrong = np.asarray(self.final_pred_wrong_act) / \
             np.asarray(total_for_act)
         plt.plot(step, pred_right, 'g', label='Correct pred')
         plt.plot(step, pred_wrong, 'r', label='Wrong pred')
         plt.legend(loc='upper left')
         plt.tight_layout()
         plt.show()
+
+    def total_sample_for_user(self):
+        total_for_user = [0 for _ in np.arange(0, self.num_user)]
+        for user in np.arange(0, self.num_user):
+            total_for_user[user] += len(
+                self.test[np.where(self.test_user == user)])
+        return total_for_user
+
+    def plot_pred_based_user(self):
+        plt.figure()
+        plt.title('Plot correct and wrong prediction based on user')
+        plt.xlabel('User')
+        plt.ylabel('%')
+        step = np.arange(0, self.num_user)
+        total_for_user = self.total_sample_for_user()
+        # pred_right = np.asarray(self.final_pred_right)/np.sum(self.final_pred_right)
+        # pred_wrong = np.asarray(self.final_pred_wrong)/np.sum(self.final_pred_wrong)
+        pred_right = np.asarray(self.final_pred_right_user) / \
+            np.asarray(total_for_user)
+        pred_wrong = np.asarray(self.final_pred_wrong_user) / \
+            np.asarray(total_for_user)
+        plt.plot(step, pred_right, 'g', label='Correct pred')
+        plt.plot(step, pred_wrong, 'r', label='Wrong pred')
+        plt.legend(loc='upper left')
+        plt.tight_layout()
+        plt.show()
+
+    def unify_act(self, mapping):
+        num_class_return, act_train, act_test = self.dataset.unify_act_class(self.train_act, self.test_act, mapping)
+
+        self.train_act = act_train
+        self.test_act = act_test
+        self.num_act = num_class_return
+        self.final_pred_right_act = [0 for _ in np.arange(0, self.num_act)]
+        self.final_pred_wrong_act = [0 for _ in np.arange(0, self.num_act)]

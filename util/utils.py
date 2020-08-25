@@ -42,3 +42,9 @@ def samples_to_down(labels_user, labels_activity, ratio=0.3):
                for freq in distribution]
 
     return to_down
+
+
+def modify_class_act(data, labels_activity, dict_mapping_action):
+    '''
+        Unify more act sample under the same class based on mapping in dict_mapping_action
+    '''

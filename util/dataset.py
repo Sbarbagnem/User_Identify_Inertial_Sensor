@@ -11,7 +11,6 @@ from scipy import stats
 from scipy.fftpack import fft
 from scipy.io import loadmat
 from sklearn import utils as skutils
-from configuration import config
 
 #from util.data_augmentation import add_gaussian_noise, scaling_sequence, discriminative_guided_warp, random_guided_warp, random_transformation, random_guided_warp_multivariate
 from util.data_augmentation import random_transformation, random_guided_warp_multivariate, jitter, compute_sub_seq
@@ -19,7 +18,7 @@ from util.data_augmentation import random_transformation, random_guided_warp_mul
 
 class Dataset(object):
 
-    def __init__(self, path, name, channel, winlen, user_num, act_num, save_dir="", outer_dir='OuterPartition/'):
+    def __init__(self, path, name, channel, winlen, user_num, act_num, config_file, outer_dir='OuterPartition/'):
         self._path = path
         self._name = name
         self._channel = channel
@@ -29,40 +28,57 @@ class Dataset(object):
         self._train_user_num = user_num
         self._train_act_num = act_num
         self._data_shape = [None, self._winlen, self._channel, 1]
-        self._save_dir = save_dir
         self.outer_dir = outer_dir
         self.augmented_fun = {
             'random_transformations': random_transformation,
             'random_warped': random_guided_warp_multivariate
         }
+        self.config_file = config_file
 
-    def load_data(self, step=0, overlapping=0.5, normalize=True, delete=True, magnitude=True):
+    def load_data(self, step_test=[0], step_val=[], overlapping=5.0, delete='delete', magnitude=True):
 
         TrainData = np.empty([0, self._winlen, self._channel], dtype=np.float)
         TrainLA = np.empty([0], dtype=np.int32)
         TrainLU = np.empty([0], dtype=np.int32)
         TrainID = np.empty([0], dtype=np.int32)
 
+
         TestData = np.empty([0, self._winlen, self._channel], dtype=np.float)
         TestLA = np.empty([0], dtype=np.int32)
         TestLU = np.empty([0], dtype=np.int32)
         TestID = np.empty([0], dtype=np.int32)
 
+        if step_val != []:
+            ValidData = np.empty([0, self._winlen, self._channel], dtype=np.float)
+            ValidLA = np.empty([0], dtype=np.int32)
+            ValidLU = np.empty([0], dtype=np.int32)
+            ValidID = np.empty([0], dtype=np.int32)
+        else:
+            ValidData = None
+            ValidLA = None
+            ValidLU = None
+            ValidID = None
+
         for i in range(10):
             Data = np.load(self._path + self.outer_dir +
-                           self._save_dir + 'fold{}/data.npy'.format(i))
+                           'fold{}/data.npy'.format(i))
             LA = np.load(self._path + self.outer_dir +
-                         self._save_dir + 'fold{}/act_label.npy'.format(i))
+                         'fold{}/act_label.npy'.format(i))
             LU = np.load(self._path + self.outer_dir +
-                         self._save_dir + 'fold{}/user_label.npy'.format(i))
+                         'fold{}/user_label.npy'.format(i))
             ID = np.load(self._path + self.outer_dir +
-                         self._save_dir + 'fold{}/id.npy'.format(i))
+                         'fold{}/id.npy'.format(i))
 
-            if i in step:
+            if i in step_test:
                 TestData = np.concatenate((TestData, Data), axis=0)
                 TestLA = np.concatenate((TestLA, LA), axis=0)
                 TestLU = np.concatenate((TestLU, LU), axis=0)
                 TestID = np.concatenate((TestID, ID), axis=0)
+            elif i in step_val:
+                ValidData = np.concatenate((ValidData, Data), axis=0)
+                ValidLA = np.concatenate((ValidLA, LA), axis=0)
+                ValidLU = np.concatenate((ValidLU, LU), axis=0)
+                ValidID = np.concatenate((ValidID, ID), axis=0)               
             else:
                 TrainData = np.concatenate((TrainData, Data), axis=0)
                 TrainLA = np.concatenate((TrainLA, LA), axis=0)
@@ -71,13 +87,17 @@ class Dataset(object):
 
         # delete overlap samples form training_data, based on overlap percentage
         if delete == 'delete':
-            print('before delete: ', TrainData.shape)
+            print('Shape train data before delete overlap sequence: ', TrainData.shape)
             distances_to_delete = to_delete(overlapping)
             overlap_ID = np.empty([0], dtype=np.int32)
 
             for distance in distances_to_delete:
-                overlap_ID = np.concatenate(
-                    (overlap_ID, TestID+distance, TestID-distance))
+                if ValidData is not None:
+                    overlap_ID = np.concatenate(
+                        (overlap_ID, TestID+distance, TestID-distance, ValidID+distance, ValidID-distance))
+                else:
+                    overlap_ID = np.concatenate(
+                        (overlap_ID, TestID+distance, TestID-distance))                 
 
             overlap_ID = np.unique(overlap_ID)
             invalid_idx = np.array([i for i in np.arange(
@@ -87,7 +107,7 @@ class Dataset(object):
             TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
             TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
 
-            print('after delete: ', TrainData.shape)
+            print('Shape train data after deleted overlap sequence: ', TrainData.shape)
 
         # don't delete overlap between train and test, but add noise to overlap train
         elif delete == 'noise':
@@ -117,13 +137,13 @@ class Dataset(object):
         TrainData, TrainLA, TrainLU = skutils.shuffle(
             TrainData, TrainLA, TrainLU)
 
-        # normalization
-        if normalize:
-            TrainData, TestData = self.normalize_data(TrainData, TestData)
+        print('Shape test data: ', TestData.shape)
+        if ValidData is not None:
+            print('Shape val data: ', ValidData.shape)
+             
+        return TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU, ValidData, ValidLA, ValidLU
 
-        return TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU
-
-    def normalize_data(self, train, test):
+    def normalize_data(self, train, test, val=None):
 
         # normalization
         mean = np.mean(np.reshape(train, [-1, self._channel]), axis=0)
@@ -132,10 +152,18 @@ class Dataset(object):
         train = (train - mean)/std
         test = (test - mean)/std
 
+        if val is not None:
+            val = (val - mean)/std
+
         train = np.expand_dims(train, 3)
         test = np.expand_dims(test,  3)
+        if val is not None:
+            val = np.expand_dims(val, 3)
 
-        return train, test
+        if val is not None:
+            return train, test, val
+        else:
+            return train, test, None
 
     def augment_data(self, data, lu, la, magnitude, augmented_par, plot_augmented):
 
@@ -145,26 +173,28 @@ class Dataset(object):
             label_act_augmented = np.copy(la)
 
             if len(augmented_par) == 1:
-                if augmented_par[0] == 'random_transformations':
+                if augmented_par[0] == 'random_transformations': 
                     train, lu_temp, la_temp = self.augmented_fun['random_transformations'](data,
                                                                                            lu,
                                                                                            la,
                                                                                            n_axis=self._channel,
                                                                                            n_sensor=len(
-                                                                                               config[self._name]['SENSOR_DICT']),
+                                                                                               self.config_file.config[self._name]['SENSOR_DICT']),
                                                                                            use_magnitude=magnitude,
-                                                                                           log=plot_augmented)
+                                                                                           log=plot_augmented,
+                                                                                           ratio=1)
 
                 if augmented_par[0] == 'random_warped':
                     train, lu_temp, la_temp = self.augmented_fun['random_warped'](data,
                                                                                   lu,
                                                                                   la,
-                                                                                  dtw_type='normal',
+                                                                                  dtw_type='normal', # normal or shape
                                                                                   use_window=False,
                                                                                   magnitude=magnitude,
                                                                                   log=plot_augmented)
 
             else:
+                # equal number of samples for every user given the activity
                 train, lu_temp, la_temp = self.augmented_fun['random_warped'](data,
                                                                               lu,
                                                                               la,
@@ -180,15 +210,18 @@ class Dataset(object):
                 label_act_augmented = np.concatenate(
                     (label_act_augmented, la_temp), axis=0)
 
+                # augment of ratio every sample activity
+                
                 train, lu_temp, la_temp = self.augmented_fun['random_transformations'](train_augmented,
                                                                                        label_user_augmented,
                                                                                        label_act_augmented,
                                                                                        n_axis=self._channel,
                                                                                        n_sensor=len(
-                                                                                           config[self._name]['SENSOR_DICT']),
+                                                                                           self.config_file.config[self._name]['SENSOR_DICT']),
                                                                                        use_magnitude=magnitude,
                                                                                        log=plot_augmented,
-                                                                                       ratio=0.7)
+                                                                                       ratio=1)
+
 
             train_augmented = np.concatenate((train_augmented, train), axis=0)
             label_user_augmented = np.concatenate(
@@ -198,6 +231,16 @@ class Dataset(object):
 
             return train_augmented, label_user_augmented, label_act_augmented
 
+    def unify_act_class(self, act_train, act_test, mapping):
+        num_class_return = mapping['NUM_CLASSES_ACTIVITY']
+
+        for act in mapping['mapping'].keys():
+            for to_merge in mapping['mapping'][act]:
+                act_train = np.where(act_train == to_merge, act, act_train)
+                act_test = np.where(act_test == to_merge, act, act_test)
+
+
+        return num_class_return, act_train, act_test
 
 def to_delete(overlapping):
     if overlapping == 5.0:
