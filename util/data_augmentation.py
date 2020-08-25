@@ -163,7 +163,7 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
     total_added = 0
 
     
-    to_add = samples_to_add(labels_user, labels_activity, ratio=1, random_warped=True)
+    to_add, _ = samples_to_add(labels_user, labels_activity, ratio=1, random_warped=True)
     
     total_sample_to_add = np.sum(to_add).astype(int)
 
