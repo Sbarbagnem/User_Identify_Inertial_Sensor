@@ -39,12 +39,13 @@ class ResNet18SingleBranch(tf.keras.Model):
                                              name='residual_block_2',
                                              stride=1,
                                              kernel=(3,3))
+        '''
         self.layer3 = make_basic_block_layer(filter_num=128,
                                              blocks=2,
                                              name='residual_block_3',
                                              stride=2,
                                              kernel=(3,3))
-
+        '''
         self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
 
         if multi_task:

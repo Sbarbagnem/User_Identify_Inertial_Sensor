@@ -201,15 +201,14 @@ class Model():
         activities_sample_count = [np.where(self.train_act == act)[
             0].shape[0] for act in np.unique(self.train_act)]
 
+        '''
         # to have balance samples in batch
         weights = np.repeat(1., len(activities_sample_count)
                            ) / activities_sample_count
-
-        # for have the same distribution of train in every batch 
         '''
+        # for have the same distribution of train in every batch 
         n = np.sum(activities_sample_count)
         weights = activities_sample_count / np.repeat(n, len(activities_sample_count))
-        '''
         
         print(f'Weight samples based on activity:  {weights}')
 
@@ -592,7 +591,7 @@ class Model():
                     with self.train_writer.as_default():
                         tf.summary.scalar("learning_rate", new_lr, step=epoch)
 
-    def decay_lr(self, init_lr=0.001, drop_factor=0.50, drops_epoch=15, epoch=0):
+    def decay_lr(self, init_lr=0.001, drop_factor=0.25, drops_epoch=20, epoch=0):
 
         exp = np.floor((1 + epoch) / drops_epoch)
         alpha = init_lr * (drop_factor ** exp)

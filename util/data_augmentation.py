@@ -13,13 +13,15 @@ from sklearn import utils as skutils
 import seaborn as sns
 
 
-def jitter(x, sigma=0.05):
+def jitter(x, sigma=0.03):
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
+def scaling(X, sigma=0.1):
+    scalingFactor = np.random.normal(loc=1.0, scale=sigma, size=(1,X.shape[2])) # shape=(1,3)
+    myNoise = np.matmul(np.ones((X.shape[1],1)), scalingFactor)
+    return X*myNoise
+'''
 def rotation(x):
-    '''
-        random rotation axis and change or not sign
-    '''
     flip = np.random.choice([-1, 1], size=(x.shape[0], x.shape[2]))
     flip = flip[:, np.newaxis, :]
     ret = np.empty([1, x.shape[1], x.shape[2]], dtype=np.float)
@@ -28,6 +30,13 @@ def rotation(x):
         rotate_axis = np.random.permutation(sensor_axis)
         ret[:, :, sensor_axis] = flip[:, :, sensor_axis] * x[:, :, rotate_axis]
     return ret
+'''
+def rotation(x):
+    from transforms3d.axangles import axangle2mat  
+
+    axis = np.random.uniform(low=-1, high=1, size=x.shape[2])
+    angle = np.random.uniform(low=-np.pi, high=np.pi)
+    return np.matmul(x , axangle2mat(axis,angle))
 
 def permutation(x, max_segments=8):
     '''
@@ -60,7 +69,7 @@ def magnitude_warp(x, sigma=0.2, knot=4):
     return ret
 
 
-def time_warp(x, sigma=0.2, knot=4):
+def time_warp(x, sigma=0.2, knot=4): 
     '''
         warp time stamp of slice of series
     '''
@@ -83,7 +92,7 @@ def time_warp(x, sigma=0.2, knot=4):
     return ret
 
 
-def window_slice(x, reduce_ratio=0.7):
+def window_slice(x, reduce_ratio=0.4): # reduce_ratio=0.7
     # https://halshs.archives-ouvertes.fr/halshs-01357973/document
     '''
         slice the series 
@@ -371,12 +380,18 @@ def samples_to_add(labels_user, labels_activity, ratio, random_warped=False):
             if samples == 0 or (random_warped and samples == 1): # there aren't samples for random_warped
                 class_no_sample.append([user,act])
 
-    max_freq = np.max(distribution, axis=0)  # max freq for every act
-    #max_freq = np.repeat(max_freq, len(activities))
+    if random_warped:
+        max_freq = np.max(distribution, axis=0)
+    else:
+        max_freq = np.max(distribution)  # max freq for every act
+        max_freq = np.repeat(max_freq, len(activities))
+
     to_add = np.zeros_like(distribution)
 
     for act, freq in enumerate(max_freq):
         to_add[:, act] = ((freq - distribution[:, act])*ratio).astype(int)
+
+    pprint.pprint(to_add)
 
     for el in class_no_sample:
         to_add[el[0], el[1]] = 0
@@ -390,23 +405,24 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
         magnitude warp and time warp
     '''
 
-    #to_add_equal, distribution = samples_to_add(labels_user, labels_activity, ratio=1) # per avere lo stesso numero di esempi per ogni utente
-    to_add_n_fold = add_percentage(labels_user, labels_activity, ratio=3)  # aumento di ratio volte il train set
+    to_add_equal, _ = samples_to_add(labels_user, labels_activity, ratio=3) # per avere lo stesso numero di esempi per ogni utente
+    #to_add_n_fold = add_percentage(labels_user, labels_activity, ratio=3)  # aumento di ratio volte il train set
 
     #to_add = to_add_equal + to_add_n_fold
-    to_add = to_add_n_fold
+    to_add = to_add_equal
 
     steps = np.arange(data.shape[1])
 
     sensor_dict = {'0': 'accelerometer', '1': 'gyrscope', '2': 'magnetometer'}
 
     functions_transformation = {
-        'jitter': jitter,
+        #'jitter': jitter,
+        #'scaling': scaling,
         #'window slice': window_slice,
         'permutation': permutation,
         'rotation': rotation,
-        'window warp': window_warp,
-        'magnitude warp': magnitude_warp,
+        #'window warp': window_warp,
+        #'magnitude warp': magnitude_warp,
         'time warp': time_warp
     }
 
