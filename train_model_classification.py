@@ -35,8 +35,12 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--weighted', type=str, choices=[
                         'no', 'balance', 'train_set'], default='no', help='chose a batch balance on act, same distribution of train set or random')
     parser.add_argument('-compose_transformations', '--compose', type=int, default=0, help='apply all transformations on the same sequence or not in data augmentation')
-    parser.add_argument('-f', '--fold', type=int,
+    parser.add_argument('-f_val', '--fold_val', type=int,
                         default=0, help='fold for validation')
+    parser.add_argument('-f_test', '--fold_test', type=int, nargs='+',
+                        default=-1, help='list of int represent folds on wich testing model')
+    parser.add_argument('-wbo', '--weighted_based_on', type=str, choices=[
+                       'subject', 'act', 'act_subject'], default='', help='weighted samples in dataset based on activity or subject frequency')                        
     args = parser.parse_args()
 
     # GPU settings
@@ -84,8 +88,10 @@ if __name__ == '__main__':
                             save_dir = FOLDER_LOG + 'log_no_magnitude'
                         save_dir = 'log_scazzo'
                         # fold used as validation during training set
-                        fold_val = [args.fold]
-                        fold_test = []  # fold used as test set after train, if empty fold_val is used as test and validation
+                        fold_val = [args.fold_val]
+                        fold_test = []
+                        if args.fold_test != -1:
+                            fold_test = args.fold_test  # fold used as test set after train, if empty fold_val is used as test and validation
                         model = Model(dataset_name=dataset_name,
                                       configuration_file=configuration,
                                       multi_task=multitask, lr='dynamic',
@@ -121,7 +127,7 @@ if __name__ == '__main__':
                         model.normalize_data()
 
                         # tf dataset to iterate over
-                        model.tf_dataset(args.weighted)
+                        model.tf_dataset(args.weighted_based_on, args.weighted)
 
                         if train:
                             model.build_model()

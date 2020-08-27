@@ -144,12 +144,16 @@ class Model():
         self.train, self.test, self.val = self.dataset.normalize_data(
             self.train, self.test, self.val)
 
-    def tf_dataset(self, weighted='no'):
-
+    def tf_dataset(self, method, weighted):
         if weighted == 'no':
             self.create_tensorflow_dataset()
         else:
-            datasets, weights = self.create_dataset_for_act(weighted)
+            if method == 'act':
+                datasets, weights = self.create_dataset_for_act(weighted)
+            if method == 'subject':
+                datasets, weights = self.create_dataset_for_subject()
+            if method == 'act_subject':
+                datasets, weights = self.create_dataset_for_act_subject()
             dataset_weighted = tf.data.experimental.sample_from_datasets(
                 datasets, weights)
             dataset_weighted = dataset_weighted.shuffle(
@@ -181,6 +185,42 @@ class Model():
             buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
         train_data = train_data.batch(self.batch_size, drop_remainder=True)
         self.train_data = train_data
+
+    def create_dataset_for_act_subject(self):
+        datasets = []
+        act_user_sample_count = []
+        for user in np.unique(self.train_user):
+            idx_user = np.where(self.train_user == user)
+            for act in np.unique(self.train_act):
+                idx = np.intersect1d(idx_user, np.where(self.train_act == act))
+                dataset = tf.data.Dataset.from_tensor_slices(
+                    (self.train[idx], self.train_act[idx], self.train_user[idx]))
+                datasets.append(dataset)
+                act_user_sample_count.append(len(idx))
+
+        weights = np.repeat(1., len(act_user_sample_count)) / act_user_sample_count
+
+        print(f'Weight samples based on act and subject frequency:  {weights}')
+
+        return datasets, weights
+
+    def create_dataset_for_subject(self):
+        datasets = []
+        for user in np.unique(self.train_user):
+            idx = np.where(self.train_user == user)
+            dataset = tf.data.Dataset.from_tensor_slices(
+                (self.train[idx], self.train_act[idx], self.train_user[idx]))
+            datasets.append(dataset)
+
+        user_sample_count = [np.where(self.train_user == user)[
+            0].shape[0] for user in np.unique(self.train_user)]
+
+        # to have a balance number of samples for every user in batch
+        weights = np.repeat(1., len(user_sample_count)) / user_sample_count
+        
+        print(f'Weight samples based on subject:  {weights}')
+
+        return datasets, weights
 
     def create_dataset_for_act(self, method='balance'):
         '''
