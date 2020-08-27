@@ -405,8 +405,8 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
             temp_to_add = to_add[user, act]
 
-            if temp_to_add >= 4:
-                number = 3
+            if temp_to_add >= 5:
+                number = 4
                 if compose:
                     to_add[user, act] -= number + 1
                     number_transformation[i] = number + 1
@@ -414,7 +414,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                     to_add[user, act] -= number
                     number_transformation[i] = number 
                 added = True
-            elif temp_to_add < 4 and temp_to_add > 1:
+            elif temp_to_add < 5 and temp_to_add > 1:
                 number = int(temp_to_add) - 1
                 if compose:
                     to_add[user,act] -= number + 1
