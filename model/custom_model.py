@@ -633,7 +633,7 @@ class Model():
                     with self.train_writer.as_default():
                         tf.summary.scalar("learning_rate", new_lr, step=epoch)
 
-    def decay_lr(self, init_lr=0.001, drop_factor=0.50, drops_epoch=10, epoch=0):
+    def decay_lr(self, init_lr=0.001, drop_factor=0.25, drops_epoch=15, epoch=0):
 
         exp = np.floor((1 + epoch) / drops_epoch)
         alpha = init_lr * (drop_factor ** exp)
