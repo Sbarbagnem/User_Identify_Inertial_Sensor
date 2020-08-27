@@ -165,7 +165,7 @@ class Dataset(object):
         else:
             return train, test, None
 
-    def augment_data(self, data, lu, la, magnitude, augmented_par, plot_augmented):
+    def augment_data(self, data, lu, la, magnitude, augmented_par, compose, plot_augmented):
 
         if augmented_par != []:
             train_augmented = np.copy(data)
@@ -182,7 +182,8 @@ class Dataset(object):
                                                                                                self.config_file.config[self._name]['SENSOR_DICT']),
                                                                                            use_magnitude=magnitude,
                                                                                            log=plot_augmented,
-                                                                                           ratio=1)
+                                                                                           ratio=1,
+                                                                                           compose=compose)
 
                 if augmented_par[0] == 'random_warped':
                     train, lu_temp, la_temp = self.augmented_fun['random_warped'](data,
@@ -220,7 +221,8 @@ class Dataset(object):
                                                                                            self.config_file.config[self._name]['SENSOR_DICT']),
                                                                                        use_magnitude=magnitude,
                                                                                        log=plot_augmented,
-                                                                                       ratio=1)
+                                                                                       ratio=1,
+                                                                                       compose=compose)
 
 
             train_augmented = np.concatenate((train_augmented, train), axis=0)

@@ -32,7 +32,9 @@ if __name__ == '__main__':
                                                                     'sbhar_complementary', 'sbhar_up_down'], default='sbhar_couple', help='unify method to apply')
     parser.add_argument('-dataset', '--dataset', type=str, choices=['unimib', 'unimib_75w', 'unimib_128w',
                                                                     'sbhar', 'realdisp', 'unimib_sbhar', 'sbhar_six_adl'], help='on which dataset train and test model')
-
+    parser.add_argument('-w', '--weighted', type=str, choices=[
+                        'no', 'balance', 'train_set'], default='no', help='chose a batch balance on act, same distribution of train set or random')
+    parser.add_argument('-compose_transformations', '--compose', type=int, default=0, help='apply all transformations on the same sequence or not in data augmentation')
     args = parser.parse_args()
 
     # GPU settings
@@ -41,7 +43,8 @@ if __name__ == '__main__':
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
 
-    # if true plot distribution of data with a heatmap of activity-subjects train and test
+    # if true plot distribution of data with a heatmap of activity-subjects
+    # train and test
     plot = args.plot
 
     train = args.train
@@ -51,7 +54,8 @@ if __name__ == '__main__':
     # if true plot original and augmented samples
     plot_augmented = args.plot_augmented
 
-    # if true plot at the end of train % of correct and wrong user predictions based on activity class
+    # if true plot at the end of train % of correct and wrong user predictions
+    # based on activity class
     plot_pred_base_act = args.plot_pred_base_act
 
     # if 'no_delete' don't delete overlap train sequence between train and test
@@ -88,7 +92,7 @@ if __name__ == '__main__':
                                       fold_val=fold_test,
                                       save_dir=save_dir,
                                       outer_dir=outer_dir +
-                                      str(overlap)+'/',
+                                      str(overlap) + '/',
                                       overlap=overlap,
                                       magnitude=magnitude,
                                       log=True)
@@ -104,14 +108,18 @@ if __name__ == '__main__':
                             model.plot_distribution_data(test=True)
 
                         if augmented:
+                            if args.compose:
+                                compose = True
+                            else:
+                                compose = False
                             model.augment_data(
-                                augmented_par, plot_augmented)
+                                augmented_par, compose, plot_augmented)
                             model.plot_distribution_data(test=False)
 
                         model.normalize_data()
 
                         # tf dataset to iterate over
-                        model.tf_dataset(weighted=True)
+                        model.tf_dataset(args.weighted)
 
                         if train:
                             model.build_model()

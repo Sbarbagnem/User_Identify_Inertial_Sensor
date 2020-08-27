@@ -12,15 +12,16 @@ import matplotlib.pyplot as plt
 from sklearn import utils as skutils
 import seaborn as sns
 
+from scipy.interpolate import CubicSpline
 
-def jitter(x, sigma=0.03):
+def jitter(x, sigma=0.1):
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
-def scaling(X, sigma=0.1):
-    scalingFactor = np.random.normal(loc=1.0, scale=sigma, size=(1,X.shape[2])) # shape=(1,3)
-    myNoise = np.matmul(np.ones((X.shape[1],1)), scalingFactor)
-    return X*myNoise
-'''
+def scaling(x, sigma=0.2):
+    scalingFactor = np.random.normal(loc=1.0, scale=sigma, size=(1,x.shape[2])) # shape=(1,3)
+    myNoise = np.matmul(np.ones((x.shape[1],1)), scalingFactor)
+    return x*myNoise
+
 def rotation(x):
     flip = np.random.choice([-1, 1], size=(x.shape[0], x.shape[2]))
     flip = flip[:, np.newaxis, :]
@@ -30,18 +31,8 @@ def rotation(x):
         rotate_axis = np.random.permutation(sensor_axis)
         ret[:, :, sensor_axis] = flip[:, :, sensor_axis] * x[:, :, rotate_axis]
     return ret
-'''
-def rotation(x):
-    from transforms3d.axangles import axangle2mat  
 
-    axis = np.random.uniform(low=-1, high=1, size=x.shape[2])
-    angle = np.random.uniform(low=-np.pi, high=np.pi)
-    return np.matmul(x , axangle2mat(axis,angle))
-
-def permutation(x, max_segments=8):
-    '''
-        random permutation slices of series
-    '''
+def permutation(x, max_segments=4):
     orig_steps = np.arange(x.shape[1])
     num_segs = np.random.randint(2, max_segments, size=(x.shape[0]))
     ret = np.zeros_like(x)
@@ -53,15 +44,22 @@ def permutation(x, max_segments=8):
 
 
 def magnitude_warp(x, sigma=0.2, knot=4):
-    from scipy.interpolate import CubicSpline
+
+    '''
+        knot = complexity of the interpolation curves
+    '''
+
     orig_steps = np.arange(x.shape[1])
 
     random_warps = np.random.normal(
         loc=1.0, scale=sigma, size=(x.shape[0], knot+2, x.shape[2]))
     warp_steps = (np.ones((x.shape[2], 1)) *
                   (np.linspace(0, x.shape[1]-1., num=knot+2))).T
+
     ret = np.zeros_like(x)
+
     for i, pat in enumerate(x):
+        # interpolation random warping step and original step
         warper = np.array([CubicSpline(warp_steps[:, dim], random_warps[i, :, dim])(
             orig_steps) for dim in range(x.shape[2])]).T
         ret[i] = pat * warper
@@ -70,10 +68,11 @@ def magnitude_warp(x, sigma=0.2, knot=4):
 
 
 def time_warp(x, sigma=0.2, knot=4): 
+
     '''
-        warp time stamp of slice of series
+        knot = complexity of the interpolation curves
     '''
-    from scipy.interpolate import CubicSpline
+
     orig_steps = np.arange(x.shape[1])
 
     random_warps = np.random.normal(
@@ -91,73 +90,28 @@ def time_warp(x, sigma=0.2, knot=4):
                 scale*time_warp, 0, x.shape[1]-1), pat[:, dim]).T
     return ret
 
+def random_sampling(x, nSample=90):
+    x = x[0,:,:]
 
-def window_slice(x, reduce_ratio=0.4): # reduce_ratio=0.7
-    # https://halshs.archives-ouvertes.fr/halshs-01357973/document
-    '''
-        slice the series 
-    '''
-    target_len = np.ceil(reduce_ratio*x.shape[1]).astype(int)
-    if target_len >= x.shape[1]:
-        return x
-    starts = np.random.randint(
-        low=0, high=x.shape[1]-target_len, size=(x.shape[0])).astype(int)
-    ends = (target_len + starts).astype(int)
+    # random sampling timesteps
+    tt = np.zeros((nSample,x.shape[1]), dtype=int)
+    for axis in range(x.shape[1]):
+        tt[1:-1,axis] = np.sort(np.random.randint(1,x.shape[0]-1,nSample-2))
+    tt[-1,:] = x.shape[0]-1
 
-    ret = np.zeros_like(x)
-    for i, pat in enumerate(x):
-        for dim in range(x.shape[2]):
-            ret[i, :, dim] = np.interp(np.linspace(0, target_len, num=x.shape[1]), np.arange(
-                target_len), pat[starts[i]:ends[i], dim]).T
-    return ret
+    # interpolate data based on sampled timesteps
+    X_new = np.zeros(x.shape)
+    for axis in range(x.shape[1]):
+        X_new[:,axis] = np.interp(np.arange(x.shape[0]), tt[:,axis], x[tt[:,axis],axis])
 
+    return X_new[np.newaxis, :, :]    
 
-def window_warp(x, window_ratio=0.3, scales=[0.5, 2.]):
-    # https://halshs.archives-ouvertes.fr/halshs-01357973/document
-    '''
-        warping a slice of series
-    '''
-    warp_scales = np.random.choice(scales, x.shape[0])
-    warp_size = np.ceil(window_ratio*x.shape[1]).astype(int)
-    window_steps = np.arange(warp_size)
-
-    window_starts = np.random.randint(
-        low=1, high=x.shape[1]-warp_size-1, size=(x.shape[0])).astype(int)
-    window_ends = (window_starts + warp_size).astype(int)
-
-    ret = np.zeros_like(x)
-    for i, pat in enumerate(x):
-        for dim in range(x.shape[2]):
-            start_seg = pat[:window_starts[i], dim]
-            window_seg = np.interp(np.linspace(0, warp_size-1, num=int(
-                warp_size*warp_scales[i])), window_steps, pat[window_starts[i]:window_ends[i], dim])
-            end_seg = pat[window_ends[i]:, dim]
-            warped = np.concatenate((start_seg, window_seg, end_seg))
-            ret[i, :, dim] = np.interp(np.arange(x.shape[1]), np.linspace(
-                0, x.shape[1]-1., num=warped.size), warped).T
-    return ret
-
-def add_percentage(labels_user, labels_activity, ratio=0.5):
-    activities = np.unique(labels_activity)
-    users = np.unique(labels_user)
-    distribution = np.zeros(shape=(len(users), len(activities)))
-    class_no_sample = []
-
-    for user in users:
-        for act in activities:
-            samples = np.intersect1d(np.where(labels_user == user), np.where(
-                labels_activity == act)).shape[0]
-            distribution[user, act] = samples
-            if samples == 0: # there aren't samples for random_warped
-                class_no_sample.append([user,act])
+def add_percentage(distribution, ratio=1):
 
     to_add = np.zeros_like(distribution)
 
-    for act in np.arange(len(activities)):
+    for act in np.arange(distribution.shape[1]):
         to_add[:,act] = (distribution[:,act] * ratio).astype(int)
-
-    for el in class_no_sample:
-        to_add[el[0], el[1]] = 0
 
     return to_add
 
@@ -365,7 +319,7 @@ def random_guided_warp(x, labels_user, labels_activity, sample_to_add=0, slope_c
     return ret, ret_idx_prototype, la_ret, lu_ret, first, added, to_add
 
 
-def samples_to_add(labels_user, labels_activity, ratio, random_warped=False):
+def samples_to_add(labels_user, labels_activity, ratio=1, random_warped=False):
 
     activities = np.unique(labels_activity)
     users = np.unique(labels_user)
@@ -391,39 +345,35 @@ def samples_to_add(labels_user, labels_activity, ratio, random_warped=False):
     for act, freq in enumerate(max_freq):
         to_add[:, act] = ((freq - distribution[:, act])*ratio).astype(int)
 
-    pprint.pprint(to_add)
-
     for el in class_no_sample:
         to_add[el[0], el[1]] = 0
 
     return to_add, distribution
 
 
-def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, n_sensor=1, use_magnitude=True, ratio=1):
+
+def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, n_sensor=1, use_magnitude=True, ratio=1, compose=False):
     '''
         Take orignal train data and apply randomly transformation between jitter, scaling, rotation, permutation
         magnitude warp and time warp
     '''
 
-    to_add_equal, _ = samples_to_add(labels_user, labels_activity, ratio=3) # per avere lo stesso numero di esempi per ogni utente
-    #to_add_n_fold = add_percentage(labels_user, labels_activity, ratio=3)  # aumento di ratio volte il train set
+    to_add, distribution = samples_to_add(labels_user, labels_activity) # per avere lo stesso numero di esempi per ogni utente
 
-    #to_add = to_add_equal + to_add_n_fold
-    to_add = to_add_equal
+    to_add = to_add + (np.max(distribution) * ratio)
 
     steps = np.arange(data.shape[1])
 
     sensor_dict = {'0': 'accelerometer', '1': 'gyrscope', '2': 'magnetometer'}
 
     functions_transformation = {
-        #'jitter': jitter,
-        #'scaling': scaling,
-        #'window slice': window_slice,
+        'jitter': jitter,
+        'scaling': scaling,
         'permutation': permutation,
         'rotation': rotation,
-        #'window warp': window_warp,
-        #'magnitude warp': magnitude_warp,
-        'time warp': time_warp
+        'magnitude warp': magnitude_warp,
+        'time warp': time_warp,
+        'random sampling': random_sampling
     }
 
     idx, idx_flatten = compute_sub_seq(n_axis, n_sensor, use_magnitude)
@@ -451,49 +401,37 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
             added = False
 
-            prob_augmentation = np.random.random()
+            # prob_augmentation = np.random.random()
 
             temp_to_add = to_add[user, act]
 
-            if temp_to_add >= 4 and prob_augmentation > 0.5:
-                # random transformations between 0 and 3
-                number = np.random.randint(1, 3, 1)[0]
-                if number == 1:
-                    to_add[user, act] -= number
-                    number_transformation[i] = 1
-                    added = True
-                elif number > 1:
+            if temp_to_add >= 4:
+                number = 3
+                if compose:
                     to_add[user, act] -= number + 1
                     number_transformation[i] = number + 1
-                    added = True
-                elif number == 0:
-                    added = False
-
-            if temp_to_add < 4 and temp_to_add > 1 and prob_augmentation > 0.5:
-                number = np.random.randint(1, temp_to_add, 1)[0]
-                if number == 1:
+                else:
                     to_add[user, act] -= number
-                    number_transformation[i] = 1
-                    added = True
-                elif number > 1:
-                    to_add[user, act] -= number + 1
-                    number_transformation[i] = number + 1
-                    added = True
-                elif number == 0:
-                    added = False
-
-            if temp_to_add == 1:
-                number = 1
-                to_add[user, act] -= 1
-                number_transformation[i] = 1
+                    number_transformation[i] = number 
                 added = True
-
-            if temp_to_add == 0:
-                added = False
+            elif temp_to_add < 4 and temp_to_add > 1:
+                number = int(temp_to_add) - 1
+                if compose:
+                    to_add[user,act] -= number + 1
+                    number_transformation[i] = number + 1
+                else:
+                    to_add[user, act] -= number
+                    number_transformation[i] = number
+                added = True
+            elif temp_to_add == 1:
+                number = 1
+                to_add[user,act] -= number
+                number_transformation[i] = number
+                added = True
 
             if added:
                 transformations = rng.choice(
-                    np.arange(len(functions_transformation)), number, replace=False)
+                    np.arange(len(functions_transformation)), number, replace=False) # 3 trasformazioni random
                 random_transformation[i] = transformations
 
         total_transformation = np.sum(number_transformation)
@@ -522,6 +460,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
                     seq = np.reshape(seq, (1, seq.shape[0], seq.shape[1]))
 
+                    # plot original signal
                     if log and len(transformations) > 0:
                         plt.figure(figsize=(12, 3))
                         for j, sensor_axis in enumerate(idx):
@@ -536,12 +475,14 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                             plt.plot(
                                 steps, seq[0, :, sensor_axis[2]+j], 'r-', label='z')
 
+                    # apply all transformations
                     for j, transformation in enumerate(transformations):
                         applied = True
                         key_func = list(functions_transformation.keys())[
                             transformation]
 
-                        if number_transformation[i] > 1:
+                        
+                        if number_transformation[i] > 1 and compose:
                             if all_transf == []:
                                 all_transf = seq  # seq to apply all transformation on the same sequence
                                 all_transf = functions_transformation[key_func](all_transf[:, :, idx_flatten]).reshape(
@@ -552,6 +493,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
                         # seq (1,100,axis)
                         # seq[:,:,idx_flatten] (1,100,axis-magnitude)
+                        
                         ret = functions_transformation[key_func](
                             seq[:, :, idx_flatten])[0]  # (100, axis)
                         transformed[past, :, idx_flatten] = ret.transpose()
@@ -577,12 +519,10 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
                         la[past] = act
                         lu[past] = user
-
                         past += 1
 
-                    if applied and len(all_transf) > 0:
-                        transformed[past, :, idx_flatten] = all_transf[0,
-                                                                       :, :].transpose()
+                    if applied and len(all_transf) > 0 and compose:
+                        transformed[past, :, idx_flatten] = all_transf[0,:, :].transpose()
                         if use_magnitude:
                             # calculate magnitude
                             for sensor_axis in idx:
@@ -594,8 +534,8 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                         la[past] = act
                         lu[past] = user
                         past += 1
-
-                    if log and applied and len(all_transf) > 0:
+                    
+                    if log and applied and len(all_transf) > 0 and compose:
                         for j, sensor_axis in enumerate(idx):
                             plt.style.use('seaborn-darkgrid')
                             plt.subplot(len(idx), 5, len(

@@ -144,12 +144,12 @@ class Model():
         self.train, self.test, self.val = self.dataset.normalize_data(
             self.train, self.test, self.val)
 
-    def tf_dataset(self, weighted=False):
+    def tf_dataset(self, weighted='no'):
 
-        if not weighted:
+        if weighted == 'no':
             self.create_tensorflow_dataset()
         else:
-            datasets, weights = self.create_dataset_for_act()
+            datasets, weights = self.create_dataset_for_act(weighted)
             dataset_weighted = tf.data.experimental.sample_from_datasets(
                 datasets, weights)
             dataset_weighted = dataset_weighted.shuffle(
@@ -182,7 +182,7 @@ class Model():
         train_data = train_data.batch(self.batch_size, drop_remainder=True)
         self.train_data = train_data
 
-    def create_dataset_for_act(self):
+    def create_dataset_for_act(self, method='balance'):
         '''
             Weight samples in dataset based on inverse activity frequency
         '''
@@ -201,25 +201,27 @@ class Model():
         activities_sample_count = [np.where(self.train_act == act)[
             0].shape[0] for act in np.unique(self.train_act)]
 
-        '''
+        
         # to have balance samples in batch
-        weights = np.repeat(1., len(activities_sample_count)
-                           ) / activities_sample_count
-        '''
+        if method == 'balance':
+            weights = np.repeat(1., len(activities_sample_count)
+                            ) / activities_sample_count
+        
         # for have the same distribution of train in every batch 
-        n = np.sum(activities_sample_count)
-        weights = activities_sample_count / np.repeat(n, len(activities_sample_count))
+        if method == 'train_set':
+            n = np.sum(activities_sample_count)
+            weights = activities_sample_count / np.repeat(n, len(activities_sample_count))
         
         print(f'Weight samples based on activity:  {weights}')
 
         return datasets, weights
 
-    def augment_data(self, augmented_par=[], plot_augmented=False):
+    def augment_data(self, augmented_par=[], compose=False, plot_augmented=False):
 
         shape_original = self.train.shape[0]
 
         train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(
-            self.train, self.train_user, self.train_act, self.magnitude, augmented_par, plot_augmented)
+            self.train, self.train_user, self.train_act, self.magnitude, augmented_par, compose, plot_augmented)
 
         self.train = train_augmented
         self.train_user = label_user_augmented
@@ -670,7 +672,7 @@ class Model():
         plt.xlabel('User id')
         plt.ylabel('Act id')
         _ = sn.heatmap(np.transpose(distribution),
-                       linewidths=0.3, cmap='YlGnBu', annot=True)
+                       linewidths=0.3, cmap='YlGnBu', annot=True, fmt="d")
         # plt.tight_layout()
         plt.show()
 
@@ -689,7 +691,7 @@ class Model():
             plt.xlabel('User id')
             plt.ylabel('Act id')
             _ = sn.heatmap(np.transpose(distribution),
-                           linewidths=0.3, cmap='YlGnBu', annot=True)
+                           linewidths=0.3, cmap='YlGnBu', annot=True, fmt="d")
             # plt.tight_layout()
             plt.show()
 
