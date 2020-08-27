@@ -32,7 +32,7 @@ def rotation(x):
         ret[:, :, sensor_axis] = flip[:, :, sensor_axis] * x[:, :, rotate_axis]
     return ret
 
-def permutation(x, max_segments=4):
+def permutation(x, max_segments=8):
     orig_steps = np.arange(x.shape[1])
     num_segs = np.random.randint(2, max_segments, size=(x.shape[0]))
     ret = np.zeros_like(x)
