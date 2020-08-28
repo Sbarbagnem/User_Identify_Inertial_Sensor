@@ -17,7 +17,7 @@ from scipy.interpolate import CubicSpline
 def jitter(x, sigma=0.01): #0.1
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
-def scaling(x, sigma=0.01): #0.2
+def scaling(x, sigma=0.2): 
     scalingFactor = np.random.normal(loc=1.0, scale=sigma, size=(1,x.shape[2])) # shape=(1,3)
     myNoise = np.matmul(np.ones((x.shape[1],1)), scalingFactor)
     return x*myNoise
@@ -32,7 +32,7 @@ def rotation(x):
         ret[:, :, sensor_axis] = flip[:, :, sensor_axis] * x[:, :, rotate_axis]
     return ret
 
-def permutation(x, max_segments=4): #8
+def permutation(x, max_segments=8):
     orig_steps = np.arange(x.shape[1])
     num_segs = np.random.randint(2, max_segments, size=(x.shape[0]))
     ret = np.zeros_like(x)
@@ -43,7 +43,7 @@ def permutation(x, max_segments=4): #8
     return ret
 
 
-def magnitude_warp(x, sigma=0.01, knot=4): #0.2
+def magnitude_warp(x, sigma=0.2, knot=4): 
 
     '''
         knot = complexity of the interpolation curves
@@ -67,7 +67,7 @@ def magnitude_warp(x, sigma=0.01, knot=4): #0.2
     return ret
 
 
-def time_warp(x, sigma=0.01, knot=4): #0.2
+def time_warp(x, sigma=0.2, knot=4):
 
     '''
         knot = complexity of the interpolation curves
@@ -407,8 +407,8 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
             temp_to_add = to_add[user, act]
 
-            if temp_to_add >= 5:
-                number = 4
+            if temp_to_add >= 4:
+                number = 3
                 if compose:
                     to_add[user, act] -= number + 1
                     number_transformation[i] = number + 1
@@ -416,7 +416,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                     to_add[user, act] -= number
                     number_transformation[i] = number 
                 added = True
-            elif temp_to_add < 5 and temp_to_add > 1:
+            elif temp_to_add < 4 and temp_to_add > 1:
                 number = int(temp_to_add) - 1
                 if compose:
                     to_add[user,act] -= number + 1
