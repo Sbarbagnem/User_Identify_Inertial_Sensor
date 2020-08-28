@@ -35,9 +35,9 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--weighted', type=str, choices=[
                         'no', 'balance', 'train_set'], default='no', help='chose a batch balance on act, same distribution of train set or random')
     parser.add_argument('-compose_transformations', '--compose', type=int, default=0, help='apply all transformations on the same sequence or not in data augmentation')
-    parser.add_argument('-f_val', '--fold_val', type=int,
+    parser.add_argument('-fold_val', '--fold_val', type=int,
                         default=0, help='fold for validation')
-    parser.add_argument('-f_test', '--fold_test', type=int, nargs='+',
+    parser.add_argument('-fold_test', '--fold_test', type=int, nargs='+',
                         default=-1, help='list of int represent folds on wich testing model')
     parser.add_argument('-wbo', '--weighted_based_on', type=str, choices=[
                        'subject', 'act', 'act_subject'], default='', help='weighted samples in dataset based on activity or subject frequency')                        

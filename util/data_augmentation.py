@@ -91,12 +91,14 @@ def time_warp(x, sigma=0.1, knot=4): #0.2
     return ret
 
 def random_sampling(x, nSample=90):
+    
     x = x[0,:,:]
 
     # random sampling timesteps
     tt = np.zeros((nSample,x.shape[1]), dtype=int)
+    random_tt = np.sort(np.random.randint(1,x.shape[0]-1,nSample-2)) # tengo stessi timestamp per ogni asse
     for axis in range(x.shape[1]):
-        tt[1:-1,axis] = np.sort(np.random.randint(1,x.shape[0]-1,nSample-2))
+        tt[1:-1,axis] = random_tt
     tt[-1,:] = x.shape[0]-1
 
     # interpolate data based on sampled timesteps
