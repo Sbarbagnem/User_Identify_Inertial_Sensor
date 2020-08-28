@@ -256,12 +256,12 @@ class Model():
 
         return datasets, weights
 
-    def augment_data(self, augmented_par=[], compose=False, plot_augmented=False):
+    def augment_data(self, augmented_par=[], compose=False, only_compose=False, plot_augmented=False):
 
         shape_original = self.train.shape[0]
 
         train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(
-            self.train, self.train_user, self.train_act, self.magnitude, augmented_par, compose, plot_augmented)
+            self.train, self.train_user, self.train_act, self.magnitude, augmented_par, compose, only_compose, plot_augmented)
 
         self.train = train_augmented
         self.train_user = label_user_augmented

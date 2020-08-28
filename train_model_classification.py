@@ -35,6 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--weighted', type=str, choices=[
                         'no', 'balance', 'train_set'], default='no', help='chose a batch balance on act, same distribution of train set or random')
     parser.add_argument('-compose_transformations', '--compose', type=int, default=0, help='apply all transformations on the same sequence or not in data augmentation')
+    parser.add_argument('-only_compose', '--only_compose', type=int, default=0, help='in data augmentation return only sequence with all transformations applied on it')
     parser.add_argument('-fold_val', '--fold_val', type=int,
                         default=0, help='fold for validation')
     parser.add_argument('-fold_test', '--fold_test', type=int, nargs='+',
@@ -116,12 +117,10 @@ if __name__ == '__main__':
                             model.plot_distribution_data(test=True)
 
                         if augmented:
-                            if args.compose:
-                                compose = True
-                            else:
-                                compose = False
+                            compose = True if args.compose else False
+                            only_compose = True if args.only_compose else False
                             model.augment_data(
-                                augmented_par, compose, plot_augmented)
+                                augmented_par, compose, only_compose, plot_augmented)
                             model.plot_distribution_data(test=False)
 
                         model.normalize_data()

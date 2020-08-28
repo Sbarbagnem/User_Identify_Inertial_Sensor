@@ -165,7 +165,7 @@ class Dataset(object):
         else:
             return train, test, None
 
-    def augment_data(self, data, lu, la, magnitude, augmented_par, compose, plot_augmented):
+    def augment_data(self, data, lu, la, magnitude, augmented_par, compose, only_compose, plot_augmented):
 
         if augmented_par != []:
             train_augmented = np.copy(data)
@@ -183,7 +183,8 @@ class Dataset(object):
                                                                                            use_magnitude=magnitude,
                                                                                            log=plot_augmented,
                                                                                            ratio=1,
-                                                                                           compose=compose)
+                                                                                           compose=compose,
+                                                                                           only_compose=only_compose)
 
                 if augmented_par[0] == 'random_warped':
                     train, lu_temp, la_temp = self.augmented_fun['random_warped'](data,

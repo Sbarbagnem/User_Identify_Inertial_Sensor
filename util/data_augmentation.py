@@ -354,7 +354,7 @@ def samples_to_add(labels_user, labels_activity, ratio=1, random_warped=False):
 
 
 
-def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, n_sensor=1, use_magnitude=True, ratio=1, compose=False):
+def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, n_sensor=1, use_magnitude=True, ratio=1, compose=False, only_compose=False):
     '''
         Take orignal train data and apply randomly transformation between jitter, scaling, rotation, permutation
         magnitude warp and time warp
@@ -369,13 +369,13 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
     sensor_dict = {'0': 'accelerometer', '1': 'gyrscope', '2': 'magnetometer'}
 
     functions_transformation = {
-        #'jitter': jitter,
-        #'scaling': scaling,
+        'jitter': jitter,
+        'scaling': scaling,
         'permutation': permutation,
         'rotation': rotation,
-        #'magnitude warp': magnitude_warp,
+        'magnitude warp': magnitude_warp,
         'time warp': time_warp,
-        #'random sampling': random_sampling
+        'random sampling': random_sampling
     }
 
     idx, idx_flatten = compute_sub_seq(n_axis, n_sensor, use_magnitude)
@@ -401,35 +401,44 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
             rng = np.random.default_rng()
 
-            added = False
+            added = True
 
             # prob_augmentation = np.random.random()
 
             temp_to_add = to_add[user, act]
 
-            if temp_to_add >= 4:
-                number = 3
-                if compose:
-                    to_add[user, act] -= number + 1
-                    number_transformation[i] = number + 1
-                else:
-                    to_add[user, act] -= number
-                    number_transformation[i] = number 
-                added = True
-            elif temp_to_add < 4 and temp_to_add > 1:
-                number = int(temp_to_add) - 1
-                if compose:
-                    to_add[user,act] -= number + 1
-                    number_transformation[i] = number + 1
-                else:
-                    to_add[user, act] -= number
+            if temp_to_add <= 0:
+                added = False
+
+            # apply 3 random transformations and compose on the same sequence if compose if true
+            if not only_compose:
+                if temp_to_add >= 4:
+                    number = 3
+                    if compose:
+                        to_add[user, act] -= number + 1
+                        number_transformation[i] = number + 1
+                    else:
+                        to_add[user, act] -= number
+                        number_transformation[i] = number 
+                elif temp_to_add < 4 and temp_to_add > 1:
+                    number = int(temp_to_add) - 1
+                    if compose:
+                        to_add[user,act] -= number + 1
+                        number_transformation[i] = number + 1
+                    else:
+                        to_add[user, act] -= number
+                        number_transformation[i] = number
+                elif temp_to_add == 1:
+                    number = 1
+                    to_add[user,act] -= number
                     number_transformation[i] = number
-                added = True
-            elif temp_to_add == 1:
-                number = 1
-                to_add[user,act] -= number
-                number_transformation[i] = number
-                added = True
+            # apply only compose transformations
+            else:
+                if temp_to_add > 0:
+                    number = 3
+                    to_add[user, act] -= 1
+                    number_transformation[i] = 1
+
 
             if added:
                 transformations = rng.choice(
@@ -459,6 +468,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
                     applied = False
                     all_transf = []
+                    all_transf_label = []
 
                     seq = np.reshape(seq, (1, seq.shape[0], seq.shape[1]))
 
@@ -467,7 +477,10 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                         plt.figure(figsize=(12, 3))
                         for j, sensor_axis in enumerate(idx):
                             plt.style.use('seaborn-darkgrid')
-                            plt.subplot(len(idx), 5, 1+5*(j))
+                            if not only_compose:
+                                plt.subplot(len(idx), 5, 1+5*(j))
+                            else:
+                                plt.subplot(len(idx), 2, 1+2*(j))
                             plt.title(
                                 f'original {sensor_dict[str(j)]} user {labels_user[i]} activity {labels_activity[i]}')
                             plt.plot(
@@ -482,9 +495,10 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                         applied = True
                         key_func = list(functions_transformation.keys())[
                             transformation]
+                        all_transf_label.append(key_func)
 
                         
-                        if number_transformation[i] > 1 and compose:
+                        if (number_transformation[i] > 1 and compose) or only_compose:
                             if all_transf == []:
                                 all_transf = seq  # seq to apply all transformation on the same sequence
                                 all_transf = functions_transformation[key_func](all_transf[:, :, idx_flatten]).reshape(
@@ -496,34 +510,35 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                         # seq (1,100,axis)
                         # seq[:,:,idx_flatten] (1,100,axis-magnitude)
                         
-                        ret = functions_transformation[key_func](
-                            seq[:, :, idx_flatten])[0]  # (100, axis)
-                        transformed[past, :, idx_flatten] = ret.transpose()
+                        if not only_compose:
+                            ret = functions_transformation[key_func](
+                                seq[:, :, idx_flatten])[0]  # (100, axis)
+                            transformed[past, :, idx_flatten] = ret.transpose()
 
-                        if use_magnitude:
-                            # calculate magnitude
-                            for sensor_axis in idx:
-                                magnitude = np.apply_along_axis(lambda x: np.sqrt(
-                                    np.sum(np.power(x, 2))), axis=1, arr=ret[:, sensor_axis])
-                                transformed[past, :,
-                                            sensor_axis[-1]+1] = magnitude
-                        if log:
-                            for h, sensor_axis in enumerate(idx):
-                                plt.style.use('seaborn-darkgrid')
-                                plt.subplot(len(idx), 5, j+2+5*(h))
-                                plt.title(f'{key_func}')
-                                plt.plot(
-                                    steps, transformed[past, :, sensor_axis[0]+h], 'b-', label='x')
-                                plt.plot(
-                                    steps, transformed[past, :, sensor_axis[1]+h], 'g-', label='y')
-                                plt.plot(
-                                    steps, transformed[past, :, sensor_axis[2]+h], 'r-', label='z')
+                            if use_magnitude:
+                                # calculate magnitude
+                                for sensor_axis in idx:
+                                    magnitude = np.apply_along_axis(lambda x: np.sqrt(
+                                        np.sum(np.power(x, 2))), axis=1, arr=ret[:, sensor_axis])
+                                    transformed[past, :,
+                                                sensor_axis[-1]+1] = magnitude
+                            if log:
+                                for h, sensor_axis in enumerate(idx):
+                                    plt.style.use('seaborn-darkgrid')
+                                    plt.subplot(len(idx), 5, j+2+5*(h))
+                                    plt.title(f'{key_func}')
+                                    plt.plot(
+                                        steps, transformed[past, :, sensor_axis[0]+h], 'b-', label='x')
+                                    plt.plot(
+                                        steps, transformed[past, :, sensor_axis[1]+h], 'g-', label='y')
+                                    plt.plot(
+                                        steps, transformed[past, :, sensor_axis[2]+h], 'r-', label='z')
 
-                        la[past] = act
-                        lu[past] = user
-                        past += 1
+                            la[past] = act
+                            lu[past] = user
+                            past += 1
 
-                    if applied and len(all_transf) > 0 and compose:
+                    if applied and len(all_transf) > 0 and (compose or only_compose):
                         transformed[past, :, idx_flatten] = all_transf[0,:, :].transpose()
                         if use_magnitude:
                             # calculate magnitude
@@ -537,19 +552,32 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                         lu[past] = user
                         past += 1
                     
-                    if log and applied and len(all_transf) > 0 and compose:
-                        for j, sensor_axis in enumerate(idx):
-                            plt.style.use('seaborn-darkgrid')
-                            plt.subplot(len(idx), 5, len(
-                                transformations)+2+5*(j))
-                            plt.title(
-                                'all transformations on same sequence acc')
-                            plt.plot(
-                                steps, all_transf[0, :, sensor_axis[0]], 'b-', label='x')
-                            plt.plot(
-                                steps, all_transf[0, :, sensor_axis[1]], 'g-', label='y')
-                            plt.plot(
-                                steps, all_transf[0, :, sensor_axis[2]], 'r-', label='z')
+                    if log and applied and len(all_transf) > 0:
+                        if not only_compose:
+                            for j, sensor_axis in enumerate(idx):
+                                plt.style.use('seaborn-darkgrid')
+                                plt.subplot(len(idx), 5, len(
+                                    transformations)+2+5*(j))
+                                plt.title(
+                                    'all transformations on same sequence acc')
+                                plt.plot(
+                                    steps, all_transf[0, :, sensor_axis[0]], 'b-', label='x')
+                                plt.plot(
+                                    steps, all_transf[0, :, sensor_axis[1]], 'g-', label='y')
+                                plt.plot(
+                                    steps, all_transf[0, :, sensor_axis[2]], 'r-', label='z')
+                        if only_compose:
+                             for j, sensor_axis in enumerate(idx):
+                                plt.style.use('seaborn-darkgrid')
+                                plt.subplot(len(idx), 2, 2+2*(j))
+                                plt.title(
+                                    f'{", ".join(all_transf_label)} on the same sequence acc')
+                                plt.plot(
+                                    steps, all_transf[0, :, sensor_axis[0]], 'b-', label='x')
+                                plt.plot(
+                                    steps, all_transf[0, :, sensor_axis[1]], 'g-', label='y')
+                                plt.plot(
+                                    steps, all_transf[0, :, sensor_axis[2]], 'r-', label='z')                   
 
                     if log and applied:
                         plt.tight_layout()
