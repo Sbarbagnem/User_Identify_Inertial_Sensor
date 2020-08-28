@@ -17,7 +17,7 @@ from scipy.interpolate import CubicSpline
 def jitter(x, sigma=0.01): #0.1
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
-def scaling(x, sigma=0.1): #0.2
+def scaling(x, sigma=0.01): #0.2
     scalingFactor = np.random.normal(loc=1.0, scale=sigma, size=(1,x.shape[2])) # shape=(1,3)
     myNoise = np.matmul(np.ones((x.shape[1],1)), scalingFactor)
     return x*myNoise
@@ -43,7 +43,7 @@ def permutation(x, max_segments=4): #8
     return ret
 
 
-def magnitude_warp(x, sigma=0.1, knot=4): #0.2
+def magnitude_warp(x, sigma=0.01, knot=4): #0.2
 
     '''
         knot = complexity of the interpolation curves
@@ -67,7 +67,7 @@ def magnitude_warp(x, sigma=0.1, knot=4): #0.2
     return ret
 
 
-def time_warp(x, sigma=0.1, knot=4): #0.2
+def time_warp(x, sigma=0.01, knot=4): #0.2
 
     '''
         knot = complexity of the interpolation curves
