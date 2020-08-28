@@ -369,13 +369,13 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
     sensor_dict = {'0': 'accelerometer', '1': 'gyrscope', '2': 'magnetometer'}
 
     functions_transformation = {
-        'jitter': jitter,
-        'scaling': scaling,
+        #'jitter': jitter,
+        #'scaling': scaling,
         'permutation': permutation,
         'rotation': rotation,
-        'magnitude warp': magnitude_warp,
+        #'magnitude warp': magnitude_warp,
         'time warp': time_warp,
-        'random sampling': random_sampling
+        #'random sampling': random_sampling
     }
 
     idx, idx_flatten = compute_sub_seq(n_axis, n_sensor, use_magnitude)
