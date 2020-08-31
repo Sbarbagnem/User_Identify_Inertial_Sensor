@@ -46,7 +46,8 @@ if __name__ == '__main__':
                        'resnet18_1D', 'resnet18_2D', 'resnet18_lstm_parallel', 'resnet18_lstm_consecutive'], default='resnet18_2D', help='define model to train')    
     parser.add_argument('-init_lr', '--init_lr', type=float, default=0.001, help='init learning rate')
     parser.add_argument('-drop_factor', '--drop_factor', type=float, default=0.50, help='drop factor for learning rate') 
-    parser.add_argument('-drop_epoch', '--drop_epoch', type=int, default=20, help='drop learning rate every epoch')               
+    parser.add_argument('-drop_epoch', '--drop_epoch', type=int, default=20, help='drop learning rate every epoch')    
+    parser.add_argument('-magnitude', '--magnitude', type=int, help='use or not magnitude')           
     args = parser.parse_args()
 
     # GPU settings
