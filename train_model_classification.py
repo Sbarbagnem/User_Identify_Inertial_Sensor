@@ -10,44 +10,164 @@ FOLDER_LOG = 'log/'
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
-        description="arguments for train classification model")
+        description="Arguments for train classification model")
 
-    parser.add_argument('-p', '--plot', type=int, default=0,
-                        help='int to plot or not distribution of train and test')
+    parser.add_argument(
+        '-p',
+        '--plot',
+        type=int,
+        default=0,
+        help='int to plot or not distribution of train and test')
     parser.add_argument('-t', '--train', type=int,
                         default=1, help='int to train or not model')
-    parser.add_argument('-a', '--augmented', type=int, default=0,
-                        help='int to apply or not data augmentation on train set')
-    parser.add_argument('-ap', '--augmented_par', choices=[
-                        'random_warped', 'random_transformations'], nargs='+', help='which data augmentation tecnique apply')
+    parser.add_argument(
+        '-a',
+        '--augmented',
+        type=int,
+        default=0,
+        help='int to apply or not data augmentation on train set')
+    parser.add_argument(
+        '-ap',
+        '--augmented_par',
+        choices=[
+            'random_warped',
+            'random_transformations'],
+        nargs='+',
+        help='which data augmentation tecnique apply')
     parser.add_argument('-pa', '--plot_augmented', type=int,
                         default=0, help='int to plot data augmented or not')
-    parser.add_argument('-ppba', '--plot_pred_base_act', type=int, default=1,
-                        help='plot percentage error of predictions based on activity at the end of train')
-    parser.add_argument('-d', '--delete_overlap', type=str, default='delete', choices=[
-                        'delete', 'noise', 'no_delete'], help='delete, apply noise or not delete overlap sequence between train and test')
+    parser.add_argument(
+        '-ppba',
+        '--plot_pred_base_act',
+        type=int,
+        default=1,
+        help='plot percentage error of predictions based on activity at the end of train')
+    parser.add_argument(
+        '-d',
+        '--delete_overlap',
+        type=str,
+        default='delete',
+        choices=[
+            'delete',
+            'noise',
+            'no_delete'],
+        help='delete, apply noise or not delete overlap sequence between train and test')
     parser.add_argument('-u', '--unify', type=int, default=0,
                         help='unify some act class, only for sbhar dataset')
-    parser.add_argument('-um', '--unify_method', type=str, choices=['sbhar_couple', 'sbhar_all_in_one',
-                                                                    'sbhar_complementary', 'sbhar_up_down'], default='sbhar_couple', help='unify method to apply')
-    parser.add_argument('-dataset', '--dataset', type=str, choices=['unimib', 'unimib_75w', 'unimib_128w',
-                                                                    'sbhar', 'realdisp', 'unimib_sbhar', 'sbhar_six_adl'], help='on which dataset train and test model')
-    parser.add_argument('-w', '--weighted', type=str, choices=[
-                        'no', 'balance', 'train_set'], default='no', help='chose a batch balance on act, same distribution of train set or random')
-    parser.add_argument('-compose_transformations', '--compose', type=int, default=0, help='apply all transformations on the same sequence or not in data augmentation')
-    parser.add_argument('-only_compose', '--only_compose', type=int, default=0, help='in data augmentation return only sequence with all transformations applied on it')
+    parser.add_argument(
+        '-um',
+        '--unify_method',
+        type=str,
+        choices=[
+            'sbhar_couple',
+            'sbhar_all_in_one',
+            'sbhar_complementary',
+            'sbhar_up_down'],
+        default='sbhar_couple',
+        help='unify method to apply')
+    parser.add_argument(
+        '-dataset',
+        '--dataset',
+        type=str,
+        choices=[
+            'unimib',
+            'unimib_75w',
+            'unimib_128w',
+            'sbhar',
+            'realdisp',
+            'unimib_sbhar',
+            'sbhar_six_adl'],
+        help='on which dataset train and test model')
+    parser.add_argument(
+        '-w',
+        '--weighted',
+        type=str,
+        choices=[
+            'no',
+            'balance',
+            'train_set'],
+        default='no',
+        help='chose a batch balance on act, same distribution of train set or random')
+    parser.add_argument(
+        '-compose_transformations',
+        '--compose',
+        type=int,
+        default=0,
+        help='apply all transformations on the same sequence or not in data augmentation')
+    parser.add_argument(
+        '-only_compose',
+        '--only_compose',
+        type=int,
+        default=0,
+        help='in data augmentation return only sequence with all transformations applied on it')
     parser.add_argument('-fold_val', '--fold_val', type=int,
                         default=0, help='fold for validation')
-    parser.add_argument('-fold_test', '--fold_test', type=int, nargs='+',
-                        default=-1, help='list of int represent folds on wich testing model')
-    parser.add_argument('-wbo', '--weighted_based_on', type=str, choices=[
-                       'subject', 'act', 'act_subject'], default='', help='weighted samples in dataset based on activity or subject frequency')     
-    parser.add_argument('-model', '--model', type=str, choices=[
-                       'resnet18_1D', 'resnet18_2D', 'resnet18_lstm_parallel', 'resnet18_lstm_consecutive'], default='resnet18_2D', help='define model to train')    
-    parser.add_argument('-init_lr', '--init_lr', type=float, default=0.001, help='init learning rate')
-    parser.add_argument('-drop_factor', '--drop_factor', type=float, default=0.50, help='drop factor for learning rate') 
-    parser.add_argument('-drop_epoch', '--drop_epoch', type=int, default=20, help='drop learning rate every epoch')    
-    parser.add_argument('-magnitude', '--magnitude', type=int, help='use or not magnitude')           
+    parser.add_argument(
+        '-fold_test',
+        '--fold_test',
+        type=int,
+        nargs='+',
+        default=-1,
+        help='list of int represent folds on wich testing model')
+    parser.add_argument(
+        '-wbo',
+        '--weighted_based_on',
+        type=str,
+        choices=[
+            'subject',
+            'act',
+            'act_subject'],
+        default='',
+        help='weighted samples in dataset based on activity or subject frequency')
+    parser.add_argument(
+        '-model',
+        '--model',
+        type=str,
+        choices=[
+            'resnet18_1D',
+            'resnet18_2D',
+            'resnet18_lstm_parallel',
+            'resnet18_lstm_consecutive'],
+        default='resnet18_2D',
+        help='define model to train')
+    parser.add_argument('-init_lr', '--init_lr', type=float,
+                        default=0.001, help='init learning rate')
+    parser.add_argument('-drop_factor', '--drop_factor', type=float,
+                        default=0.50, help='drop factor for learning rate')
+    parser.add_argument('-drop_epoch', '--drop_epoch', type=int,
+                        default=20, help='drop learning rate every epoch')
+    parser.add_argument('-magnitude', '--magnitude',
+                        type=int, help='use or not magnitude')
+    parser.add_argument(
+        '-aug_function',
+        '--aug_function',
+        choices=[
+            'jitter',
+            'scaling',
+            'permutation',
+            'rotation',
+            'magnitude_warp',
+            'time_warp',
+            'random_sampling'],
+        nargs='+',
+        help='list of function applied to sequences to augment train set',
+        default=[
+            'permutation',
+            'rotation',
+            'time_warp'])
+    parser.add_argument(
+        '-ratio',
+        '--ratio',
+        type=int,
+        nargs='+',
+        help='ratio of augmented data in random transformations after had equal number of samples act/sub')
+    parser.add_argument(
+        '-n_func_to_apply',
+        '--n_func_to_apply',
+        type=int,
+        default=1,
+        help='how functions from choosen set apply on sequences'
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -98,10 +218,12 @@ if __name__ == '__main__':
                         fold_val = [args.fold_val]
                         fold_test = []
                         if args.fold_test != -1:
-                            fold_test = args.fold_test  # fold used as test set after train, if empty fold_val is used as test and validation
+                            # fold used as test set after train, if empty
+                            # fold_val is used as test and validation
+                            fold_test = args.fold_test
                         model = Model(dataset_name=dataset_name,
                                       configuration_file=configuration,
-                                      multi_task=multitask, 
+                                      multi_task=multitask,
                                       lr='dynamic',
                                       model_type=model_type,
                                       fold_test=fold_val,
@@ -130,7 +252,13 @@ if __name__ == '__main__':
                             compose = True if args.compose else False
                             only_compose = True if args.only_compose else False
                             model.augment_data(
-                                augmented_par, compose, only_compose, plot_augmented)
+                                function_to_apply=args.aug_function,
+                                augmented_par=augmented_par,
+                                compose=compose,
+                                only_compose=only_compose,
+                                plot_augmented=plot_augmented,
+                                ratio_random_transformations=args.ratio,
+                                n_func_to_apply=args.n_func_to_apply)
                             model.plot_distribution_data(test=False)
 
                         model.normalize_data()

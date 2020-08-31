@@ -159,7 +159,6 @@ class Model():
             if method == 'act_subject':
                 datasets, weights = self.create_dataset_for_act_subject()
             weights = np.where(weights == float('Inf'), 0, weights)
-            print(f'Weight samples based on act and subject frequency:  {weights}')
             dataset_weighted = tf.data.experimental.sample_from_datasets(
                 datasets, weights)
             dataset_weighted = dataset_weighted.shuffle(
@@ -223,8 +222,6 @@ class Model():
         # to have a balance number of samples for every user in batch
         weights = np.repeat(1., len(user_sample_count)) / user_sample_count
 
-        print(f'Weight samples based on subject:  {weights}')
-
         return datasets, weights
 
     def create_dataset_for_act(self, method='balance'):
@@ -257,16 +254,14 @@ class Model():
             weights = activities_sample_count / \
                 np.repeat(n, len(activities_sample_count))
 
-        print(f'Weight samples based on activity:  {weights}')
-
         return datasets, weights
 
-    def augment_data(self, augmented_par=[], compose=False, only_compose=False, plot_augmented=False):
+    def augment_data(self, function_to_apply=[], augmented_par=[], ratio_random_transformations=1, compose=False, only_compose=False, plot_augmented=False, n_func_to_apply=3):
 
         shape_original = self.train.shape[0]
 
         train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(
-            self.train, self.train_user, self.train_act, self.magnitude, augmented_par, compose, only_compose, plot_augmented)
+            self.train, self.train_user, self.train_act, self.magnitude, augmented_par, function_to_apply, compose, only_compose, plot_augmented, ratio_random_transformations, n_func_to_apply)
 
         self.train = train_augmented
         self.train_user = label_user_augmented

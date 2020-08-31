@@ -165,7 +165,7 @@ class Dataset(object):
         else:
             return train, test, None
 
-    def augment_data(self, data, lu, la, magnitude, augmented_par, compose, only_compose, plot_augmented):
+    def augment_data(self, data, lu, la, magnitude, augmented_par, function_to_apply, compose, only_compose, plot_augmented, ratio_random_transformations, n_func_to_apply):
 
         if augmented_par != []:
             train_augmented = np.copy(data)
@@ -182,9 +182,11 @@ class Dataset(object):
                                                                                                self.config_file.config[self._name]['SENSOR_DICT']),
                                                                                            use_magnitude=magnitude,
                                                                                            log=plot_augmented,
-                                                                                           ratio=1,
+                                                                                           ratio=ratio_random_transformations[0],
                                                                                            compose=compose,
-                                                                                           only_compose=only_compose)
+                                                                                           only_compose=only_compose,
+                                                                                           function_to_apply=function_to_apply,
+                                                                                           n_func_to_apply=n_func_to_apply)
 
                 if augmented_par[0] == 'random_warped':
                     train, lu_temp, la_temp = self.augmented_fun['random_warped'](data,
@@ -193,6 +195,7 @@ class Dataset(object):
                                                                                   dtw_type='normal', # normal or shape
                                                                                   use_window=False,
                                                                                   magnitude=magnitude,
+                                                                                  ratio=ratio_random_transformations[0],
                                                                                   log=plot_augmented)
 
             else:
@@ -203,6 +206,7 @@ class Dataset(object):
                                                                               dtw_type='normal',
                                                                               use_window=False,
                                                                               magnitude=magnitude,
+                                                                              ratio=ratio_random_transformations[0],
                                                                               log=plot_augmented)
 
                 train_augmented = np.concatenate(
@@ -222,8 +226,10 @@ class Dataset(object):
                                                                                            self.config_file.config[self._name]['SENSOR_DICT']),
                                                                                        use_magnitude=magnitude,
                                                                                        log=plot_augmented,
-                                                                                       ratio=1,
-                                                                                       compose=compose)
+                                                                                       ratio=ratio_random_transformations[1],
+                                                                                       compose=compose,
+                                                                                       function_to_apply=function_to_apply,
+                                                                                       n_func_to_apply=n_func_to_apply)
 
 
             train_augmented = np.concatenate((train_augmented, train), axis=0)

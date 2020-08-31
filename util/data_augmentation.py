@@ -14,6 +14,10 @@ import seaborn as sns
 
 from scipy.interpolate import CubicSpline
 
+##########################################
+###### BASE FUNCTIONS FOR AUGMENTED ######
+##########################################
+
 def jitter(x, sigma=0.01): #0.1
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
@@ -32,14 +36,23 @@ def rotation(x):
         ret[:, :, sensor_axis] = flip[:, :, sensor_axis] * x[:, :, rotate_axis]
     return ret
 
-def permutation(x, max_segments=8):
+def permutation(x, max_segments=8, seg_mode='equal'):
     orig_steps = np.arange(x.shape[1])
     num_segs = np.random.randint(2, max_segments, size=(x.shape[0]))
     ret = np.zeros_like(x)
-    for i, pat in enumerate(x):
-        splits = np.array_split(orig_steps, num_segs[i])
-        warp = np.concatenate(np.random.permutation(splits)).ravel()
-        ret[i] = pat[warp]
+    diff = False
+    while not diff:
+        for i, pat in enumerate(x):
+            if seg_mode == "random":
+                split_points = np.random.choice(x.shape[1]-2, num_segs[i]-1, replace=False)
+                split_points.sort()
+                splits = np.split(orig_steps, split_points)
+            else:
+                splits = np.array_split(orig_steps, num_segs[i])
+            warp = np.concatenate(np.random.permutation(splits)).ravel()
+            ret[i] = pat[warp]
+        if bool(np.asarray(warp != orig_steps).any()):
+            diff = True
     return ret
 
 
@@ -108,17 +121,22 @@ def random_sampling(x, nSample=90):
 
     return X_new[np.newaxis, :, :]    
 
-def add_percentage(distribution, ratio=1):
+# dict of base function from which choose 
+BASE_FUNCTION = {
+    'jitter': jitter,
+    'scaling': scaling,
+    'permutation': permutation,
+    'rotation': rotation,
+    'magnitude_warp': magnitude_warp,
+    'time_warp': time_warp,
+    'random_sampling': random_sampling
+}
 
-    to_add = np.zeros_like(distribution)
+##########################################
+###### CORE DATA AUGMENTED ###############
+##########################################
 
-    for act in np.arange(distribution.shape[1]):
-        to_add[:,act] = (distribution[:,act] * ratio).astype(int)
-
-    return to_add
-
-
-def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_constraint='symmetric', use_window=True, dtw_type='normal', magnitude=True, log=False):
+def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_constraint='symmetric', use_window=True, dtw_type='normal', magnitude=True, log=False, ratio=1):
     '''
         call random guided warp on every sensors' data
     '''
@@ -128,7 +146,8 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
     total_added = 0
 
     
-    to_add, _ = samples_to_add(labels_user, labels_activity, ratio=1, random_warped=True)
+    to_add, distribution = samples_to_add(labels_user, labels_activity, random_warped=True)
+    to_add = to_add + (np.max(distribution) * ratio)
     
     total_sample_to_add = np.sum(to_add).astype(int)
 
@@ -320,45 +339,14 @@ def random_guided_warp(x, labels_user, labels_activity, sample_to_add=0, slope_c
 
     return ret, ret_idx_prototype, la_ret, lu_ret, first, added, to_add
 
-
-def samples_to_add(labels_user, labels_activity, ratio=1, random_warped=False):
-
-    activities = np.unique(labels_activity)
-    users = np.unique(labels_user)
-    distribution = np.zeros(shape=(len(users), len(activities)))
-    class_no_sample = []
-
-    for user in users:
-        for act in activities:
-            samples = np.intersect1d(np.where(labels_user == user), np.where(
-                labels_activity == act)).shape[0]
-            distribution[user, act] = samples
-            if samples == 0 or (random_warped and samples == 1): # there aren't samples for random_warped
-                class_no_sample.append([user,act])
-
-    if random_warped:
-        max_freq = np.max(distribution, axis=0)
-    else:
-        max_freq = np.max(distribution)  # max freq for every act
-        max_freq = np.repeat(max_freq, len(activities))
-
-    to_add = np.zeros_like(distribution)
-
-    for act, freq in enumerate(max_freq):
-        to_add[:, act] = ((freq - distribution[:, act])*ratio).astype(int)
-
-    for el in class_no_sample:
-        to_add[el[0], el[1]] = 0
-
-    return to_add, distribution
-
-
-
-def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, n_sensor=1, use_magnitude=True, ratio=1, compose=False, only_compose=False):
+def random_transformation(data, labels_user, labels_activity, log=False, n_axis=3, n_sensor=1, use_magnitude=True, ratio=1, compose=False, only_compose=False, function_to_apply=[], n_func_to_apply=3):
     '''
         Take orignal train data and apply randomly transformation between jitter, scaling, rotation, permutation
         magnitude warp and time warp
     '''
+
+    if n_func_to_apply > len(function_to_apply):
+        sys.exit('Fcuntion to apply must be <= to number of possible function choosen')
 
     to_add, distribution = samples_to_add(labels_user, labels_activity) # per avere lo stesso numero di esempi per ogni utente
 
@@ -368,15 +356,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
     sensor_dict = {'0': 'accelerometer', '1': 'gyrscope', '2': 'magnetometer'}
 
-    functions_transformation = {
-        'jitter': jitter,
-        'scaling': scaling,
-        'permutation': permutation,
-        'rotation': rotation,
-        'magnitude warp': magnitude_warp,
-        'time warp': time_warp,
-        'random sampling': random_sampling
-    }
+    functions_transformation = {str(func): BASE_FUNCTION[str(func)] for func in function_to_apply}
 
     idx, idx_flatten = compute_sub_seq(n_axis, n_sensor, use_magnitude)
 
@@ -410,19 +390,20 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
             if temp_to_add <= 0:
                 added = False
 
-            # apply 3 random transformations and compose on the same sequence if compose if true
+            # apply n_func_to_apply function if it's possible
             if not only_compose:
-                if temp_to_add >= 4:
-                    number = 3
-                    if compose:
+               # if temp_to_add >= 4:
+                if temp_to_add >= n_func_to_apply + 1:
+                    number = n_func_to_apply
+                    if compose and number>1:
                         to_add[user, act] -= number + 1
                         number_transformation[i] = number + 1
                     else:
                         to_add[user, act] -= number
                         number_transformation[i] = number 
-                elif temp_to_add < 4 and temp_to_add > 1:
+                elif temp_to_add < n_func_to_apply + 1 and temp_to_add > 1:
                     number = int(temp_to_add) - 1
-                    if compose:
+                    if compose and number>1:
                         to_add[user,act] -= number + 1
                         number_transformation[i] = number + 1
                     else:
@@ -435,7 +416,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
             # apply only compose transformations
             else:
                 if temp_to_add > 0:
-                    number = 3
+                    number = n_func_to_apply
                     to_add[user, act] -= 1
                     number_transformation[i] = 1
 
@@ -477,18 +458,20 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                         plt.figure(figsize=(12, 3))
                         for j, sensor_axis in enumerate(idx):
                             plt.style.use('seaborn-darkgrid')
-                            if not only_compose:
-                                plt.subplot(len(idx), 5, 1+5*(j))
-                            else:
+                            if only_compose:
                                 plt.subplot(len(idx), 2, 1+2*(j))
+                            elif not only_compose and compose:
+                                plt.subplot(len(idx), n_func_to_apply + 2, 1+((n_func_to_apply + 2)*(j)))
+                            elif not compose and not only_compose:
+                                plt.subplot(len(idx), n_func_to_apply + 1, 1+((n_func_to_apply + 1)*(j)))
                             plt.title(
                                 f'original {sensor_dict[str(j)]} user {labels_user[i]} activity {labels_activity[i]}')
                             plt.plot(
-                                steps, seq[0, :, sensor_axis[0]+j], 'b-', label='x')
+                                steps, seq[0, :, sensor_axis[0]], 'b-', label='x')
                             plt.plot(
-                                steps, seq[0, :, sensor_axis[1]+j], 'g-', label='y')
+                                steps, seq[0, :, sensor_axis[1]], 'g-', label='y')
                             plt.plot(
-                                steps, seq[0, :, sensor_axis[2]+j], 'r-', label='z')
+                                steps, seq[0, :, sensor_axis[2]], 'r-', label='z')
 
                     # apply all transformations
                     for j, transformation in enumerate(transformations):
@@ -525,14 +508,17 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                             if log:
                                 for h, sensor_axis in enumerate(idx):
                                     plt.style.use('seaborn-darkgrid')
-                                    plt.subplot(len(idx), 5, j+2+5*(h))
+                                    if compose:
+                                        plt.subplot(len(idx), n_func_to_apply + 2, j+2+( (n_func_to_apply + 2) * h ))
+                                    else:
+                                        plt.subplot(len(idx), n_func_to_apply + 1, j+2+( (n_func_to_apply + 1) * h ))
                                     plt.title(f'{key_func}')
                                     plt.plot(
-                                        steps, transformed[past, :, sensor_axis[0]+h], 'b-', label='x')
+                                        steps, transformed[past, :, sensor_axis[0]], 'b-', label='x')
                                     plt.plot(
-                                        steps, transformed[past, :, sensor_axis[1]+h], 'g-', label='y')
+                                        steps, transformed[past, :, sensor_axis[1]], 'g-', label='y')
                                     plt.plot(
-                                        steps, transformed[past, :, sensor_axis[2]+h], 'r-', label='z')
+                                        steps, transformed[past, :, sensor_axis[2]], 'r-', label='z')
 
                             la[past] = act
                             lu[past] = user
@@ -556,8 +542,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                         if not only_compose:
                             for j, sensor_axis in enumerate(idx):
                                 plt.style.use('seaborn-darkgrid')
-                                plt.subplot(len(idx), 5, len(
-                                    transformations)+2+5*(j))
+                                plt.subplot(len(idx), n_func_to_apply + 2, (n_func_to_apply + 2) + (n_func_to_apply + 2)*(j))
                                 plt.title(
                                     'all transformations on same sequence acc')
                                 plt.plot(
@@ -567,7 +552,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                                 plt.plot(
                                     steps, all_transf[0, :, sensor_axis[2]], 'r-', label='z')
                         if only_compose:
-                             for j, sensor_axis in enumerate(idx):
+                            for j, sensor_axis in enumerate(idx):
                                 plt.style.use('seaborn-darkgrid')
                                 plt.subplot(len(idx), 2, 2+2*(j))
                                 plt.title(
@@ -592,6 +577,46 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
     return transformed_final, lu_final, la_final
 
+############################
+###### UTIL FUNCTIONS ######
+############################
+
+def add_percentage(distribution, ratio=1):
+
+    to_add = np.zeros_like(distribution)
+
+    for act in np.arange(distribution.shape[1]):
+        to_add[:,act] = (distribution[:,act] * ratio).astype(int)
+
+    return to_add
+
+def samples_to_add(labels_user, labels_activity, random_warped=False):
+
+    activities = np.unique(labels_activity)
+    users = np.unique(labels_user)
+    distribution = np.zeros(shape=(len(users), len(activities)))
+    class_no_sample = []
+
+    for user in users:
+        for act in activities:
+            samples = np.intersect1d(np.where(labels_user == user), np.where(
+                labels_activity == act)).shape[0]
+            distribution[user, act] = samples
+            if samples == 0 or (random_warped and samples == 1): # there aren't samples for random_warped
+                class_no_sample.append([user,act])
+
+    max_freq = np.max(distribution)  # max freq for every act
+    max_freq = np.repeat(max_freq, len(activities))
+
+    to_add = np.zeros_like(distribution)
+
+    for act, freq in enumerate(max_freq):
+        to_add[:, act] = ((freq - distribution[:, act])*1).astype(int)
+
+    for el in class_no_sample:
+        to_add[el[0], el[1]] = 0
+
+    return to_add, distribution
 
 def compute_sub_seq(n_axis, n_sensor=1, use_magnitude=True):
     '''
