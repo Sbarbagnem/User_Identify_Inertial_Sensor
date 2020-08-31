@@ -497,7 +497,7 @@ class Model():
             self.valid_accuracy_user.reset_states()
 
             if self.lr == 'dynamic':
-                new_lr = self.decay_lr(epoch=epoch)
+                new_lr = self.decay_lr(self.init_lr, self.drop_factor, self.drop_epoch, epoch=epoch)
                 self.optimizer.learning_rate.assign(new_lr)
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
