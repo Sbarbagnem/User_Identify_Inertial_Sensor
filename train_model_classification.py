@@ -101,7 +101,8 @@ if __name__ == '__main__':
                             fold_test = args.fold_test  # fold used as test set after train, if empty fold_val is used as test and validation
                         model = Model(dataset_name=dataset_name,
                                       configuration_file=configuration,
-                                      multi_task=multitask, lr='dynamic',
+                                      multi_task=multitask, 
+                                      lr='dynamic',
                                       model_type=model_type,
                                       fold_test=fold_val,
                                       fold_val=fold_test,
