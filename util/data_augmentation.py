@@ -142,7 +142,6 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
     '''
 
     idx_prototype = None
-    max_cycle = 20 
     total_added = 0
 
     
@@ -167,7 +166,7 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
 
     print(f'Total sample to add: {total_sample_to_add}')
 
-    while total_sample_to_add > 0 and max_cycle > 0:
+    while total_sample_to_add > 0:
         for i, idx in enumerate(np.arange(0, x.shape[2], step)):
 
             idx_sensor = np.arange(i+(offset*i), idx+step)
@@ -197,7 +196,6 @@ def random_guided_warp_multivariate(x, labels_user, labels_activity, slope_const
         total_sample_to_add -= added
         total_added += added
         to_add = to_added
-        max_cycle -= 1
 
     idx_to_del = []
 
