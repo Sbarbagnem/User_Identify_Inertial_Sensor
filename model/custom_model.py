@@ -158,6 +158,8 @@ class Model():
                 datasets, weights = self.create_dataset_for_subject()
             if method == 'act_subject':
                 datasets, weights = self.create_dataset_for_act_subject()
+            weights = np.where(weights == float('Inf'), 0, weights)
+            print(f'Weight samples based on act and subject frequency:  {weights}')
             dataset_weighted = tf.data.experimental.sample_from_datasets(
                 datasets, weights)
             dataset_weighted = dataset_weighted.shuffle(
@@ -204,8 +206,6 @@ class Model():
 
         weights = np.repeat(1., len(act_user_sample_count)
                             ) / act_user_sample_count
-
-        print(f'Weight samples based on act and subject frequency:  {weights}')
 
         return datasets, weights
 
@@ -256,8 +256,6 @@ class Model():
             n = np.sum(activities_sample_count)
             weights = activities_sample_count / \
                 np.repeat(n, len(activities_sample_count))
-
-        weights = np.where(weights == float('Inf'), 0, weights)
 
         print(f'Weight samples based on activity:  {weights}')
 
