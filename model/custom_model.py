@@ -31,14 +31,14 @@ import pandas as pd
 
 class Model():
     def __init__(self, dataset_name, configuration_file, multi_task, lr, model_type, fold_test=0, fold_val=None, save_dir='log', 
-                outer_dir='OuterPartition/', overlap=5.0, magnitude=False, init_lr=0.001, drop_factor=0.5, drop_eoch=10, log=False):
+                outer_dir='OuterPartition/', overlap=5.0, magnitude=False, init_lr=0.001, drop_factor=0.5, drop_epoch=10, log=False):
         self.dataset_name = dataset_name
         self.configuration = configuration_file
         self.multi_task = multi_task
         self.lr = lr
         self.init_lr = init_lr
         self.drop_factor = drop_factor
-        self.drops_epoch = drops_epoch
+        self.drop_epoch = drop_epoch
         self.overlap = overlap
         self.model_type = model_type
         self.epochs = configuration_file.EPOCHS
@@ -634,7 +634,7 @@ class Model():
                 self.valid_accuracy_user.reset_states()
 
                 if self.lr == 'dynamic':
-                    new_lr = self.decay_lr(self.init_lr, self.drop_factor, self.drops_epoch, epoch=epoch)
+                    new_lr = self.decay_lr(self.init_lr, self.drop_factor, self.drop_epoch, epoch=epoch)
                     self.optimizer.learning_rate.assign(new_lr)
                     with self.train_writer.as_default():
                         tf.summary.scalar("learning_rate", new_lr, step=epoch)
