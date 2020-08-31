@@ -257,7 +257,7 @@ class Model():
             weights = activities_sample_count / \
                 np.repeat(n, len(activities_sample_count))
 
-        weights = np.where(weights == np.inf, 0, weights)
+        weights = np.where(weights == float('Inf'), 0, weights)
 
         print(f'Weight samples based on activity:  {weights}')
 
