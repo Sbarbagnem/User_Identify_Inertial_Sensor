@@ -82,8 +82,8 @@ if __name__ == '__main__':
     for model_type in [args.model]:
         for dataset_name in [args.dataset]:
             for multitask in [False]:
-                for overlap in [True if args.magnitude else False]:
-                    for magnitude in [args.magnitude]:
+                for overlap in [5.0]:
+                    for magnitude in [True if args.magnitude else False]:
                         if magnitude:
                             if dataset_name == 'sbhar_six_adl':
                                 outer_dir = 'OuterPartition_magnitude_sbhar_six_adl_'
