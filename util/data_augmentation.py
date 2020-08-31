@@ -449,11 +449,11 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
         if total_transformation > 0:
 
-            print('total transformations to apply: ', total_transformation)
+            # print('total transformations to apply: ', total_transformation)
 
             transformed = np.zeros(
                 [total_transformation, data.shape[1], data.shape[2]], dtype=np.float)
-            print(f'shape transformed {transformed.shape}')
+            # print(f'shape transformed {transformed.shape}')
             lu = np.zeros([total_transformation], dtype=np.int)
             la = np.zeros([total_transformation], dtype=np.int)
 
@@ -588,8 +588,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
             lu_final = np.concatenate([lu_final, lu], axis=0)
             la_final = np.concatenate([la_final, la], axis=0)
 
-    print(
-        f'shape original plus transformed {transformed_final.shape[0] + data.shape[0]}')
+    # print(f'shape original plus transformed {transformed_final.shape[0] + data.shape[0]}')
 
     return transformed_final, lu_final, la_final
 

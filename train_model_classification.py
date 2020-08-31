@@ -41,7 +41,12 @@ if __name__ == '__main__':
     parser.add_argument('-fold_test', '--fold_test', type=int, nargs='+',
                         default=-1, help='list of int represent folds on wich testing model')
     parser.add_argument('-wbo', '--weighted_based_on', type=str, choices=[
-                       'subject', 'act', 'act_subject'], default='', help='weighted samples in dataset based on activity or subject frequency')                        
+                       'subject', 'act', 'act_subject'], default='', help='weighted samples in dataset based on activity or subject frequency')     
+    parser.add_argument('-model', '--model', type=str, choices=[
+                       'resnet18_1D', 'resnet18_2D', 'resnet18_lstm_parallel', 'resnet18_lstm_consecutive'], default='resnet18_2D', help='define model to train')    
+    parser.add_argument('-init_lr', '--init_lr', type=float, default=0.001, help='init learning rate')
+    parser.add_argument('-drop_factor', '--drop_factor', type=float, default=0.50, help='drop factor for learning rate') 
+    parser.add_argument('-drop_epoch', '--drop_epoch', type=int, default=20, help='drop learning rate every epoch')               
     args = parser.parse_args()
 
     # GPU settings
@@ -73,11 +78,11 @@ if __name__ == '__main__':
     unify = args.unify
     unify_method = args.unify_method
 
-    for model_type in ['resnet18_2D']:
+    for model_type in [args.model]:
         for dataset_name in [args.dataset]:
             for multitask in [False]:
-                for overlap in [5.0]:
-                    for magnitude in [True]:
+                for overlap in [True if args.magnitude else False]:
+                    for magnitude in [args.magnitude]:
                         if magnitude:
                             if dataset_name == 'sbhar_six_adl':
                                 outer_dir = 'OuterPartition_magnitude_sbhar_six_adl_'
@@ -104,6 +109,9 @@ if __name__ == '__main__':
                                       str(overlap) + '/',
                                       overlap=overlap,
                                       magnitude=magnitude,
+                                      init_lr=args.init_lr,
+                                      drop_factor=args.drop_factor,
+                                      drop_epoch=args.drop_epoch,
                                       log=True)
                         model.create_dataset()
                         model.load_data(only_acc=False, delete=delete_overlap)

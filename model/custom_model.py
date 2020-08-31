@@ -30,11 +30,15 @@ import pandas as pd
 
 
 class Model():
-    def __init__(self, dataset_name, configuration_file, multi_task, lr, model_type, fold_test=0, fold_val=None, save_dir='log', outer_dir='OuterPartition/', overlap=5.0, magnitude=False, log=False):
+    def __init__(self, dataset_name, configuration_file, multi_task, lr, model_type, fold_test=0, fold_val=None, save_dir='log', 
+                outer_dir='OuterPartition/', overlap=5.0, magnitude=False, init_lr=0.001, drop_factor=0.5, drop_eoch=10, log=False):
         self.dataset_name = dataset_name
         self.configuration = configuration_file
         self.multi_task = multi_task
         self.lr = lr
+        self.init_lr = init_lr
+        self.drop_factor = drop_factor
+        self.drops_epoch = drops_epoch
         self.overlap = overlap
         self.model_type = model_type
         self.epochs = configuration_file.EPOCHS
@@ -95,13 +99,13 @@ class Model():
             channel = self.configuration.config[self.dataset_name]['WINDOW_AXES']
 
         self.dataset = Dataset(path=self.configuration.config[self.dataset_name]['PATH_OUTER_PARTITION'],
-                                name=self.dataset_name,
-                                channel=channel,
-                                winlen=self.configuration.config[self.dataset_name]['WINDOW_SAMPLES'],
-                                user_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_USER'],
-                                act_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_ACTIVITY'],
-                                outer_dir=self.outer_dir,
-                                config_file=self.configuration)
+                               name=self.dataset_name,
+                               channel=channel,
+                               winlen=self.configuration.config[self.dataset_name]['WINDOW_SAMPLES'],
+                               user_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_USER'],
+                               act_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_ACTIVITY'],
+                               outer_dir=self.outer_dir,
+                               config_file=self.configuration)
 
     def load_data(self, only_acc=False, normalize=True, delete='delete'):
         # gat data [examples, window_samples, axes, channel]
@@ -198,7 +202,8 @@ class Model():
                 datasets.append(dataset)
                 act_user_sample_count.append(len(idx))
 
-        weights = np.repeat(1., len(act_user_sample_count)) / act_user_sample_count
+        weights = np.repeat(1., len(act_user_sample_count)
+                            ) / act_user_sample_count
 
         print(f'Weight samples based on act and subject frequency:  {weights}')
 
@@ -217,7 +222,7 @@ class Model():
 
         # to have a balance number of samples for every user in batch
         weights = np.repeat(1., len(user_sample_count)) / user_sample_count
-        
+
         print(f'Weight samples based on subject:  {weights}')
 
         return datasets, weights
@@ -241,17 +246,17 @@ class Model():
         activities_sample_count = [np.where(self.train_act == act)[
             0].shape[0] for act in np.unique(self.train_act)]
 
-        
         # to have balance samples in batch
         if method == 'balance':
             weights = np.repeat(1., len(activities_sample_count)
-                            ) / activities_sample_count
-        
-        # for have the same distribution of train in every batch 
+                                ) / activities_sample_count
+
+        # for have the same distribution of train in every batch
         if method == 'train_set':
             n = np.sum(activities_sample_count)
-            weights = activities_sample_count / np.repeat(n, len(activities_sample_count))
-        
+            weights = activities_sample_count / \
+                np.repeat(n, len(activities_sample_count))
+
         print(f'Weight samples based on activity:  {weights}')
 
         return datasets, weights
@@ -307,7 +312,7 @@ class Model():
         # define loss and optimizer
         self.loss_act = tf.keras.losses.SparseCategoricalCrossentropy()
         self.loss_user = tf.keras.losses.SparseCategoricalCrossentropy()
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr)
 
         # performance on train
         self.train_loss_activity = tf.keras.metrics.Mean(
@@ -345,14 +350,14 @@ class Model():
                     y_pred=predictions_user)
                 penality = sum(tf.nn.l2_loss(tf_var)
                                for tf_var in self.model.trainable_variables)
-                loss_global = loss_a + loss_u #+ 0.003*penality
+                loss_global = loss_a + loss_u  # + 0.003*penality
             else:
                 predictions_user = self.model(batch, training=True)
                 loss_u = self.loss_user(
                     y_true=label_user, y_pred=predictions_user)
                 penality = sum(tf.nn.l2_loss(tf_var)
                                for tf_var in self.model.trainable_variables)
-                loss_global = loss_u #+ 0.003*penality
+                loss_global = loss_u  # + 0.003*penality
 
         gradients = tape.gradient(loss_global, self.model.trainable_variables)
         self.optimizer.apply_gradients(
@@ -398,7 +403,8 @@ class Model():
         return cm, tf.math.argmax(predictions_user, axis=1)
 
     def distribution_act_on_batch(self, label_act):
-        distribution = {act: np.count_nonzero(label_act == act) for act in np.unique(label_act)}
+        distribution = {act: np.count_nonzero(
+            label_act == act) for act in np.unique(label_act)}
         pprint.pprint(distribution)
 
     def train_model(self):
@@ -417,7 +423,7 @@ class Model():
             ### PERFORMANCE ON TRAIN AFTER EACH EPOCH ###
 
             for batch, label_act, label_user in self.train_data:
-                #self.distribution_act_on_batch(label_act)
+                # self.distribution_act_on_batch(label_act)
                 cm_batch = self.train_step(
                     batch, None, label_user, self.dataset._user_num)
                 cm = cm + cm_batch
@@ -628,12 +634,12 @@ class Model():
                 self.valid_accuracy_user.reset_states()
 
                 if self.lr == 'dynamic':
-                    new_lr = self.decay_lr(epoch=epoch)
+                    new_lr = self.decay_lr(self.init_lr, self.drop_factor, self.drops_epoch, epoch=epoch)
                     self.optimizer.learning_rate.assign(new_lr)
                     with self.train_writer.as_default():
                         tf.summary.scalar("learning_rate", new_lr, step=epoch)
 
-    def decay_lr(self, init_lr=0.01, drop_factor=0.50, drops_epoch=10, epoch=0):
+    def decay_lr(self, init_lr, drop_factor, drops_epoch, epoch):
 
         exp = np.floor((1 + epoch) / drops_epoch)
         alpha = init_lr * (drop_factor ** exp)
@@ -752,7 +758,8 @@ class Model():
     def total_sample_for_act(self):
         total_for_act = [0 for _ in np.arange(0, self.num_act)]
         for act in np.arange(0, self.num_act):
-            total_for_act[act] += np.unique(self.test_act, return_counts=True)[1][act]
+            total_for_act[act] += np.unique(self.test_act,
+                                            return_counts=True)[1][act]
         return total_for_act
 
     def plot_pred_based_act(self):
@@ -801,7 +808,8 @@ class Model():
         plt.show()
 
     def unify_act(self, mapping):
-        num_class_return, act_train, act_test = self.dataset.unify_act_class(self.train_act, self.test_act, mapping)
+        num_class_return, act_train, act_test = self.dataset.unify_act_class(
+            self.train_act, self.test_act, mapping)
 
         self.train_act = act_train
         self.test_act = act_test
