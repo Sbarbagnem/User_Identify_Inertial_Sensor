@@ -1,5 +1,5 @@
 # global training parameters
-EPOCHS = 80
+EPOCHS = 50
 EPOCHS_GAN = 20
 BATCH_SIZE = 128
 LATENT_DIM = 128
