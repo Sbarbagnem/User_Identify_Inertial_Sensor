@@ -247,7 +247,6 @@ def random_guided_warp(x, labels_user, labels_activity, sample_to_add=0, slope_c
         activity = la[i]
         if (first and to_add[user][activity] > 0) or (not first and ret_idx_prototype[i] != -1):
             if log:
-                print('sample: user {} activity {}'.format(user, activity))
                 plt.figure(figsize=(12, 8))
                 plt.style.use('seaborn-darkgrid')
                 plt.subplot(1, 3, 1)
