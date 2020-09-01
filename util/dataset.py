@@ -166,15 +166,11 @@ class Dataset(object):
             return train, test, None
 
     def augment_data(self, data, lu, la, magnitude, augmented_par, function_to_apply, compose, only_compose, plot_augmented, ratio_random_transformations, n_func_to_apply):
-
         if augmented_par != []:
-            train_augmented = np.copy(data)
-            label_user_augmented = np.copy(lu)
-            label_act_augmented = np.copy(la)
-
-            if len(augmented_par) == 1:
-                if augmented_par[0] == 'random_transformations': 
-                    train, lu_temp, la_temp = self.augmented_fun['random_transformations'](data,
+            for t,ratio in zip(augmented_par, ratio_random_transformations):
+                if t == 'random_transformations': 
+                    print('\n apply random transformations \n')
+                    train_aug, lu_aug, la_aug = self.augmented_fun['random_transformations'](data,
                                                                                            lu,
                                                                                            la,
                                                                                            n_axis=self._channel,
@@ -182,63 +178,29 @@ class Dataset(object):
                                                                                                self.config_file.config[self._name]['SENSOR_DICT']),
                                                                                            use_magnitude=magnitude,
                                                                                            log=plot_augmented,
-                                                                                           ratio=ratio_random_transformations[0],
+                                                                                           ratio=ratio,
                                                                                            compose=compose,
                                                                                            only_compose=only_compose,
                                                                                            function_to_apply=function_to_apply,
                                                                                            n_func_to_apply=n_func_to_apply)
-
-                if augmented_par[0] == 'random_warped':
-                    train, lu_temp, la_temp = self.augmented_fun['random_warped'](data,
+                if t == 'random_warped':
+                    print('\n apply random warped \n')
+                    train_aug, lu_aug, la_aug = self.augmented_fun['random_warped'](data,
                                                                                   lu,
                                                                                   la,
                                                                                   dtw_type='normal', # normal or shape
                                                                                   use_window=False,
                                                                                   magnitude=magnitude,
-                                                                                  ratio=ratio_random_transformations[0],
+                                                                                  ratio=ratio,
                                                                                   log=plot_augmented)
+                data = np.concatenate(
+                    (data, train_aug), axis=0)
+                lu = np.concatenate(
+                    (lu, lu_aug), axis=0)
+                la = np.concatenate(
+                    (la, la_aug), axis=0)
 
-            else:
-                # equal number of samples for every user given the activity
-                train, lu_temp, la_temp = self.augmented_fun['random_warped'](data,
-                                                                              lu,
-                                                                              la,
-                                                                              dtw_type='normal',
-                                                                              use_window=False,
-                                                                              magnitude=magnitude,
-                                                                              ratio=ratio_random_transformations[0],
-                                                                              log=plot_augmented)
-
-                train_augmented = np.concatenate(
-                    (train_augmented, train), axis=0)
-                label_user_augmented = np.concatenate(
-                    (label_user_augmented, lu_temp), axis=0)
-                label_act_augmented = np.concatenate(
-                    (label_act_augmented, la_temp), axis=0)
-
-                # augment of ratio every sample activity
-                
-                train, lu_temp, la_temp = self.augmented_fun['random_transformations'](train_augmented,
-                                                                                       label_user_augmented,
-                                                                                       label_act_augmented,
-                                                                                       n_axis=self._channel,
-                                                                                       n_sensor=len(
-                                                                                           self.config_file.config[self._name]['SENSOR_DICT']),
-                                                                                       use_magnitude=magnitude,
-                                                                                       log=plot_augmented,
-                                                                                       ratio=ratio_random_transformations[1],
-                                                                                       compose=compose,
-                                                                                       function_to_apply=function_to_apply,
-                                                                                       n_func_to_apply=n_func_to_apply)
-
-
-            train_augmented = np.concatenate((train_augmented, train), axis=0)
-            label_user_augmented = np.concatenate(
-                (label_user_augmented, lu_temp), axis=0)
-            label_act_augmented = np.concatenate(
-                (label_act_augmented, la_temp), axis=0)
-
-            return train_augmented, label_user_augmented, label_act_augmented
+            return data, lu, la
 
     def unify_act_class(self, act_train, act_test, mapping):
         num_class_return = mapping['NUM_CLASSES_ACTIVITY']

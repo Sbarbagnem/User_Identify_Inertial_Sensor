@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division, print_function
 import tensorflow as tf
 import argparse
+import sys
 
 import configuration
 from model.custom_model import Model
@@ -33,7 +34,7 @@ if __name__ == '__main__':
             'random_warped',
             'random_transformations'],
         nargs='+',
-        help='which data augmentation tecnique apply')
+        help='which data augmentation tecnique apply in  sequence')
     parser.add_argument('-pa', '--plot_augmented', type=int,
                         default=0, help='int to plot data augmented or not')
     parser.add_argument(
@@ -137,7 +138,7 @@ if __name__ == '__main__':
     parser.add_argument('-drop_epoch', '--drop_epoch', type=int,
                         default=20, help='drop learning rate every epoch')
     parser.add_argument('-magnitude', '--magnitude',
-                        type=int, help='use or not magnitude')
+                        type=int, default=1, help='use or not magnitude')
     parser.add_argument(
         '-aug_function',
         '--aug_function',
@@ -158,9 +159,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '-ratio',
         '--ratio',
-        type=int,
+        type=float,
         nargs='+',
-        help='ratio of augmented data in random transformations after had equal number of samples act/sub')
+        default=[0],
+        help='ratio of augmented data in random transformations after had equal number of samples act/sub, for every data augmentation technique choosen')
     parser.add_argument(
         '-n_func_to_apply',
         '--n_func_to_apply',
