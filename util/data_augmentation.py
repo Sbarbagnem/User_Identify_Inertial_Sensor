@@ -13,19 +13,98 @@ from sklearn import utils as skutils
 import seaborn as sns
 
 from scipy.interpolate import CubicSpline
+from transforms3d.axangles import axangle2mat
 
 ##########################################
 ###### BASE FUNCTIONS FOR AUGMENTED ######
 ##########################################
 
-def jitter(x, sigma=0.01): #0.1
+def GenerateRandomCurves(x, sigma=0.2, knot=4):
+    xx = (np.ones((x.shape[1],1))*(np.arange(0,x.shape[0], (x.shape[0]-1)/(knot+1)))).transpose()
+    yy = np.random.normal(loc=1.0, scale=sigma, size=(knot+2, x.shape[1]))
+    x_range = np.arange(x.shape[0])
+    cs = []
+    for dim in range(x.shape[1]):
+        cs.append(CubicSpline(xx[:,dim], yy[:,dim])(x_range))
+    return np.array(cs).transpose()
+
+
+def DistortTimesteps(x, sigma=0.2):
+    tt = GenerateRandomCurves(x, sigma) 
+    tt_cum = np.cumsum(tt, axis=0)       
+    t_scale = [(x.shape[0]-1)/tt_cum[-1,0],(x.shape[0]-1)/tt_cum[-1,1],(x.shape[0]-1)/tt_cum[-1,2]]
+    for dim in range(x.shape[1]):
+        tt_cum[:,dim] = tt_cum[:,dim]*t_scale[dim]
+    return tt_cum
+
+def jitter(x, sigma=0.05): #0.1
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
-def scaling(x, sigma=0.2): 
+def scaling(x, sigma=0.1): 
     scalingFactor = np.random.normal(loc=1.0, scale=sigma, size=(1,x.shape[2])) # shape=(1,3)
     myNoise = np.matmul(np.ones((x.shape[1],1)), scalingFactor)
     return x*myNoise
 
+def magnitude_warp(x, sigma=0.2):
+    x = x[0,:,:]
+    return (x * GenerateRandomCurves(x, sigma))[np.newaxis,:,:]
+
+def time_warp(x, sigma=0.2):
+    x = x[0,:,:]
+    tt_new = DistortTimesteps(x, sigma)
+    X_new = np.zeros(x.shape)
+    x_range = np.arange(x.shape[0])
+    for dim in range(x.shape[1]):
+        X_new[:,dim] = np.interp(x_range, tt_new[:,dim], x[:,dim])
+    return X_new[np.newaxis,:,:]
+
+def rotation(x):
+    x = x[0,:,:]
+    axis = np.random.uniform(low=-1, high=1, size=x.shape[1])
+    angle = np.random.uniform(low=-np.pi, high=np.pi)
+    return np.matmul(x , axangle2mat(axis,angle))[np.newaxis,:,:]
+
+def permutation(x, nPerm=4, minSegLength=20):
+    x = x[0,:,:]
+    diff = False
+    while diff == False:
+        X_new = np.zeros(x.shape)
+        idx = np.random.permutation(nPerm)
+        bWhile = True
+        while bWhile == True:
+            segs = np.zeros(nPerm+1, dtype=int)
+            segs[1:-1] = np.sort(np.random.randint(minSegLength, x.shape[0]-minSegLength, nPerm-1))
+            segs[-1] = x.shape[0]
+            if np.min(segs[1:]-segs[0:-1]) > minSegLength:
+                bWhile = False
+        pp = 0
+        for ii in range(nPerm):
+            x_temp = x[segs[idx[ii]]:segs[idx[ii]+1],:]
+            X_new[pp:pp+len(x_temp),:] = x_temp
+            pp += len(x_temp)
+        if bool(np.asarray(x != X_new).any()):
+            diff = True
+    return X_new[np.newaxis,:,:]
+
+def random_sampling(x, nSample=90):
+    
+    x = x[0,:,:]
+
+    # random sampling timesteps
+    tt = np.zeros((nSample,x.shape[1]), dtype=int)
+    random_tt = np.sort(np.random.randint(1,x.shape[0]-1,nSample-2)) # tengo stessi timestamp per ogni asse
+    for axis in range(x.shape[1]):
+        tt[1:-1,axis] = random_tt
+    tt[-1,:] = x.shape[0]-1
+
+    # interpolate data based on sampled timesteps
+    X_new = np.zeros(x.shape)
+    for axis in range(x.shape[1]):
+        X_new[:,axis] = np.interp(np.arange(x.shape[0]), tt[:,axis], x[tt[:,axis],axis])
+
+    return X_new[np.newaxis, :, :] 
+
+'''
 def rotation(x):
     flip = np.random.choice([-1, 1], size=(x.shape[0], x.shape[2]))
     flip = flip[:, np.newaxis, :]
@@ -58,9 +137,7 @@ def permutation(x, max_segments=8, seg_mode='equal'):
 
 def magnitude_warp(x, sigma=0.2, knot=4): 
 
-    '''
-        knot = complexity of the interpolation curves
-    '''
+        # knot = complexity of the interpolation curves
 
     orig_steps = np.arange(x.shape[1])
 
@@ -82,9 +159,7 @@ def magnitude_warp(x, sigma=0.2, knot=4):
 
 def time_warp(x, sigma=0.2, knot=4):
 
-    '''
-        knot = complexity of the interpolation curves
-    '''
+        # knot = complexity of the interpolation curves
 
     orig_steps = np.arange(x.shape[1])
 
@@ -101,26 +176,8 @@ def time_warp(x, sigma=0.2, knot=4):
             scale = (x.shape[1]-1)/time_warp[-1]
             ret[i, :, dim] = np.interp(orig_steps, np.clip(
                 scale*time_warp, 0, x.shape[1]-1), pat[:, dim]).T
-    return ret
-
-def random_sampling(x, nSample=90):
-    
-    x = x[0,:,:]
-
-    # random sampling timesteps
-    tt = np.zeros((nSample,x.shape[1]), dtype=int)
-    random_tt = np.sort(np.random.randint(1,x.shape[0]-1,nSample-2)) # tengo stessi timestamp per ogni asse
-    for axis in range(x.shape[1]):
-        tt[1:-1,axis] = random_tt
-    tt[-1,:] = x.shape[0]-1
-
-    # interpolate data based on sampled timesteps
-    X_new = np.zeros(x.shape)
-    for axis in range(x.shape[1]):
-        X_new[:,axis] = np.interp(np.arange(x.shape[0]), tt[:,axis], x[tt[:,axis],axis])
-
-    return X_new[np.newaxis, :, :]    
-
+    return ret   
+'''
 # dict of base function from which choose 
 BASE_FUNCTION = {
     'jitter': jitter,

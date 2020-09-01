@@ -153,9 +153,13 @@ if __name__ == '__main__':
         nargs='+',
         help='list of function applied to sequences to augment train set',
         default=[
+            'jitter',
+            'scaling',
             'permutation',
             'rotation',
-            'time_warp'])
+            'magnitude_warp',
+            'time_warp',
+            'random_sampling'])
     parser.add_argument(
         '-ratio',
         '--ratio',
