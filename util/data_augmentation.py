@@ -31,10 +31,10 @@ def GenerateRandomCurves(x, sigma=0.2, knot=4):
 
 def DistortTimesteps(x, sigma=0.2):
     tt = GenerateRandomCurves(x, sigma) 
-    tt_cum = np.cumsum(tt, axis=0)       
-    t_scale = [(x.shape[0]-1)/tt_cum[-1,0],(x.shape[0]-1)/tt_cum[-1,1],(x.shape[0]-1)/tt_cum[-1,2]]
+    tt_cum = np.cumsum(tt, axis=0)     
     for dim in range(x.shape[1]):
-        tt_cum[:,dim] = tt_cum[:,dim]*t_scale[dim]
+        t_scale = (x.shape[0]-1)/tt_cum[-1,dim]
+        tt_cum[:,dim] = tt_cum[:,dim]*t_scale
     return tt_cum
 
 def jitter(x, sigma=0.1): 
@@ -86,8 +86,7 @@ def permutation(x, nPerm=4, minSegLength=20):
             diff = True
     return X_new[np.newaxis,:,:]
 
-def random_sampling(x, nSample=90):
-    
+def random_sampling(x, nSample=90):    
     x = x[0,:,:]
 
     # random sampling timesteps
@@ -104,80 +103,6 @@ def random_sampling(x, nSample=90):
 
     return X_new[np.newaxis, :, :] 
 
-'''
-def rotation(x):
-    flip = np.random.choice([-1, 1], size=(x.shape[0], x.shape[2]))
-    flip = flip[:, np.newaxis, :]
-    ret = np.empty([1, x.shape[1], x.shape[2]], dtype=np.float)
-    for sensor in np.arange(0, x.shape[2], 3):
-        sensor_axis = np.arange(sensor, sensor+3)
-        rotate_axis = np.random.permutation(sensor_axis)
-        ret[:, :, sensor_axis] = flip[:, :, sensor_axis] * x[:, :, rotate_axis]
-    return ret
-
-def permutation(x, max_segments=8, seg_mode='equal'):
-    orig_steps = np.arange(x.shape[1])
-    num_segs = np.random.randint(2, max_segments, size=(x.shape[0]))
-    ret = np.zeros_like(x)
-    diff = False
-    while not diff:
-        for i, pat in enumerate(x):
-            if seg_mode == "random":
-                split_points = np.random.choice(x.shape[1]-2, num_segs[i]-1, replace=False)
-                split_points.sort()
-                splits = np.split(orig_steps, split_points)
-            else:
-                splits = np.array_split(orig_steps, num_segs[i])
-            warp = np.concatenate(np.random.permutation(splits)).ravel()
-            ret[i] = pat[warp]
-        if bool(np.asarray(warp != orig_steps).any()):
-            diff = True
-    return ret
-
-
-def magnitude_warp(x, sigma=0.2, knot=4): 
-
-        # knot = complexity of the interpolation curves
-
-    orig_steps = np.arange(x.shape[1])
-
-    random_warps = np.random.normal(
-        loc=1.0, scale=sigma, size=(x.shape[0], knot+2, x.shape[2]))
-    warp_steps = (np.ones((x.shape[2], 1)) *
-                  (np.linspace(0, x.shape[1]-1., num=knot+2))).T
-
-    ret = np.zeros_like(x)
-
-    for i, pat in enumerate(x):
-        # interpolation random warping step and original step
-        warper = np.array([CubicSpline(warp_steps[:, dim], random_warps[i, :, dim])(
-            orig_steps) for dim in range(x.shape[2])]).T
-        ret[i] = pat * warper
-
-    return ret
-
-
-def time_warp(x, sigma=0.2, knot=4):
-
-        # knot = complexity of the interpolation curves
-
-    orig_steps = np.arange(x.shape[1])
-
-    random_warps = np.random.normal(
-        loc=1.0, scale=sigma, size=(x.shape[0], knot+2, x.shape[2]))
-    warp_steps = (np.ones((x.shape[2], 1)) *
-                  (np.linspace(0, x.shape[1]-1., num=knot+2))).T
-
-    ret = np.zeros_like(x)
-    for i, pat in enumerate(x):
-        for dim in range(x.shape[2]):
-            time_warp = CubicSpline(
-                warp_steps[:, dim], warp_steps[:, dim] * random_warps[i, :, dim])(orig_steps)
-            scale = (x.shape[1]-1)/time_warp[-1]
-            ret[i, :, dim] = np.interp(orig_steps, np.clip(
-                scale*time_warp, 0, x.shape[1]-1), pat[:, dim]).T
-    return ret   
-'''
 # dict of base function from which choose 
 BASE_FUNCTION = {
     'jitter': jitter,
