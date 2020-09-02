@@ -155,9 +155,9 @@ class Model():
             if method == 'act':
                 datasets, weights = self.create_dataset_for_act(weighted)
             if method == 'subject':
-                datasets, weights = self.create_dataset_for_subject()
+                datasets, weights = self.create_dataset_for_subject(weighted)
             if method == 'act_subject':
-                datasets, weights = self.create_dataset_for_act_subject()
+                datasets, weights = self.create_dataset_for_act_subject(weighted)
             weights = np.where(weights == float('Inf'), 0, weights)
             dataset_weighted = tf.data.experimental.sample_from_datasets(
                 datasets, weights)
@@ -191,7 +191,7 @@ class Model():
         train_data = train_data.batch(self.batch_size, drop_remainder=True)
         self.train_data = train_data
 
-    def create_dataset_for_act_subject(self):
+    def create_dataset_for_act_subject(self, method='balance'):
         datasets = []
         act_user_sample_count = []
         for user in np.unique(self.train_user):
@@ -203,12 +203,17 @@ class Model():
                 datasets.append(dataset)
                 act_user_sample_count.append(len(idx))
 
-        weights = np.repeat(1., len(act_user_sample_count)
-                            ) / act_user_sample_count
+        if method == 'balance':
+            weights = np.repeat(1., len(act_user_sample_count)
+                                ) / act_user_sample_count
+        if method == 'train_set':
+            n = np.sum(act_user_sample_count)
+            weights = act_user_sample_count / \
+                np.repeat(n, len(act_user_sample_count))
 
         return datasets, weights
 
-    def create_dataset_for_subject(self):
+    def create_dataset_for_subject(self, method='balance'):
         datasets = []
         for user in np.unique(self.train_user):
             idx = np.where(self.train_user == user)
@@ -219,8 +224,13 @@ class Model():
         user_sample_count = [np.where(self.train_user == user)[
             0].shape[0] for user in np.unique(self.train_user)]
 
-        # to have a balance number of samples for every user in batch
-        weights = np.repeat(1., len(user_sample_count)) / user_sample_count
+        if method == 'balance':
+            weights = np.repeat(1., len(user_sample_count)
+                                ) / user_sample_count
+        if method == 'train_set':
+            n = np.sum(user_sample_count)
+            weights = user_sample_count / \
+                np.repeat(n, len(user_sample_count))
 
         return datasets, weights
 
