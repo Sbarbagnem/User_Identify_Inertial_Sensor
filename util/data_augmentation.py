@@ -37,7 +37,7 @@ def DistortTimesteps(x, sigma=0.2):
         tt_cum[:,dim] = tt_cum[:,dim]*t_scale[dim]
     return tt_cum
 
-def jitter(x, sigma=0.05): #0.1
+def jitter(x, sigma=0.1): #0.1
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
 def scaling(x, sigma=0.1): 
