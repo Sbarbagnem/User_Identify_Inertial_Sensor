@@ -412,7 +412,8 @@ class Model():
             label_act == act) for act in np.unique(label_act)}
         pprint.pprint(distribution)
 
-    def train_model(self):
+    def train_model(self, epochs=50):
+        self.epochs = epochs
         if self.model_type == 'resnet18_2D_multitask':
             self.train_multi_task()
         elif self.multi_task:

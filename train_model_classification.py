@@ -174,6 +174,13 @@ if __name__ == '__main__':
         default=1,
         help='how functions from choosen set apply on sequences'
     )
+    parser.add_argument(
+        '-epochs',
+        '--epochs',
+        type=int,
+        default=50,
+        help='number of epochs of training'
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -276,6 +283,6 @@ if __name__ == '__main__':
                             model.build_model()
                             model.print_model_summary()
                             model.loss_opt_metric()
-                            model.train_model()
+                            model.train_model(args.epochs)
                             if plot_pred_base_act:
                                 model.plot_pred_based_act()
