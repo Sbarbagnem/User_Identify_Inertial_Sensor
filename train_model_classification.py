@@ -253,7 +253,7 @@ if __name__ == '__main__':
                         else:
                             outer_dir = 'OuterPartition_'
                             save_dir = FOLDER_LOG + 'log_no_magnitude'
-                        save_dir = 'log_scazzo'
+                        save_dir = 'log'
                         # fold used as validation during training set
                         fold_val = args.fold_val
                         fold_test = []
