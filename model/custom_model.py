@@ -47,7 +47,6 @@ class Model():
         self.batch_size = configuration_file.BATCH_SIZE
         self.latent_dim = configuration_file.LATENT_DIM
         self.epochs_gan = configuration_file.EPOCHS_GAN
-        self.model_type = model_type
         self.sensor_dict = configuration_file.config[dataset_name]['SENSOR_DICT']
         self.fold_test = fold_test
         self.fold_val = fold_val
@@ -281,7 +280,7 @@ class Model():
             shape_original, train_augmented.shape[0]))
 
     def build_model(self):
-        # create model
+        print('using model: ', self.model_type)
         if self.model_type == 'resnet18_2D':
             self.model = resnet2D(
                 self.multi_task, self.num_act, self.num_user, self.axes
