@@ -279,6 +279,8 @@ if __name__ == '__main__':
                                       log=True)
 
                         run_colab = True if args.run_colab else False
+                        print(colab_path)
+                        print(type(colab_path))
                         model.create_dataset(run_colab, args.colab_path)
 
                         only_acc = True if args.only_acc else False

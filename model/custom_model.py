@@ -100,8 +100,6 @@ class Model():
         path = self.configuration.config[self.dataset_name]['PATH_OUTER_PARTITION']
         print(path)
         print(type(path))
-        print(colab_path)
-        print(type(colab_path))
 
         # joint to path of drive data
         if run_colab:
