@@ -288,6 +288,7 @@ if __name__ == '__main__':
                         model.tf_dataset(args.weighted_based_on, args.weighted)
 
                         if train:
+                            print(model.model_type)
                             model.build_model()
                             model.print_model_summary()
                             model.loss_opt_metric()

@@ -281,7 +281,6 @@ class Model():
             shape_original, train_augmented.shape[0]))
 
     def build_model(self):
-        print(self.model_type)
         # create model
         if self.model_type == 'resnet18_2D':
             self.model = resnet2D(
