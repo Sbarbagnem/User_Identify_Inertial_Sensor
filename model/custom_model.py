@@ -286,26 +286,32 @@ class Model():
             self.model = resnet2D(
                 self.multi_task, self.num_act, self.num_user, self.axes
             )
+            print('use resnet18_2D')
         if self.model_type == 'resnet18_multi_branch':
             self.model = resnet18MultiBranch(
                 self.sensor_dict, self.num_user, self.magnitude
             )
+            print('use resnet18_multi_branch')
         if self.model_type == 'resnet18_lstm_parallel':
             self.model = parallel(
                 self.multi_task, self.num_act, self.num_user, self.axes
             )
+            print('use resnet18_lstm_parallel')
         if self.model_type == 'resnet18_lstm_consecutive':
             self.model = consecutive(
                 self.multi_task, self.num_act, self.num_user, self.axes
             )
+            print('use resnet18_lstm_consecutive')
         if self.model_type == 'resnet18_1D':
             self.model = resnet1D(
                 self.multi_task, self.num_act, self.num_user, self.axes
             )
+            print('use resnet18_1D')
         if self.model_type == 'resnet18_2D_multitask':
             self.model = resne18MultiTask(
                 self.num_act, self.num_user
             )
+            print('use resnet18_2D_multitask')
 
         samples = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
         self.model.build(input_shape=(None, samples, self.axes, 1))
