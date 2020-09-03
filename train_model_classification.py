@@ -181,6 +181,13 @@ if __name__ == '__main__':
         default=50,
         help='number of epochs of training'
     )
+    parser.add_argument(
+        '-only_acc',
+        '--only_acc',
+        type=int,
+        default=0,
+        help='indicate to user only accelerometer data or all data'
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -251,7 +258,8 @@ if __name__ == '__main__':
                                       drop_epoch=args.drop_epoch,
                                       log=True)
                         model.create_dataset()
-                        model.load_data(only_acc=False, delete=delete_overlap)
+                        only_acc = True if only_acc else False
+                        model.load_data(only_acc=only_acc, delete=delete_overlap)
 
                         if unify:
                             model.unify_act(
