@@ -101,7 +101,7 @@ class Model():
 
         # joint to path of drive data
         if run_colab:
-            path = colab_path + self.configuration.split('.')[1:]
+            path = colab_path + path.split('.')[1:]
 
         self.dataset = Dataset(path=path,
                                name=self.dataset_name,
