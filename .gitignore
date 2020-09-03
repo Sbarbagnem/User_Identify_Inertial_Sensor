@@ -1,8 +1,9 @@
 .vscode
 *pycache*
-#data/*
+data
 *.pyc
 *.npy
+plot
 
 # no original datasets
 data/datasets/REALDISP
