@@ -98,12 +98,10 @@ class Model():
             channel = self.configuration.config[self.dataset_name]['WINDOW_AXES']
 
         path = self.configuration.config[self.dataset_name]['PATH_OUTER_PARTITION']
-        print(path)
-        print(type(path))
 
         # joint to path of drive data
         if run_colab:
-            path = colab_path + path.split('.')[1:]
+            path = colab_path + ''.join(path.split('.')[1:])
 
         self.dataset = Dataset(path=path,
                                name=self.dataset_name,
