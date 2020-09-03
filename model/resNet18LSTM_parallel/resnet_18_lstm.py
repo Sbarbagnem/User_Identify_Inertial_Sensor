@@ -12,7 +12,7 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
 
     def __init__(self, layer_params, multi_task, num_act, num_user):
         super(ResNet18SingleBranchLSTM, self).__init__()
-        print('in init')
+  
         self.multi_task = multi_task
         if multi_task:
             self.num_act = num_act
@@ -156,5 +156,4 @@ def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1):
 
 
 def resnet18_lstm(multi_task, num_act, num_user):
-    print('in parallel')
     return ResNet18SingleBranchLSTM(layer_params=[2, 2, 2, 2], multi_task=multi_task, num_act=num_act, num_user=num_user)
