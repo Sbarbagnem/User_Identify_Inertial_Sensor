@@ -14,12 +14,12 @@ import matplotlib.pyplot as plt
 from sliding_window import sliding_window
 
 
-def preprocessing(dataset, path, path_out, save_dir="", sensors_type='acc_gyro_magn', positions='all', magnitude=False, size_overlapping=0.5):
+def preprocessing(dataset, path, path_out, save_dir="", sensors_type='acc_gyro_magn', positions='all', magnitude=False, size_overlapping=0.5, win_len=100, six_adl=False):
 
     if dataset == 'unimib':
-        unimib_process(path, path_out, magnitude, size_overlapping)
+        unimib_process(path, path_out, magnitude, size_overlapping, win_len)
     elif dataset == 'sbhar':
-        sbhar_process(path, path_out, magnitude, size_overlapping)
+        sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl)
     elif dataset == 'realdisp':
         realdisp_process(path, path_out, save_dir, sensors_type,
                          positions, magnitude, size_overlapping)
@@ -248,20 +248,26 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
         np.save(processed_path+'/fold{}/id'.format(i),         ID[idx])
 
 
-def sbhar_process(path, path_out, magnitude, size_overlapping):
+def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl = False):
     print('Processing sbhar dataset')
 
     root_path = path + 'SBHAR'
     raw_data_path = root_path + '/RawData/'
     if magnitude:
-        processed_path = path_out + \
-            'OuterPartition_magnitude_sbhar_six_adl_{}'.format(
-                str(size_overlapping*10))
+        if six_adl:
+            processed_path = path_out + \
+                'OuterPartition_magnitude_sbhar_six_adl_{}'.format(
+                    str(size_overlapping*10))
+        else:
+            processed_path = path_out + \
+            'OuterPartition_magnitude_{}'.format(
+                str(size_overlapping*10))          
     else:
         processed_path = path_out + \
             'OuterPartition_{}'.format(str(size_overlapping*10))
-
-    win_len = 100
+    if win_len != 100:
+        processed_path = processed_path + f'_wl_{win_len}'
+    #win_len = 100
     if magnitude:
         channel = 4
     else:
@@ -269,10 +275,10 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
     ID_generater = 1
     number_sensor = 2
 
-    data = np.empty([0, win_len, channel*number_sensor], dtype=np.float)
-    la = np.empty([0], dtype=np.int32)
-    lu = np.empty([0], dtype=np.int32)
-    ID = np.empty([0], dtype=np.int32)
+    data = []
+    la = []
+    lu = []
+    ID = []
 
     if not os.path.exists(path_out):
         os.mkdir(path_out)
@@ -358,35 +364,51 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
             _id = np.arange(ID_generater, ID_generater +
                             len(acc_gyro))  # id for every window
             # concat verticaly every window
-            data = np.concatenate((data, acc_gyro), axis=0)
-            ID = np.concatenate((ID,   _id), axis=0)
+            data.append(acc_gyro)
+            ID.extend(_id)
             ID_generater = ID_generater + len(acc_gyro) + 10
 
             # label activity for every window
-            _la = np.full(len(data)-len(la), int(id_act) - 1, dtype=np.int32)
-            la = np.concatenate((la, _la), axis=0)
+            _la = [int(id_act)-1] * (len(ID)-len(la))
+            la.extend(_la)
 
-        _lu = np.full(len(data)-len(lu), int(id_user) - 1,
-                      dtype=np.int32)  # label user for every window
-        lu = np.concatenate((lu, _lu), axis=0)
+        # update gloabl variabel lu
+        _lu = [int(id_user)-1] * (len(ID)-len(lu))
+        lu.extend(_lu)
 
-    # shuffle
-    data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
-    data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
+    # define array dimension for data and labels
+    data_array = np.zeros(
+        [len(lu), win_len, channel*number_sensor], dtype=np.float)
+    la_array = np.zeros([len(lu)], dtype=np.int32)
+    lu_array = np.zeros([len(lu)], dtype=np.int32)
+    ID_array = np.zeros([len(lu)], dtype=np.int32)
 
-    idx_to_del = np.where(la > 5)
-    data = np.delete(data, idx_to_del, axis=0)
-    la = np.delete(la, idx_to_del, axis=0)
-    lu = np.delete(lu, idx_to_del, axis=0)
+    idx = 0
+    for i, el in enumerate(data):
+        n = el.shape[0]
+        ID_array[idx:idx + n] = ID[idx:idx + n]
+        lu_array[idx:idx + n] = lu[idx:idx + n]
+        la_array[idx:idx + n] = la[idx:idx + n]
+        data_array[idx:idx + n, :, :] = el
+        idx += n
+
+    # delete data of transition action for six_adl dataset
+    if six_adl:
+        print('make six adl dataset')
+        idx_to_del = np.where(la_array > 5)
+        data_array = np.delete(data_array, idx_to_del, axis=0)
+        la_array = np.delete(la_array, idx_to_del, axis=0)
+        lu_array = np.delete(lu_array, idx_to_del, axis=0)
+        ID_array = np.delete(ID_array, idx_to_del, axis=0)
 
     if not os.path.exists(processed_path + '/'):
         os.mkdir(processed_path + '/')
 
-    indexes = split_balanced_data(lu, la, folders=10)
+    indexes = split_balanced_data(lu_array, la_array, folders=10)
 
-    #plt_user_distribution(indexes, lu)
+    #plt_user_distribution(indexes, lu_array)
 
-    #plt_act_distribution(indexes, la)
+    #plt_act_distribution(indexes, la_array)
 
     # partition
     for i in range(10):
@@ -396,15 +418,14 @@ def sbhar_process(path, path_out, magnitude, size_overlapping):
             shutil.rmtree(processed_path+'/fold{}'.format(i))
         os.mkdir(processed_path+'/fold{}'.format(i))
 
-        #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
         idx = indexes[str(i)]
-        np.save(processed_path+'/fold{}/data'.format(i),       data[idx])
-        np.save(processed_path+'/fold{}/user_label'.format(i), lu[idx])
-        np.save(processed_path+'/fold{}/act_label'.format(i),  la[idx])
-        np.save(processed_path+'/fold{}/id'.format(i),         ID[idx])
+        np.save(processed_path+'/fold{}/data'.format(i),       data_array[idx])
+        np.save(processed_path+'/fold{}/user_label'.format(i), lu_array[idx])
+        np.save(processed_path+'/fold{}/act_label'.format(i),  la_array[idx])
+        np.save(processed_path+'/fold{}/id'.format(i),         ID_array[idx])
 
 
-def unimib_process(path, path_out, magnitude, size_overlapping):
+def unimib_process(path, path_out, magnitude, size_overlapping, win_len):
     print('Processing unimib dataset')
 
     root_path = path + 'unimib_dataset'
@@ -416,7 +437,10 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
     else:
         processed_path = path_out + \
             'OuterPartition_{}'.format(str(size_overlapping*10))
-    win_len = 100 # 50 Hz * 2 seconds
+    if win_len != 100:
+        processed_path = processed_path + f'_wl_{win_len}'
+
+    #win_len = 100 # 50 Hz * 2 seconds
     if magnitude:
         channel = 4
     else:
@@ -467,10 +491,6 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
         _lu = np.full(len(data)-len(lu), sid, dtype=np.int32)
         lu = np.concatenate((lu, _lu), axis=0)
         
-    # shuffle
-    data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
-    data, la, lu, ID = skutils.shuffle(data, la, lu, ID)
-
     if not os.path.exists(processed_path + '/'):
         os.makedirs(processed_path + '/')
 
@@ -478,7 +498,6 @@ def unimib_process(path, path_out, magnitude, size_overlapping):
     indexes = split_balanced_data(lu, la, folders=10)
 
     #plt_user_distribution(indexes, lu)
-
     #plt_act_distribution(indexes, la)
 
     # create dir partition
@@ -587,11 +606,12 @@ if __name__ == '__main__':
                         default='../data/datasets/', help='path to dataset')
     parser.add_argument('-o', '--out', type=str, default='../data/datasets/UNIMIBDataset/',
                         help='path to store data preprocessed')
+    parser.add_argument('-win_len', '--win_len', type=int, default=100, help='windows slice len')
 
     args = parser.parse_args()
     for magnitude in [True]:
         for overlap in [0.5]:
-            preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap)
-            #preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap)
+            #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len)
+            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len, six_adl=True)
             #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn",
             #              save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)

@@ -90,14 +90,20 @@ class Model():
         self.final_pred_right_user = [0 for _ in np.arange(0, self.num_user)]
         self.final_pred_wrong_user = [0 for _ in np.arange(0, self.num_user)]
 
-    def create_dataset(self):
+    def create_dataset(self, run_colab, colab_path):
         if self.magnitude:
             channel = self.configuration.config[self.dataset_name]['WINDOW_AXES'] + len(
                 list(self.configuration.config[self.dataset_name]['SENSOR_DICT'].keys()))
         else:
             channel = self.configuration.config[self.dataset_name]['WINDOW_AXES']
 
-        self.dataset = Dataset(path=self.configuration.config[self.dataset_name]['PATH_OUTER_PARTITION'],
+        path = self.configuration.config[self.dataset_name]['PATH_OUTER_PARTITION']
+
+        # joint to path of drive data
+        if run_colab:
+            path = colab_path + self.configuration.split('.')[1:]
+
+        self.dataset = Dataset(path=path,
                                name=self.dataset_name,
                                channel=channel,
                                winlen=self.configuration.config[self.dataset_name]['WINDOW_SAMPLES'],

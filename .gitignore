@@ -2,7 +2,7 @@
 *pycache*
 #data/*
 *.pyc
-#*.npy
+*.npy
 
 # no original datasets
 data/datasets/REALDISP
@@ -12,9 +12,6 @@ data/datasets/merged_unimib_sbhar
 data/datasets/REALDISP_processed/OuterPartition*
 data/datasets/SBHAR_processed/OuterPartition*
 data/datasets/UNIMIBDataset/OuterPartition*
-!data/datasets/UNIMIBDataset/OuterPartition_5.0
-!data/datasets/SBHAR_processed/OuterPartition_5.0
-!data/datasets/SBHAR_processed/OuterPartition_magnitude_sbhar_six_adl_5.0
 data/parameters/
 log*
 prova_lr.py

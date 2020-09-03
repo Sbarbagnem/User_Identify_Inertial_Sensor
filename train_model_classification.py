@@ -188,6 +188,26 @@ if __name__ == '__main__':
         default=0,
         help='indicate to user only accelerometer data or all data'
     )
+    parser.add_argument(
+        '-run_colab',
+        '--run_colab',
+        type=int,
+        default=0,
+        help='run or not in colab, to change directory to data'
+    )
+    parser.add_argument(
+        '-colab_path',
+        '--colab_path',
+        type=str,
+        help='colab path to data'
+    )
+    parser.add_argument(
+        '-overlap',
+        '--overlap',
+        type=float,
+        nargs='+',
+        default=[5.0],
+        help='ratio of augmented data in random transformations after had equal number of samples act/sub, for every data augmentation technique choosen')
     args = parser.parse_args()
 
     # GPU settings
@@ -222,7 +242,7 @@ if __name__ == '__main__':
     for model_type in [args.model]:
         for dataset_name in [args.dataset]:
             for multitask in [False]:
-                for overlap in [5.0]:
+                for overlap in [*args.overlap]:
                     for magnitude in [True if args.magnitude else False]:
                         if magnitude:
                             if dataset_name == 'sbhar_six_adl':
@@ -257,7 +277,10 @@ if __name__ == '__main__':
                                       drop_factor=args.drop_factor,
                                       drop_epoch=args.drop_epoch,
                                       log=True)
-                        model.create_dataset()
+
+                        run_colab = True if args.run_colab else False
+                        model.create_dataset(run_colab, args.colab_path)
+
                         only_acc = True if args.only_acc else False
                         model.load_data(only_acc=only_acc, delete=delete_overlap)
 
