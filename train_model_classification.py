@@ -129,7 +129,7 @@ if __name__ == '__main__':
             'resnet18_2D',
             'resnet18_lstm_parallel',
             'resnet18_lstm_consecutive'],
-        default='resnet18_lstm_parallel',
+        default='resnet18_2D',
         help='define model to train')
     parser.add_argument('-init_lr', '--init_lr', type=float,
                         default=0.001, help='init learning rate')
