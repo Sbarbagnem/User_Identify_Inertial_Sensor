@@ -300,8 +300,9 @@ class Model():
             self.model = resne18MultiTask(
                 self.num_act, self.num_user
             )
-
+        print('after model choice')
         samples = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
+        print('sample: ', samples)
         self.model.build(input_shape=(None, samples, self.axes, 1))
 
     def print_model_summary(self):
