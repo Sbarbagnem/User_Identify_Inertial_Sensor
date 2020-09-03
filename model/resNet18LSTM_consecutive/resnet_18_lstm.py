@@ -9,14 +9,13 @@ class ResNet18SingleBranchLSTM(tf.keras.Model):
     '''
         consecutive simplify Resnet18 and LSTM
     '''
-    def __init__(self, layer_params, multi_task, num_act, num_user, axes):
+    def __init__(self, layer_params, multi_task, num_act, num_user):
         super(ResNet18SingleBranchLSTM, self).__init__()
 
         self.multi_task = multi_task
         if multi_task:
             self.num_act = num_act
         self.num_user = num_user
-        self.axes= axes
 
         # CNN for extract features about single axes sonsors
 
@@ -156,5 +155,5 @@ def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1, downsampl
     return res_block
 
 
-def resnet18_lstm(multi_task, num_act, num_user, axes):
-    return ResNet18SingleBranchLSTM(layer_params=[2, 2, 2, 2], multi_task=multi_task, num_act=num_act, num_user=num_user, axes=axes)
+def resnet18_lstm(multi_task, num_act, num_user):
+    return ResNet18SingleBranchLSTM(layer_params=[2, 2, 2, 2], multi_task=multi_task, num_act=num_act, num_user=num_user)

@@ -283,24 +283,19 @@ class Model():
         print('using model: ', self.model_type)
         if self.model_type == 'resnet18_2D':
             self.model = resnet2D(
-                self.multi_task, self.num_act, self.num_user, self.axes
-            )
+                self.multi_task, self.num_act, self.num_user)
         if self.model_type == 'resnet18_multi_branch':
             self.model = resnet18MultiBranch(
-                self.sensor_dict, self.num_user, self.magnitude
-            )
+                self.sensor_dict, self.num_user, self.magnitude)
         if self.model_type == 'resnet18_lstm_parallel':
             self.model = parallel(
-                self.multi_task, self.num_act, self.num_user, self.axes
-            )
+                self.multi_task, self.num_act, self.num_user)
         if self.model_type == 'resnet18_lstm_consecutive':
             self.model = consecutive(
-                self.multi_task, self.num_act, self.num_user, self.axes
-            )
+                self.multi_task, self.num_act, self.num_user)
         if self.model_type == 'resnet18_1D':
             self.model = resnet1D(
-                self.multi_task, self.num_act, self.num_user, self.axes
-            )
+                self.multi_task, self.num_act, self.num_user)
         if self.model_type == 'resnet18_2D_multitask':
             self.model = resne18MultiTask(
                 self.num_act, self.num_user
