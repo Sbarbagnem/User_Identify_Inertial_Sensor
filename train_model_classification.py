@@ -102,7 +102,7 @@ if __name__ == '__main__':
         default=0,
         help='in data augmentation return only sequence with all transformations applied on it')
     parser.add_argument('-fold_val', '--fold_val', type=int,
-                        default=0, help='fold for validation')
+                        default=0, nargs='+', help='fold for validation')
     parser.add_argument(
         '-fold_test',
         '--fold_test',
@@ -235,7 +235,7 @@ if __name__ == '__main__':
                             save_dir = FOLDER_LOG + 'log_no_magnitude'
                         save_dir = 'log_scazzo'
                         # fold used as validation during training set
-                        fold_val = [args.fold_val]
+                        fold_val = args.fold_val
                         fold_test = []
                         if args.fold_test != -1:
                             # fold used as test set after train, if empty
