@@ -258,7 +258,7 @@ if __name__ == '__main__':
                                       drop_epoch=args.drop_epoch,
                                       log=True)
                         model.create_dataset()
-                        only_acc = True if only_acc else False
+                        only_acc = True if args.only_acc else False
                         model.load_data(only_acc=only_acc, delete=delete_overlap)
 
                         if unify:
