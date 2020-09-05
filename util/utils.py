@@ -43,8 +43,11 @@ def samples_to_down(labels_user, labels_activity, ratio=0.3):
 
     return to_down
 
-
-def modify_class_act(data, labels_activity, dict_mapping_action):
-    '''
-        Unify more act sample under the same class based on mapping in dict_mapping_action
-    '''
+# to pass boolean string in command line
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False

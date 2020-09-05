@@ -5,6 +5,7 @@ import sys
 
 import configuration
 from model.custom_model import Model
+from util.utils import str2bool
 
 FOLDER_LOG = 'log/'
 
@@ -16,17 +17,17 @@ if __name__ == '__main__':
     parser.add_argument(
         '-p',
         '--plot',
-        type=int,
-        default=0,
-        help='int to plot or not distribution of train and test')
-    parser.add_argument('-t', '--train', type=int,
-                        default=1, help='int to train or not model')
+        type=str2bool,
+        default=False,
+        help='bool to plot or not distribution of train and test')
+    parser.add_argument('-t', '--train', type=str2bool,
+                        default=True, help='bool to train or not model')
     parser.add_argument(
         '-a',
         '--augmented',
-        type=int,
-        default=0,
-        help='int to apply or not data augmentation on train set')
+        type=str2bool,
+        default=False,
+        help='bool to apply or not data augmentation on train set')
     parser.add_argument(
         '-ap',
         '--augmented_par',
@@ -35,26 +36,24 @@ if __name__ == '__main__':
             'random_transformations'],
         nargs='+',
         help='which data augmentation tecnique apply in  sequence')
-    parser.add_argument('-pa', '--plot_augmented', type=int,
-                        default=0, help='int to plot data augmented or not')
+    parser.add_argument(
+        '-pa',
+        '--plot_augmented',
+        type=str2bool,
+        default=False,
+        help='bool to plot data augmented or not')
     parser.add_argument(
         '-ppba',
         '--plot_pred_base_act',
-        type=int,
-        default=1,
-        help='plot percentage error of predictions based on activity at the end of train')
+        type=str2bool,
+        default=True,
+        help='bool, if true plot percentage error of predictions based on activity at the end of train')
     parser.add_argument(
-        '-d',
-        '--delete_overlap',
-        type=str,
-        default='delete',
-        choices=[
-            'delete',
-            'noise',
-            'no_delete'],
-        help='delete, apply noise or not delete overlap sequence between train and test')
-    parser.add_argument('-u', '--unify', type=int, default=0,
-                        help='unify some act class, only for sbhar dataset')
+        '-u',
+        '--unify',
+        type=str2bool,
+        default=False,
+        help='bool to unify some act class, only for sbhar dataset')
     parser.add_argument(
         '-um',
         '--unify_method',
@@ -78,7 +77,8 @@ if __name__ == '__main__':
             'realdisp',
             'unimib_sbhar',
             'sbhar_six_adl'],
-        help='on which dataset train and test model')
+        help='on which dataset train and test model',
+        required=True)
     parser.add_argument(
         '-w',
         '--weighted',
@@ -92,23 +92,23 @@ if __name__ == '__main__':
     parser.add_argument(
         '-compose_transformations',
         '--compose',
-        type=int,
-        default=0,
-        help='apply all transformations on the same sequence or not in data augmentation')
+        type=str2bool,
+        default=False,
+        help='bool, if true apply also compose transformations')
     parser.add_argument(
         '-only_compose',
         '--only_compose',
-        type=int,
-        default=0,
-        help='in data augmentation return only sequence with all transformations applied on it')
+        type=str2bool,
+        default=False,
+        help='bool, if true data augmentation method return only compose sequences')
     parser.add_argument('-fold_val', '--fold_val', type=int,
-                        default=0, nargs='+', help='fold for validation')
+                        default=[], nargs='+', help='fold for validation', required=True)
     parser.add_argument(
         '-fold_test',
         '--fold_test',
         type=int,
         nargs='+',
-        default=-1,
+        default=[],
         help='list of int represent folds on wich testing model')
     parser.add_argument(
         '-wbo',
@@ -134,11 +134,15 @@ if __name__ == '__main__':
     parser.add_argument('-init_lr', '--init_lr', type=float,
                         default=0.001, help='init learning rate')
     parser.add_argument('-drop_factor', '--drop_factor', type=float,
-                        default=0.50, help='drop factor for learning rate')
+                        default=0.25, help='drop factor for learning rate')
     parser.add_argument('-drop_epoch', '--drop_epoch', type=int,
                         default=20, help='drop learning rate every epoch')
-    parser.add_argument('-magnitude', '--magnitude',
-                        type=int, default=1, help='use or not magnitude')
+    parser.add_argument(
+        '-magnitude',
+        '--magnitude',
+        type=str2bool,
+        default=True,
+        help='bool use or not magnitude')
     parser.add_argument(
         '-aug_function',
         '--aug_function',
@@ -184,16 +188,16 @@ if __name__ == '__main__':
     parser.add_argument(
         '-only_acc',
         '--only_acc',
-        type=int,
-        default=0,
-        help='indicate to user only accelerometer data or all data'
+        type=str2bool,
+        default=False,
+        help='bool to indicate to use only accelerometer data or all data'
     )
     parser.add_argument(
         '-run_colab',
         '--run_colab',
-        type=int,
-        default=0,
-        help='run or not in colab, to change directory to data'
+        type=str2bool,
+        default=False,
+        help='bool to indicate if the code wiil run or not in colab, to change directory to data'
     )
     parser.add_argument(
         '-colab_path',
@@ -208,6 +212,20 @@ if __name__ == '__main__':
         nargs='+',
         default=[5.0],
         help='ratio of augmented data in random transformations after had equal number of samples act/sub, for every data augmentation technique choosen')
+    parser.add_argument(
+        '-path_best_model',
+        '--path_best_model',
+        type=str,
+        default='best_seen.h5',
+        help='path and name to save best model seen in training phase'
+    )
+    parser.add_argument(
+        '-save_best_model',
+        '--save_best_model',
+        type=str2bool,
+        default=False,
+        help='bool, if true save the best seen model in path_best_seen '
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -216,34 +234,11 @@ if __name__ == '__main__':
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
 
-    # if true plot distribution of data with a heatmap of activity-subjects
-    # train and test
-    plot = args.plot
-
-    train = args.train
-
-    augmented = args.augmented
-    augmented_par = args.augmented_par
-    # if true plot original and augmented samples
-    plot_augmented = args.plot_augmented
-
-    # if true plot at the end of train % of correct and wrong user predictions
-    # based on activity class
-    plot_pred_base_act = args.plot_pred_base_act
-
-    # if 'no_delete' don't delete overlap train sequence between train and test
-    # if 'delete' default delete overlapping sequence in train
-    # if 'noise' add gaussian noise to overlapping sequence and don't delete it
-    delete_overlap = args.delete_overlap
-
-    unify = args.unify
-    unify_method = args.unify_method
-
     for model_type in [args.model]:
         for dataset_name in [args.dataset]:
             for multitask in [False]:
                 for overlap in [*args.overlap]:
-                    for magnitude in [True if args.magnitude else False]:
+                    for magnitude in [args.magnitude]:
                         if magnitude:
                             if dataset_name == 'sbhar_six_adl':
                                 outer_dir = 'OuterPartition_magnitude_sbhar_six_adl_'
@@ -253,21 +248,20 @@ if __name__ == '__main__':
                         else:
                             outer_dir = 'OuterPartition_'
                             save_dir = FOLDER_LOG + 'log_no_magnitude'
+
                         save_dir = 'log'
+
                         # fold used as validation during training set
                         fold_val = args.fold_val
-                        fold_test = []
-                        if args.fold_test != -1:
-                            # fold used as test set after train, if empty
-                            # fold_val is used as test and validation
-                            fold_test = args.fold_test
+                        fold_test = args.fold_test
+
                         model = Model(dataset_name=dataset_name,
                                       configuration_file=configuration,
                                       multi_task=multitask,
                                       lr='dynamic',
                                       model_type=model_type,
-                                      fold_test=fold_val,
-                                      fold_val=fold_test,
+                                      fold_val=fold_val,
+                                      fold_test=fold_test,
                                       save_dir=save_dir,
                                       outer_dir=outer_dir +
                                       str(overlap) + '/',
@@ -276,44 +270,54 @@ if __name__ == '__main__':
                                       init_lr=args.init_lr,
                                       drop_factor=args.drop_factor,
                                       drop_epoch=args.drop_epoch,
+                                      path_best_model=args.path_best_model,
                                       log=True)
 
-                        run_colab = True if args.run_colab else False
-                        model.create_dataset(run_colab, args.colab_path)
+                        model.create_dataset(args.run_colab, args.colab_path)
 
-                        only_acc = True if args.only_acc else False
-                        model.load_data(only_acc=only_acc, delete=delete_overlap)
+                        model.load_data(
+                            only_acc=args.only_acc)
 
-                        if unify:
+                        if args.unify:
                             model.unify_act(
-                                model.configuration.sbhar_mapping[unify_method])
+                                model.configuration.sbhar_mapping[args.unify_method])
 
                         # plot original distribution data train and test
-                        if plot:
-                            model.plot_distribution_data(test=True)
+                        if args.plot:
+                            model.plot_distribution_data(val_test=True)
 
-                        if augmented:
-                            compose = True if args.compose else False
-                            only_compose = True if args.only_compose else False
+                        if args.augmented:
                             model.augment_data(
                                 function_to_apply=args.aug_function,
-                                augmented_par=augmented_par,
-                                compose=compose,
-                                only_compose=only_compose,
-                                plot_augmented=plot_augmented,
+                                augmented_par=args.augmented_par,
+                                compose=args.compose,
+                                only_compose=args.only_compose,
+                                plot_augmented=args.plot_augmented,
                                 ratio_random_transformations=args.ratio,
                                 n_func_to_apply=args.n_func_to_apply)
-                            model.plot_distribution_data(test=False)
+                            model.plot_distribution_data(val_test=False)
 
                         model.normalize_data()
 
                         # tf dataset to weight sample in train set
                         model.tf_dataset(args.weighted_based_on, args.weighted)
 
-                        if train:
+                        if args.train:
                             model.build_model()
                             model.print_model_summary()
                             model.loss_opt_metric()
                             model.train_model(args.epochs)
-                            if plot_pred_base_act:
-                                model.plot_pred_based_act()
+                            if args.plot_pred_base_act:
+                                model.plot_pred_based_act(title='percentage error in validation best seen')
+                            if args.fold_test != []:
+                                model.test_model()
+                                model.plot_pred_based_act(title='percentage error in test set')
+                            if args.save_best_model:
+                                model.best_model.save_weights(filepath=args.path_best_model, overwrite=True, save_format=None)
+                        # TODO
+                        '''
+                        if args.load_model:
+                            # cose .......
+                            model.load_model(path_model)
+                            model.test_model()
+                        '''

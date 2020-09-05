@@ -35,29 +35,40 @@ class Dataset(object):
         }
         self.config_file = config_file
 
-    def load_data(self, step_test=[0], step_val=[], overlapping=5.0, delete='delete', magnitude=True):
+    def load_data(self, fold_val, fold_test, overlapping):
 
+        """
+        Load train, validation and test data based on path and datataset name passed in Dataset object.
+        
+        Parameters
+        ----------
+        fold_val : list[int]
+            List of fold used for validation.
+        fold_test : list[int]
+            List of fold used for test.
+        overlapping : float -> 5.0, 6.0, ....
+            Represent percentage of overlapping between sequences.
+
+        """
+        
+        # train data
         TrainData = np.empty([0, self._winlen, self._channel], dtype=np.float)
         TrainLA = np.empty([0], dtype=np.int32)
         TrainLU = np.empty([0], dtype=np.int32)
         TrainID = np.empty([0], dtype=np.int32)
 
+        # validation data
+        ValidData = np.empty([0, self._winlen, self._channel], dtype=np.float)
+        ValidLA = np.empty([0], dtype=np.int32)
+        ValidLU = np.empty([0], dtype=np.int32)
+        ValidID = np.empty([0], dtype=np.int32)
 
-        TestData = np.empty([0, self._winlen, self._channel], dtype=np.float)
-        TestLA = np.empty([0], dtype=np.int32)
-        TestLU = np.empty([0], dtype=np.int32)
-        TestID = np.empty([0], dtype=np.int32)
-
-        if step_val != []:
-            ValidData = np.empty([0, self._winlen, self._channel], dtype=np.float)
-            ValidLA = np.empty([0], dtype=np.int32)
-            ValidLU = np.empty([0], dtype=np.int32)
-            ValidID = np.empty([0], dtype=np.int32)
-        else:
-            ValidData = None
-            ValidLA = None
-            ValidLU = None
-            ValidID = None
+        # test data
+        if fold_test != []:
+            TestData = np.empty([0, self._winlen, self._channel], dtype=np.float)
+            TestLA = np.empty([0], dtype=np.int32)
+            TestLU = np.empty([0], dtype=np.int32)
+            TestID = np.empty([0], dtype=np.int32)
 
         for i in range(10):
             Data = np.load(self._path + self.outer_dir +
@@ -69,12 +80,12 @@ class Dataset(object):
             ID = np.load(self._path + self.outer_dir +
                          'fold{}/id.npy'.format(i))
 
-            if i in step_test:
+            if i in fold_test:
                 TestData = np.concatenate((TestData, Data), axis=0)
                 TestLA = np.concatenate((TestLA, LA), axis=0)
                 TestLU = np.concatenate((TestLU, LU), axis=0)
                 TestID = np.concatenate((TestID, ID), axis=0)
-            elif i in step_val:
+            elif i in fold_val:
                 ValidData = np.concatenate((ValidData, Data), axis=0)
                 ValidLA = np.concatenate((ValidLA, LA), axis=0)
                 ValidLU = np.concatenate((ValidLU, LU), axis=0)
@@ -86,84 +97,61 @@ class Dataset(object):
                 TrainID = np.concatenate((TrainID, ID), axis=0)
 
         # delete overlap samples form training_data, based on overlap percentage
-        if delete == 'delete':
-            print('Shape train data before delete overlap sequence: ', TrainData.shape)
-            distances_to_delete = to_delete(overlapping)
-            overlap_ID = np.empty([0], dtype=np.int32)
+        print('Shape train data before delete overlap sequence: ', TrainData.shape)
+        distances_to_delete = to_delete(overlapping)
+        overlap_ID = np.empty([0], dtype=np.int32)
 
-            for distance in distances_to_delete:
-                if ValidData is not None:
-                    overlap_ID = np.concatenate(
-                        (overlap_ID, TestID+distance, TestID-distance, ValidID+distance, ValidID-distance))
-                else:
-                    overlap_ID = np.concatenate(
-                        (overlap_ID, TestID+distance, TestID-distance))                 
-
-            overlap_ID = np.unique(overlap_ID)
-            invalid_idx = np.array([i for i in np.arange(
-                len(TrainID)) if TrainID[i] in overlap_ID])
-
-            TrainData = np.delete(TrainData, invalid_idx, axis=0)
-            TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
-            TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
-
-            print('Shape train data after deleted overlap sequence: ', TrainData.shape)
-
-        # don't delete overlap between train and test, but add noise to overlap train
-        elif delete == 'noise':
-            print('don\'t delete overlap sample between train and test, but add noise')
-            distances_to_delete = to_delete(overlapping)
-            overlap_ID = np.empty([0], dtype=np.int32)
-            for distance in distances_to_delete:
+        for distance in distances_to_delete:
+            if fold_test != []:
                 overlap_ID = np.concatenate(
-                    (overlap_ID, TestID+distance, TestID-distance))
-            overlap_ID = np.unique(overlap_ID)
-            invalid_idx = np.array([i for i in np.arange(
-                len(TrainID)) if TrainID[i] in overlap_ID])
-            idx, flatten = compute_sub_seq(self._channel, n_sensor=len(
-                config[self._name]['SENSOR_DICT']), use_magnitude=magnitude)
-            for i, _ in enumerate(TrainData):
-                if i in invalid_idx:
-                    TrainData[i, :, flatten] = jitter(TrainData[i, :, flatten], sigma=0.01)
-                    if magnitude:
-                        for sensor_idx in idx:
-                            TrainData[i, :, sensor_idx[-1]+1] = np.apply_along_axis(lambda x: np.sqrt(
-                                np.sum(np.power(x, 2))), axis=0, arr=TrainData[i, :, sensor_idx])
+                    (overlap_ID, TestID+distance, TestID-distance, ValidID+distance, ValidID-distance))
+            else:
+                overlap_ID = np.concatenate(
+                    (overlap_ID, ValidID+distance, ValidID-distance))                 
+
+        overlap_ID = np.unique(overlap_ID)
+        invalid_idx = np.array([i for i in np.arange(
+            len(TrainID)) if TrainID[i] in overlap_ID])
+
+        TrainData = np.delete(TrainData, invalid_idx, axis=0)
+        TrainLA = np.delete(TrainLA,   invalid_idx, axis=0)
+        TrainLU = np.delete(TrainLU,   invalid_idx, axis=0)
+
+        print('Shape train data after deleted overlap sequence: ', TrainData.shape)
+
+        TrainData, TrainLA, TrainLU = skutils.shuffle(
+            TrainData, TrainLA, TrainLU)
+        TrainData, TrainLA, TrainLU = skutils.shuffle(
+            TrainData, TrainLA, TrainLU)
+
+        print('Shape val data: ', ValidData.shape)
+
+        if fold_test != []:
+            print('Shape test data: ', TestData.shape)
+            return TrainData, TrainLA, TrainLU, ValidData, ValidLA, ValidLU, TestData, TestLA, TestLU
         else:
-            print('don\'t delete overlapping sequence between train and test')
+            return TrainData, TrainLA, TrainLU, ValidData, ValidLA, ValidLU, None, None, None
 
-        TrainData, TrainLA, TrainLU = skutils.shuffle(
-            TrainData, TrainLA, TrainLU)
-        TrainData, TrainLA, TrainLU = skutils.shuffle(
-            TrainData, TrainLA, TrainLU)
-
-        print('Shape test data: ', TestData.shape)
-        if ValidData is not None:
-            print('Shape val data: ', ValidData.shape)
-             
-        return TrainData, TrainLA, TrainLU, TestData, TestLA, TestLU, ValidData, ValidLA, ValidLU
-
-    def normalize_data(self, train, test, val=None):
+    def normalize_data(self, train, val, test=None):
 
         # normalization
         mean = np.mean(np.reshape(train, [-1, self._channel]), axis=0)
         std = np.std(np.reshape(train, [-1, self._channel]), axis=0)
 
         train = (train - mean)/std
-        test = (test - mean)/std
-
-        if val is not None:
-            val = (val - mean)/std
+        val = (val - mean)/std
 
         train = np.expand_dims(train, 3)
-        test = np.expand_dims(test,  3)
-        if val is not None:
-            val = np.expand_dims(val, 3)
+        val = np.expand_dims(val,  3)
 
-        if val is not None:
-            return train, test, val
+        if test is not None:
+            test = (test - mean)/std
+            test = np.expand_dims(test, 3)
+
+        if test is not None:
+            return train, val, test
         else:
-            return train, test, None
+            return train, val, None
 
     def augment_data(self, data, lu, la, magnitude, augmented_par, function_to_apply, compose, only_compose, plot_augmented, ratio_random_transformations, n_func_to_apply):
         if augmented_par != []:
@@ -214,6 +202,17 @@ class Dataset(object):
         return num_class_return, act_train, act_test
 
 def to_delete(overlapping):
+
+    """
+    Return a list of distance to overlapping sequence.
+    
+    Parameters
+    ----------
+    overlapping : float
+        Overlap percentage used.
+
+    """
+
     if overlapping == 5.0:
         return [1]
     if overlapping == 6.0:
