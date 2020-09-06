@@ -421,7 +421,7 @@ class Model():
             label_act == act) for act in np.unique(label_act)}
         pprint.pprint(distribution)
 
-    def train_model(self, epochs=50, train_90=False):
+    def train_model(self, epochs):
         self.epochs = epochs
         if self.model_type == 'resnet18_2D_multitask':
             self.train_multi_task()
@@ -436,7 +436,8 @@ class Model():
         best_seen = {
             'epoch': 0,
             'loss': 10,
-            'model': None
+            'model': None,
+            #'time_not_improved': 0
         }
 
         for epoch in range(1, self.epochs + 1):
@@ -518,13 +519,20 @@ class Model():
 
             # update best seen model based on accuracy of validation
             if self.valid_loss_user.result().numpy() < best_seen['loss']:
-                print('update best seen model')
                 best_seen['loss'] = self.valid_loss_user.result().numpy()
                 best_seen['epoch'] = epoch
                 best_seen['model'] = self.model
+                #best_seen['time_not_improved'] = 0
                 self.final_pred_right_act = [0 for _ in np.arange(0, self.num_act)]
                 self.final_pred_wrong_act = [0 for _ in np.arange(0, self.num_act)]
                 self.update_pred_based_on_act(temp_predictions_user, temp_label_user, temp_label_act)
+            '''
+            else:
+                best_seen['time_not_improved'] += 1
+                if best_seen['time_not_improved'] == 5:
+                    print('early stop')
+                    break
+            '''
                 
             # reset loss and accuracy after each epoch
             self.valid_loss_user.reset_states()
