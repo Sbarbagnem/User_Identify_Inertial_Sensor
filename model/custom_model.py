@@ -437,7 +437,7 @@ class Model():
             'epoch': 0,
             'loss': 10,
             'model': None,
-            #'time_not_improved': 0
+            'time_not_improved': 0
         }
 
         for epoch in range(1, self.epochs + 1):
@@ -522,28 +522,39 @@ class Model():
                 best_seen['loss'] = self.valid_loss_user.result().numpy()
                 best_seen['epoch'] = epoch
                 best_seen['model'] = self.model
-                #best_seen['time_not_improved'] = 0
+                best_seen['time_not_improved'] = 0
                 self.final_pred_right_act = [0 for _ in np.arange(0, self.num_act)]
                 self.final_pred_wrong_act = [0 for _ in np.arange(0, self.num_act)]
                 self.update_pred_based_on_act(temp_predictions_user, temp_label_user, temp_label_act)
-            '''
             else:
                 best_seen['time_not_improved'] += 1
-                if best_seen['time_not_improved'] == 5:
+                if best_seen['time_not_improved'] >= 6:
                     print('early stop')
+                    self.valid_loss_user.reset_states()
+                    self.valid_accuracy_user.reset_states()
                     break
-            '''
+                elif best_seen['time_not_improved'] == 5:
+                    new_lr = self.decay_lr_on_plateau()
+                    if new_lr < 0.000001:
+                        print('min lr reached')
+                        self.valid_loss_user.reset_states()
+                        self.valid_accuracy_user.reset_states()
+                        break                       
+                    self.optimizer.learning_rate.assign(new_lr)
+                    print(f'reduce learning rate on plateau to {new_lr}')
                 
             # reset loss and accuracy after each epoch
             self.valid_loss_user.reset_states()
             self.valid_accuracy_user.reset_states()
 
+            '''
             if self.lr == 'dynamic':
                 new_lr = self.decay_lr(
                     init_lr=self.init_lr, drop_factor=self.drop_factor, drops_epoch=self.drop_epoch, epoch=epoch)
                 self.optimizer.learning_rate.assign(new_lr)
                 with self.train_writer.as_default():
                     tf.summary.scalar("learning_rate", new_lr, step=epoch)
+            '''
 
         # save best model finished train process (Model.save maybe is more appropriate)
         self.best_model = best_seen['model']
@@ -650,6 +661,10 @@ class Model():
         exp = np.floor((1 + epoch) / drops_epoch)
         alpha = init_lr * (drop_factor ** exp)
         return float(alpha)
+
+    def decay_lr_on_plateau(self):
+        lr = self.optimizer.learning_rate
+        return lr * self.drop_factor
 
     def test_model(self):
 
