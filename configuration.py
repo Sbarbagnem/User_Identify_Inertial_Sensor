@@ -53,7 +53,20 @@ config = {
         'SENSOR_DICT':          {
             'accelerometer': 3,
             'gyroscope': 3
-        }
+        } 
+    },
+    'sbhar_128w': {
+        'PATH_OUTER_PARTITION': './data/datasets/SBHAR_processed/',
+        'NUM_CLASSES_ACTIVITY': 12,
+        'NUM_CLASSES_USER': 30,
+        'WINDOW_AXES': 6,  # number of sample for window
+        'WINDOW_SAMPLES': 128,    # number of axes' sensor
+        'AXIS': 6,
+        'AXIS_MAGNITUDE': 2,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3
+        } 
     },
     'realdisp': {
         'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed/',

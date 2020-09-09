@@ -74,6 +74,7 @@ if __name__ == '__main__':
             'unimib_75w',
             'unimib_128w',
             'sbhar',
+            'sbhar_128w',
             'realdisp',
             'unimib_sbhar',
             'sbhar_six_adl'],
@@ -244,7 +245,7 @@ if __name__ == '__main__':
                                 outer_dir = 'OuterPartition_magnitude_sbhar_six_adl_'
                             elif dataset_name == 'unimib_75w':
                                 outer_dir = 'OuterPartition_magnitude_wl_75_'
-                            elif dataset_name == 'unimib_128w':
+                            elif dataset_name == 'unimib_128w' or dataset_name == 'sbhar_128w':
                                 outer_dir = 'OuterPartition_magnitude_wl_128_'
                             else:
                                 outer_dir = 'OuterPartition_magnitude_'

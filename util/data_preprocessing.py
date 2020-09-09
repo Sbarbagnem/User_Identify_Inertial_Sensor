@@ -612,6 +612,6 @@ if __name__ == '__main__':
     for magnitude in [True]:
         for overlap in [0.5]:
             #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len)
-            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len, six_adl=True)
+            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len, six_adl=False)
             #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn",
             #              save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)
