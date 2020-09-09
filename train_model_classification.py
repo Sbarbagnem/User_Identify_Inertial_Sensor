@@ -242,6 +242,10 @@ if __name__ == '__main__':
                         if magnitude:
                             if dataset_name == 'sbhar_six_adl':
                                 outer_dir = 'OuterPartition_magnitude_sbhar_six_adl_'
+                            elif dataset_name == 'unimib_75w':
+                                outer_dir = 'OuterPartition_magnitude_wl_75_'
+                            elif dataset_name == 'unimib_128w':
+                                outer_dir = 'OuterPartition_magnitude_wl_128_'
                             else:
                                 outer_dir = 'OuterPartition_magnitude_'
                             save_dir = FOLDER_LOG + 'log_magnitude'
