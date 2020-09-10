@@ -102,15 +102,15 @@ class Dataset(object):
         overlap_ID = np.empty([0], dtype=np.int32)
 
         for distance in distances_to_delete:
-            '''
+            
             if fold_test != []:
                 overlap_ID = np.concatenate(
                     (overlap_ID, TestID+distance, TestID-distance, ValidID+distance, ValidID-distance))
             else:
                 overlap_ID = np.concatenate(
                     (overlap_ID, ValidID+distance, ValidID-distance))  
-            '''
-        overlap_ID = np.concatenate((overlap_ID, TestID+distance, TestID-distance))
+            
+        # overlap_ID = np.concatenate((overlap_ID, TestID+distance, TestID-distance))
         overlap_ID = np.unique(overlap_ID)
         invalid_idx = np.array([i for i in np.arange(
             len(TrainID)) if TrainID[i] in overlap_ID])
