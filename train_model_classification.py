@@ -91,7 +91,7 @@ if __name__ == '__main__':
         default='no',
         help='chose a batch balance on act, same distribution of train set or random')
     parser.add_argument(
-        '-compose_transformations',
+        '-compose',
         '--compose',
         type=str2bool,
         default=False,
@@ -102,15 +102,14 @@ if __name__ == '__main__':
         type=str2bool,
         default=False,
         help='bool, if true data augmentation method return only compose sequences')
-    parser.add_argument('-fold_val', '--fold_val', type=int,
-                        default=[], nargs='+', help='fold for validation', required=True)
     parser.add_argument(
         '-fold_test',
         '--fold_test',
         type=int,
         nargs='+',
-        default=[],
-        help='list of int represent folds on wich testing model')
+        default=[0],
+        help='list of int represent folds on wich testing model',
+        required=True)
     parser.add_argument(
         '-wbo',
         '--weighted_based_on',
@@ -256,17 +255,12 @@ if __name__ == '__main__':
 
                         save_dir = 'log'
 
-                        # fold used as validation during training set
-                        fold_val = args.fold_val
-                        fold_test = args.fold_test
-
                         model = Model(dataset_name=dataset_name,
                                       configuration_file=configuration,
                                       multi_task=multitask,
                                       lr='dynamic',
                                       model_type=model_type,
-                                      fold_val=fold_val,
-                                      fold_test=fold_test,
+                                      fold_test=args.fold_test,
                                       save_dir=save_dir,
                                       outer_dir=outer_dir +
                                       str(overlap) + '/',
@@ -314,15 +308,7 @@ if __name__ == '__main__':
                             model.train_model(args.epochs)
                             if args.plot_pred_base_act:
                                 model.plot_pred_based_act(title='percentage error in validation best seen')
-                            if args.fold_test != []:
                                 model.test_model()
                                 model.plot_pred_based_act(title='percentage error in test set')
                             if args.save_best_model:
                                 model.best_model.save_weights(filepath=args.path_best_model, overwrite=True, save_format=None)
-                        # TODO
-                        '''
-                        if args.load_model:
-                            # cose .......
-                            model.load_model(path_model)
-                            model.test_model()
-                        '''

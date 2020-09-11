@@ -12,6 +12,7 @@ from sklearn import utils as skutils
 import matplotlib.pyplot as plt
 
 from sliding_window import sliding_window
+from utils import str2bool
 
 
 def preprocessing(dataset, path, path_out, save_dir="", sensors_type='acc_gyro_magn', positions='all', magnitude=False, size_overlapping=0.5, win_len=100, six_adl=False):
@@ -19,7 +20,8 @@ def preprocessing(dataset, path, path_out, save_dir="", sensors_type='acc_gyro_m
     if dataset == 'unimib':
         unimib_process(path, path_out, magnitude, size_overlapping, win_len)
     elif dataset == 'sbhar':
-        sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl)
+        sbhar_process(path, path_out, magnitude,
+                      size_overlapping, win_len, six_adl)
     elif dataset == 'realdisp':
         realdisp_process(path, path_out, save_dir, sensors_type,
                          positions, magnitude, size_overlapping)
@@ -222,7 +224,7 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
     data, la, lu, ID = skutils.shuffle(
         data_array, la_array, lu_array, ID_array)
     data, la, lu, ID = skutils.shuffle(
-        data_array, la_array, lu_array, ID_array)
+        data, la, lu, ID)
 
     print(f'shape data {data.shape}')
 
@@ -248,7 +250,7 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
         np.save(processed_path+'/fold{}/id'.format(i),         ID[idx])
 
 
-def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl = False):
+def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl=False):
     print('Processing sbhar dataset')
 
     root_path = path + 'SBHAR'
@@ -260,8 +262,8 @@ def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl 
                     str(size_overlapping*10))
         else:
             processed_path = path_out + \
-            'OuterPartition_magnitude_{}'.format(
-                str(size_overlapping*10))          
+                'OuterPartition_magnitude_{}'.format(
+                    str(size_overlapping*10))
     else:
         processed_path = path_out + \
             'OuterPartition_{}'.format(str(size_overlapping*10))
@@ -336,7 +338,7 @@ def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl 
             # sliding window
             try:
                 _data_windows_acc = sliding_window(
-                    acc, (win_len, channel), (int(win_len*(1-size_overlapping)), 1))
+                    acc, (win_len, channel), (int(win_len*(1-size_overlapping)), 1))              
             except:
                 print("Not enough data for sliding window")
             invalid_idx = np.where(np.any(
@@ -404,6 +406,11 @@ def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl 
     if not os.path.exists(processed_path + '/'):
         os.mkdir(processed_path + '/')
 
+    data_array, lu_array, la_array, ID_array = skutils.shuffle(
+        data_array, lu_array, la_array, ID_array)
+    data_array, lu_array, la_array, ID_array = skutils.shuffle(
+        data_array, lu_array, la_array, ID_array)
+
     indexes = split_balanced_data(lu_array, la_array, folders=10)
 
     #plt_user_distribution(indexes, lu_array)
@@ -440,7 +447,7 @@ def unimib_process(path, path_out, magnitude, size_overlapping, win_len):
     if win_len != 100:
         processed_path = processed_path + f'_wl_{win_len}'
 
-    #win_len = 100 # 50 Hz * 2 seconds
+    # win_len = 100 # 50 Hz * 2 seconds
     if magnitude:
         channel = 4
     else:
@@ -462,7 +469,7 @@ def unimib_process(path, path_out, magnitude, size_overlapping, win_len):
         # id activity
         for aid in range(9):
             act = activity_table[aid]
-            trials = (signal[sid, 0][0, 0][act].shape)[0]      
+            trials = (signal[sid, 0][0, 0][act].shape)[0]
             # id trial
             for tid in range(trials):
                 if magnitude:
@@ -473,7 +480,7 @@ def unimib_process(path, path_out, magnitude, size_overlapping, win_len):
                 _data_windows = sliding_window(
                     _data, (win_len, channel), (int(win_len*(1-size_overlapping)), 1))
                 invalid_idx = np.where(
-                    np.any(np.isnan(np.reshape(_data_windows, [-1, win_len*channel])), axis=1))[0] # delete window with NaN sample
+                    np.any(np.isnan(np.reshape(_data_windows, [-1, win_len*channel])), axis=1))[0]  # delete window with NaN sample
                 _data_windows = np.delete(_data_windows, invalid_idx, axis=0)
                 _id = np.arange(ID_generater, ID_generater +
                                 len(_data_windows))  # id for every window
@@ -490,9 +497,12 @@ def unimib_process(path, path_out, magnitude, size_overlapping, win_len):
         # label user for every window
         _lu = np.full(len(data)-len(lu), sid, dtype=np.int32)
         lu = np.concatenate((lu, _lu), axis=0)
-        
+
     if not os.path.exists(processed_path + '/'):
         os.makedirs(processed_path + '/')
+
+    data, lu, la, ID = skutils.shuffle(data, lu, la, ID)
+    data, lu, la, ID = skutils.shuffle(data, lu, la, ID)
 
     # split balanced data, return array (10, indexes_folder)
     indexes = split_balanced_data(lu, la, folders=10)
@@ -601,17 +611,34 @@ if __name__ == '__main__':
         description="preprocessing pipeline for signal")
 
     parser.add_argument('-d', '--dataset', type=str, choices=[
-                        'unimib', 'sbhar', 'realdisp', 'ouisir'], default="unimib", help='dataset to preprocessing')
+                        'unimib', 'sbhar', 'sbhar_six_adl', 'realdisp', 'ouisir'], help='dataset to preprocessing', required=False)
     parser.add_argument('-p', '--path', type=str,
                         default='../data/datasets/', help='path to dataset')
     parser.add_argument('-o', '--out', type=str, default='../data/datasets/UNIMIBDataset/',
                         help='path to store data preprocessed')
-    parser.add_argument('-win_len', '--win_len', type=int, default=100, help='windows slice len')
+    parser.add_argument('-win_len', '--win_len', type=int,
+                        default=100, help='windows slice len')
+    parser.add_argument(
+        '-overlap',
+        '--overlap',
+        type=float,
+        nargs='+',
+        default=[0.5],
+        choices=[0.5, 0.6, 0.7, 0.8, 0.9],
+        help='overlap in sliding window')
+    parser.add_argument(
+        '-magnitude',
+        '--magnitude',
+        type=str2bool,
+        default=[True],
+        nargs='+',
+        help='bool use or not magnitude')
 
     args = parser.parse_args()
-    for magnitude in [True]:
-        for overlap in [0.5]:
+    for magnitude in [args.magnitude]:
+        for overlap in [*args.overlap]:
             #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len)
-            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/", magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len, six_adl=False)
-            #preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn",
+            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/",
+                          magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len, six_adl=True)
+            # preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn",
             #              save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)
