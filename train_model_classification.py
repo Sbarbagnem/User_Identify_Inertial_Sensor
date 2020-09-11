@@ -226,6 +226,13 @@ if __name__ == '__main__':
         default=False,
         help='bool, if true save the best seen model in path_best_seen '
     )
+    parser.add_argument(
+        '-log',
+        '--log',
+        type=str2bool,
+        help='bool, if true log all train history',
+        default=True
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -270,7 +277,7 @@ if __name__ == '__main__':
                                       drop_factor=args.drop_factor,
                                       drop_epoch=args.drop_epoch,
                                       path_best_model=args.path_best_model,
-                                      log=True)
+                                      log=args.log)
 
                         model.create_dataset(args.run_colab, args.colab_path)
 
