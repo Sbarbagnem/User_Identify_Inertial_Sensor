@@ -72,7 +72,7 @@ class Dataset(object):
             ID = np.load(self._path + self.outer_dir +
                          'fold{}/id.npy'.format(i))
 
-            if i in fold_test:
+            if i == fold_test:
                 TestData = np.concatenate((TestData, Data), axis=0)
                 TestLA = np.concatenate((TestLA, LA), axis=0)
                 TestLU = np.concatenate((TestLU, LU), axis=0)
