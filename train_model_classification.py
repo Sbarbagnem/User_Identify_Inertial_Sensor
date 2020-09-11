@@ -46,7 +46,7 @@ if __name__ == '__main__':
         '-plot_pred_base_act_val',
         '--plot_pred_base_act_val',
         type=str2bool,
-        default=True,
+        default=False,
         help='bool, if true plot percentage error of predictions based on activity at the end of train')
     parser.add_argument(
         '-u',

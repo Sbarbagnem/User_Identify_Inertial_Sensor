@@ -675,21 +675,21 @@ class Model():
         self.update_pred_based_on_act(
             temp_predictions_user, temp_label_user, temp_label_act)
 
-        if self.log:
-            print(
-                "\nTEST FINAL: loss_user: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
-                    self.valid_loss_user.result().numpy(),
-                    self.valid_accuracy_user.result().numpy(),
-                    metrics['macro_precision'],
-                    metrics['macro_recall'],
-                    metrics['macro_f1']))
+        print(
+            "\nTEST FINAL: loss_user: {:.5f}, acc_user: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
+                self.valid_loss_user.result().numpy(),
+                self.valid_accuracy_user.result().numpy(),
+                metrics['macro_precision'],
+                metrics['macro_recall'],
+                metrics['macro_f1']))
 
         # confusion matrix
-        df_cm = pd.DataFrame(cm.numpy(), index=[str(i) for i in range(0, self.dataset._user_num)],
-                             columns=[str(i) for i in range(0, self.dataset._user_num)])
-        plt.figure(figsize=(30, 21))
-        sn.heatmap(df_cm, annot=True)
-        plt.show()
+        if log:
+            df_cm = pd.DataFrame(cm.numpy(), index=[str(i) for i in range(0, self.dataset._user_num)],
+                                columns=[str(i) for i in range(0, self.dataset._user_num)])
+            plt.figure(figsize=(30, 21))
+            sn.heatmap(df_cm, annot=True)
+            plt.show()
 
     def plot_distribution_data(self, val_test=True):
 
