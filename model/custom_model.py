@@ -650,7 +650,7 @@ class Model():
         lr = self.optimizer.learning_rate
         return lr * self.drop_factor
 
-    def test_model(self):
+    def test_model(self, log=False):
 
         # reset variables for plot percentage error respect to activity
         self.final_pred_right_act = [0 for _ in np.arange(0, self.num_act)]

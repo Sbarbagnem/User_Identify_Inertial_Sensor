@@ -43,8 +43,8 @@ if __name__ == '__main__':
         default=False,
         help='bool to plot data augmented or not')
     parser.add_argument(
-        '-ppba',
-        '--plot_pred_base_act',
+        '-plot_pred_base_act_val',
+        '--plot_pred_base_act_val',
         type=str2bool,
         default=True,
         help='bool, if true plot percentage error of predictions based on activity at the end of train')
@@ -233,6 +233,20 @@ if __name__ == '__main__':
         help='bool, if true log all train history',
         default=True
     )
+    parser.add_argument(
+        '-print_model_summary',
+        '--print_model_summary',
+        type=str2bool,
+        help='bool, if true print summary of model choose',
+        default=False
+    )
+    parser.add_argument(
+        '-confusion_matrix',
+        '--confusion_matrix',
+        type=str2bool,
+        help='bool, if true print confusion matrix on test set',
+        default=False
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -246,76 +260,78 @@ if __name__ == '__main__':
             for multitask in [False]:
                 for overlap in [*args.overlap]:
                     for magnitude in [args.magnitude]:
-                        if magnitude:
-                            if dataset_name == 'sbhar_six_adl':
-                                outer_dir = 'OuterPartition_magnitude_sbhar_six_adl_'
-                            elif dataset_name == 'unimib_75w':
-                                outer_dir = 'OuterPartition_magnitude_wl_75_'
-                            elif dataset_name == 'unimib_128w' or dataset_name == 'sbhar_128w':
-                                outer_dir = 'OuterPartition_magnitude_wl_128_'
+                        for fold_test in [*args.fold_test]:
+                            if magnitude:
+                                if dataset_name == 'sbhar_six_adl':
+                                    outer_dir = 'OuterPartition_magnitude_sbhar_six_adl_'
+                                elif dataset_name == 'unimib_75w':
+                                    outer_dir = 'OuterPartition_magnitude_wl_75_'
+                                elif dataset_name == 'unimib_128w' or dataset_name == 'sbhar_128w':
+                                    outer_dir = 'OuterPartition_magnitude_wl_128_'
+                                else:
+                                    outer_dir = 'OuterPartition_magnitude_'
+                                save_dir = FOLDER_LOG + 'log_magnitude'
                             else:
-                                outer_dir = 'OuterPartition_magnitude_'
-                            save_dir = FOLDER_LOG + 'log_magnitude'
-                        else:
-                            outer_dir = 'OuterPartition_'
-                            save_dir = FOLDER_LOG + 'log_no_magnitude'
+                                outer_dir = 'OuterPartition_'
+                                save_dir = FOLDER_LOG + 'log_no_magnitude'
 
-                        save_dir = 'log'
+                            save_dir = 'log'
 
-                        model = Model(dataset_name=dataset_name,
-                                      configuration_file=configuration,
-                                      multi_task=multitask,
-                                      lr='dynamic',
-                                      model_type=model_type,
-                                      fold_test=args.fold_test,
-                                      save_dir=save_dir,
-                                      outer_dir=outer_dir +
-                                      str(overlap) + '/',
-                                      overlap=overlap,
-                                      magnitude=magnitude,
-                                      init_lr=args.init_lr,
-                                      drop_factor=args.drop_factor,
-                                      drop_epoch=args.drop_epoch,
-                                      path_best_model=args.path_best_model,
-                                      log=args.log)
+                            model = Model(dataset_name=dataset_name,
+                                        configuration_file=configuration,
+                                        multi_task=multitask,
+                                        lr='dynamic',
+                                        model_type=model_type,
+                                        fold_test=fold_test,
+                                        save_dir=save_dir,
+                                        outer_dir=outer_dir +
+                                        str(overlap) + '/',
+                                        overlap=overlap,
+                                        magnitude=magnitude,
+                                        init_lr=args.init_lr,
+                                        drop_factor=args.drop_factor,
+                                        drop_epoch=args.drop_epoch,
+                                        path_best_model=args.path_best_model,
+                                        log=args.log)
 
-                        model.create_dataset(args.run_colab, args.colab_path)
+                            model.create_dataset(args.run_colab, args.colab_path)
 
-                        model.load_data(
-                            only_acc=args.only_acc)
+                            model.load_data(
+                                only_acc=args.only_acc)
 
-                        if args.unify:
-                            model.unify_act(
-                                model.configuration.sbhar_mapping[args.unify_method])
+                            if args.unify:
+                                model.unify_act(
+                                    model.configuration.sbhar_mapping[args.unify_method])
 
-                        # plot original distribution data train and test
-                        if args.plot:
-                            model.plot_distribution_data(val_test=True)
+                            # plot original distribution data train and test
+                            if args.plot:
+                                model.plot_distribution_data(val_test=True)
 
-                        if args.augmented:
-                            model.augment_data(
-                                function_to_apply=args.aug_function,
-                                augmented_par=args.augmented_par,
-                                compose=args.compose,
-                                only_compose=args.only_compose,
-                                plot_augmented=args.plot_augmented,
-                                ratio_random_transformations=args.ratio,
-                                n_func_to_apply=args.n_func_to_apply)
-                            model.plot_distribution_data(val_test=False)
+                            if args.augmented:
+                                model.augment_data(
+                                    function_to_apply=args.aug_function,
+                                    augmented_par=args.augmented_par,
+                                    compose=args.compose,
+                                    only_compose=args.only_compose,
+                                    plot_augmented=args.plot_augmented,
+                                    ratio_random_transformations=args.ratio,
+                                    n_func_to_apply=args.n_func_to_apply)
+                                model.plot_distribution_data(val_test=False)
 
-                        model.normalize_data()
+                            model.normalize_data()
 
-                        # tf dataset to weight sample in train set
-                        model.tf_dataset(args.weighted_based_on, args.weighted)
+                            # tf dataset to weight sample in train set
+                            model.tf_dataset(args.weighted_based_on, args.weighted)
 
-                        if args.train:
-                            model.build_model()
-                            model.print_model_summary()
-                            model.loss_opt_metric()
-                            model.train_model(args.epochs)
-                            if args.plot_pred_base_act:
-                                model.plot_pred_based_act(title='percentage error in validation best seen')
-                                model.test_model()
+                            if args.train:
+                                model.build_model()
+                                if args.print_model_summary:
+                                    model.print_model_summary()
+                                model.loss_opt_metric()
+                                model.train_model(args.epochs)
+                                if args.plot_pred_base_act_val:
+                                    model.plot_pred_based_act(title='percentage error in validation best seen')
+                                model.test_model(log=args.confusion_matrix)
                                 model.plot_pred_based_act(title='percentage error in test set')
-                            if args.save_best_model:
-                                model.best_model.save_weights(filepath=args.path_best_model, overwrite=True, save_format=None)
+                                if args.save_best_model:
+                                    model.best_model.save_weights(filepath=args.path_best_model, overwrite=True, save_format=None)
