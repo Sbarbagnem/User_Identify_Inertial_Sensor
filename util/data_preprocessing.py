@@ -15,19 +15,15 @@ from sliding_window import sliding_window
 from utils import str2bool
 
 
-def preprocessing(dataset, path, path_out, save_dir="", sensors_type='acc_gyro_magn', positions='all', magnitude=False, size_overlapping=0.5, win_len=100, six_adl=False):
-
-    if dataset == 'unimib':
-        unimib_process(path, path_out, magnitude, size_overlapping, win_len)
-    elif dataset == 'sbhar':
-        sbhar_process(path, path_out, magnitude,
-                      size_overlapping, win_len, six_adl)
-    elif dataset == 'realdisp':
-        realdisp_process(path, path_out, save_dir, sensors_type,
-                         positions, magnitude, size_overlapping)
-
-
-def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', positions='all', magnitude=True, size_overlapping=0.5):
+def realdisp_process(
+        path_data,
+        path_out,
+        save_dir,
+        sensors_type='acc_gyro_magn',
+        positions='all',
+        magnitude=True,
+        size_overlapping=0.5,
+        win_len=100):
     '''
         positions:  list of positions sensor to consider in preprocessing.
                     If "all" parameter is passed no filter to position will
@@ -47,16 +43,15 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
 
     print('Processing realdisp dataset')
 
-    root_path = path + 'REALDISP'
-    raw_data_path = root_path + '/'
+    raw_data_path = path_data
     if magnitude:
         processed_path = path_out + \
             'OuterPartition_magnitude_{}_{}'.format(
-                sensors_type, str(size_overlapping*10))
+                sensors_type, str(size_overlapping * 10))
     else:
         processed_path = path_out + \
             'OuterPartition_{}_{}'.format(
-                sensors_type, str(size_overlapping*10))
+                sensors_type, str(size_overlapping * 10))
 
     win_len = 100
     channel = 3
@@ -101,8 +96,12 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
 
             # delete orientation quaternion
             for _ in range(9):
-                sensors = np.delete(sensors, np.arange(
-                    (offset*step) + offset, (offset*step) + offset + to_del), axis=1)
+                sensors = np.delete(
+                    sensors,
+                    np.arange(
+                        (offset * step) + offset,
+                        (offset * step) + offset + to_del),
+                    axis=1)
                 step += 1
 
             step = 0
@@ -110,39 +109,39 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
             # filter positions based on parameter positions
             if positions != 'all':
                 if 'RLA' not in positions:
-                    acc_gyro = acc_gyro[:, step*offset:]
+                    acc_gyro = acc_gyro[:, step * offset:]
                 else:
                     step += 1
                 if 'RUA' not in positions:
-                    acc_gyro = acc_gyro[:, step*offset:]
+                    acc_gyro = acc_gyro[:, step * offset:]
                 else:
                     step += 1
                 if 'BACK' not in positions:
-                    acc_gyro = acc_gyro[:, step*offset:]
+                    acc_gyro = acc_gyro[:, step * offset:]
                 else:
                     step += 1
                 if 'LUA' not in positions:
-                    acc_gyro = acc_gyro[:, step*offset:]
+                    acc_gyro = acc_gyro[:, step * offset:]
                 else:
                     step += 1
                 if 'LLA' not in positions:
-                    acc_gyro = acc_gyro[:, step*offset:]
+                    acc_gyro = acc_gyro[:, step * offset:]
                 else:
                     step += 1
                 if 'RC' not in positions:
-                    acc_gyro = acc_gyro[:, step*offset:]
+                    acc_gyro = acc_gyro[:, step * offset:]
                 else:
                     step += 1
                 if 'RT' not in positions:
-                    acc_gyro = acc_gyro[:, step*offset:]
+                    acc_gyro = acc_gyro[:, step * offset:]
                 else:
                     step += 1
                 if 'LT' not in positions:
-                    acc_gyro = acc_gyro[:, step*offset:]
+                    acc_gyro = acc_gyro[:, step * offset:]
                 else:
                     step += 1
                 if 'LC' not in positions:
-                    acc_gyro = acc_gyro[:, step*offset:]
+                    acc_gyro = acc_gyro[:, step * offset:]
 
             sensors = np.concatenate((sensors, activities), axis=1)
 
@@ -163,11 +162,11 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
                 # sliding window on every of 9 sensor
                 for i in range(9):
 
-                    acc = temp[:, offset*step:(step*offset)+3]
-                    gyro = temp[:, 3+(offset*step):(step*offset)+6]
+                    acc = temp[:, offset * step:(step * offset) + 3]
+                    gyro = temp[:, 3 + (offset * step):(step * offset) + 6]
 
                     if use_magn:
-                        magn = temp[:, 6+(offset*step):(step*offset)+9]
+                        magn = temp[:, 6 + (offset * step):(step * offset) + 9]
 
                     if magnitude:
                         acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
@@ -180,13 +179,14 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
 
                     # concat sensor and sliding only one time
                     merge_sensor = np.concatenate(
-                        (acc, gyro), axis=1) if not use_magn else np.concatenate((acc, gyro, magn), axis=1)
+                        (acc, gyro), axis=1) if not use_magn else np.concatenate(
+                        (acc, gyro, magn), axis=1)
                     _data_windows = sliding_window(
-                        merge_sensor, (win_len, merge_sensor.shape[1]), (int(win_len/2), 1))
+                        merge_sensor, (win_len, merge_sensor.shape[1]), (int(win_len / 2), 1))
 
                     # id for every window
                     _id = np.arange(
-                        ID_generater, ID_generater+len(_data_windows))
+                        ID_generater, ID_generater + len(_data_windows))
                     # concat verticaly every window
                     data.append(_data_windows)
                     ID.extend(_id)
@@ -197,16 +197,16 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
                 ID_generater = ID_generater + len(_data_windows) + 10
 
                 # update la
-                _la = [int(id_act)-1] * (len(ID)-len(la))
+                _la = [int(id_act) - 1] * (len(ID) - len(la))
                 la.extend(_la)
 
             # update gloabl variabel lu
-            _lu = [int(id_user)-1] * (len(ID)-len(lu))
+            _lu = [int(id_user) - 1] * (len(ID) - len(lu))
             lu.extend(_lu)
 
     # define array dimension for data and labels
     data_array = np.zeros(
-        [len(lu), win_len, channel*number_sensor], dtype=np.float)
+        [len(lu), win_len, channel * number_sensor], dtype=np.float)
     la_array = np.zeros([len(lu)], dtype=np.int32)
     lu_array = np.zeros([len(lu)], dtype=np.int32)
     ID_array = np.zeros([len(lu)], dtype=np.int32)
@@ -238,35 +238,40 @@ def realdisp_process(path, path_out, save_dir, sensors_type='acc_gyro_magn', pos
     for i in range(10):
 
         # clear dir
-        if os.path.exists(processed_path+'/fold{}'.format(i)):
-            shutil.rmtree(processed_path+'/fold{}'.format(i))
-        os.mkdir(processed_path+'/fold{}'.format(i))
+        if os.path.exists(processed_path + '/fold{}'.format(i)):
+            shutil.rmtree(processed_path + '/fold{}'.format(i))
+        os.mkdir(processed_path + '/fold{}'.format(i))
 
         #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
         idx = indexes[str(i)]
-        np.save(processed_path+'/fold{}/data'.format(i),       data[idx])
-        np.save(processed_path+'/fold{}/user_label'.format(i), lu[idx])
-        np.save(processed_path+'/fold{}/act_label'.format(i),  la[idx])
-        np.save(processed_path+'/fold{}/id'.format(i),         ID[idx])
+        np.save(processed_path + '/fold{}/data'.format(i), data[idx])
+        np.save(processed_path + '/fold{}/user_label'.format(i), lu[idx])
+        np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
+        np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
 
 
-def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl=False):
+def sbhar_process(
+        path_data,
+        path_out,
+        magnitude,
+        size_overlapping,
+        win_len,
+        six_adl=False):
     print('Processing sbhar dataset')
 
-    root_path = path + 'SBHAR'
-    raw_data_path = root_path + '/RawData/'
+    raw_data_path = path_data + 'RawData/'
     if magnitude:
         if six_adl:
             processed_path = path_out + \
                 'OuterPartition_magnitude_sbhar_six_adl_{}'.format(
-                    str(size_overlapping*10))
+                    str(size_overlapping * 10))
         else:
             processed_path = path_out + \
                 'OuterPartition_magnitude_{}'.format(
-                    str(size_overlapping*10))
+                    str(size_overlapping * 10))
     else:
         processed_path = path_out + \
-            'OuterPartition_{}'.format(str(size_overlapping*10))
+            'OuterPartition_{}'.format(str(size_overlapping * 10))
     if win_len != 100:
         processed_path = processed_path + f'_wl_{win_len}'
     #win_len = 100
@@ -285,11 +290,12 @@ def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl=
     if not os.path.exists(path_out):
         os.mkdir(path_out)
 
-    # read labels.txt with inf about data (id_exp, id_usr, id_activity, start_sample, stop_sample)
+    # read labels.txt with inf about data (id_exp, id_usr, id_activity,
+    # start_sample, stop_sample)
     info = np.loadtxt(fname=raw_data_path + 'labels.txt')
 
     # for subject
-    for id_user in np.unique(info[:, 1]):
+    for id_user in tqdm(np.unique(info[:, 1])):
         user_info = info[np.where(info[:, 1] == int(id_user))]
 
         # for activity
@@ -338,25 +344,25 @@ def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl=
             # sliding window
             try:
                 _data_windows_acc = sliding_window(
-                    acc, (win_len, channel), (int(win_len*(1-size_overlapping)), 1))              
-            except:
+                    acc, (win_len, channel), (int(win_len * (1 - size_overlapping)), 1))
+            except BaseException:
                 print("Not enough data for sliding window")
-            invalid_idx = np.where(np.any(
-                np.isnan(np.reshape(_data_windows_acc, [-1, win_len*channel])), axis=1))[0]
+            invalid_idx = np.where(np.any(np.isnan(np.reshape(
+                _data_windows_acc, [-1, win_len * channel])), axis=1))[0]
             _data_windows_acc = np.delete(
                 _data_windows_acc, invalid_idx, axis=0)
 
             _data_windows_gyro = sliding_window(
-                gyro, (win_len, channel), (int(win_len*(1-size_overlapping)), 1))
-            invalid_idx = np.where(np.any(
-                np.isnan(np.reshape(_data_windows_gyro, [-1, win_len*channel])), axis=1))[0]
+                gyro, (win_len, channel), (int(win_len * (1 - size_overlapping)), 1))
+            invalid_idx = np.where(np.any(np.isnan(np.reshape(
+                _data_windows_gyro, [-1, win_len * channel])), axis=1))[0]
             _data_windows_gyro = np.delete(
                 _data_windows_gyro, invalid_idx, axis=0)
 
             try:
                 acc_gyro = np.concatenate(
                     (_data_windows_acc, _data_windows_gyro), axis=2)
-            except:
+            except BaseException:
                 print("There is only one sliding window")
                 acc_gyro = np.concatenate(
                     (_data_windows_acc, _data_windows_gyro), axis=1)
@@ -371,16 +377,16 @@ def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl=
             ID_generater = ID_generater + len(acc_gyro) + 10
 
             # label activity for every window
-            _la = [int(id_act)-1] * (len(ID)-len(la))
+            _la = [int(id_act) - 1] * (len(ID) - len(la))
             la.extend(_la)
 
         # update gloabl variabel lu
-        _lu = [int(id_user)-1] * (len(ID)-len(lu))
+        _lu = [int(id_user) - 1] * (len(ID) - len(lu))
         lu.extend(_lu)
 
     # define array dimension for data and labels
     data_array = np.zeros(
-        [len(lu), win_len, channel*number_sensor], dtype=np.float)
+        [len(lu), win_len, channel * number_sensor], dtype=np.float)
     la_array = np.zeros([len(lu)], dtype=np.int32)
     lu_array = np.zeros([len(lu)], dtype=np.int32)
     ID_array = np.zeros([len(lu)], dtype=np.int32)
@@ -421,29 +427,28 @@ def sbhar_process(path, path_out, magnitude, size_overlapping, win_len, six_adl=
     for i in range(10):
 
         # clear dir
-        if os.path.exists(processed_path+'/fold{}'.format(i)):
-            shutil.rmtree(processed_path+'/fold{}'.format(i))
-        os.mkdir(processed_path+'/fold{}'.format(i))
+        if os.path.exists(processed_path + '/fold{}'.format(i)):
+            shutil.rmtree(processed_path + '/fold{}'.format(i))
+        os.mkdir(processed_path + '/fold{}'.format(i))
 
         idx = indexes[str(i)]
-        np.save(processed_path+'/fold{}/data'.format(i),       data_array[idx])
-        np.save(processed_path+'/fold{}/user_label'.format(i), lu_array[idx])
-        np.save(processed_path+'/fold{}/act_label'.format(i),  la_array[idx])
-        np.save(processed_path+'/fold{}/id'.format(i),         ID_array[idx])
+        np.save(processed_path + '/fold{}/data'.format(i), data_array[idx])
+        np.save(processed_path + '/fold{}/user_label'.format(i), lu_array[idx])
+        np.save(processed_path + '/fold{}/act_label'.format(i), la_array[idx])
+        np.save(processed_path + '/fold{}/id'.format(i), ID_array[idx])
 
 
-def unimib_process(path, path_out, magnitude, size_overlapping, win_len):
+def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len):
     print('Processing unimib dataset')
 
-    root_path = path + 'unimib_dataset'
-    raw_data_path = root_path + '/data/'
+    raw_data_path = path_data + 'data/'
     if magnitude:
         processed_path = path_out + \
             'OuterPartition_magnitude_{}'.format(
-                str(size_overlapping*10))
+                str(size_overlapping * 10))
     else:
         processed_path = path_out + \
-            'OuterPartition_{}'.format(str(size_overlapping*10))
+            'OuterPartition_{}'.format(str(size_overlapping * 10))
     if win_len != 100:
         processed_path = processed_path + f'_wl_{win_len}'
 
@@ -461,8 +466,24 @@ def unimib_process(path, path_out, magnitude, size_overlapping, win_len):
 
     signal = loadmat(raw_data_path + 'full_data.mat')['full_data']
 
-    activity_table = ['StandingUpFS', 'StandingUpFL', 'Walking', 'Running', 'GoingUpS', 'Jumping', 'GoingDownS', 'LyingDownFS', 'SittingDown',
-                      'FallingForw', 'FallingRight', 'FallingBack', 'HittingObstacle', 'FallingWithPS', 'FallingBackSC', 'Syncope', 'FallingLeft']
+    activity_table = [
+        'StandingUpFS',
+        'StandingUpFL',
+        'Walking',
+        'Running',
+        'GoingUpS',
+        'Jumping',
+        'GoingDownS',
+        'LyingDownFS',
+        'SittingDown',
+        'FallingForw',
+        'FallingRight',
+        'FallingBack',
+        'HittingObstacle',
+        'FallingWithPS',
+        'FallingBackSC',
+        'Syncope',
+        'FallingLeft']
 
     # id subject
     for sid in range(30):
@@ -478,24 +499,24 @@ def unimib_process(path, path_out, magnitude, size_overlapping, win_len):
                     _data = signal[sid, 0][0, 0][act][tid, 0][0:3, :]
                 _data = np.transpose(_data)
                 _data_windows = sliding_window(
-                    _data, (win_len, channel), (int(win_len*(1-size_overlapping)), 1))
-                invalid_idx = np.where(
-                    np.any(np.isnan(np.reshape(_data_windows, [-1, win_len*channel])), axis=1))[0]  # delete window with NaN sample
+                    _data, (win_len, channel), (int(win_len * (1 - size_overlapping)), 1))
+                invalid_idx = np.where(np.any(np.isnan(np.reshape(
+                    _data_windows, [-1, win_len * channel])), axis=1))[0]  # delete window with NaN sample
                 _data_windows = np.delete(_data_windows, invalid_idx, axis=0)
                 _id = np.arange(ID_generater, ID_generater +
                                 len(_data_windows))  # id for every window
 
                 # concat verticaly every window
                 data = np.concatenate((data, _data_windows), axis=0)
-                ID = np.concatenate((ID,   _id), axis=0)
+                ID = np.concatenate((ID, _id), axis=0)
                 ID_generater = ID_generater + len(_data_windows) + 10
 
             # label activity for every window
-            _la = np.full(len(data)-len(la), aid, dtype=np.int32)
+            _la = np.full(len(data) - len(la), aid, dtype=np.int32)
             la = np.concatenate((la, _la), axis=0)
 
         # label user for every window
-        _lu = np.full(len(data)-len(lu), sid, dtype=np.int32)
+        _lu = np.full(len(data) - len(lu), sid, dtype=np.int32)
         lu = np.concatenate((lu, _lu), axis=0)
 
     if not os.path.exists(processed_path + '/'):
@@ -514,16 +535,16 @@ def unimib_process(path, path_out, magnitude, size_overlapping, win_len):
     for i in range(10):
 
         # clear dir
-        if os.path.exists(processed_path+'/fold{}'.format(i)):
-            shutil.rmtree(processed_path+'/fold{}'.format(i))
-        os.mkdir(processed_path+'/fold{}'.format(i))
+        if os.path.exists(processed_path + '/fold{}'.format(i)):
+            shutil.rmtree(processed_path + '/fold{}'.format(i))
+        os.mkdir(processed_path + '/fold{}'.format(i))
 
         #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
         idx = indexes[str(i)]
-        np.save(processed_path+'/fold{}/data'.format(i),       data[idx])
-        np.save(processed_path+'/fold{}/user_label'.format(i), lu[idx])
-        np.save(processed_path+'/fold{}/act_label'.format(i),  la[idx])
-        np.save(processed_path+'/fold{}/id'.format(i),         ID[idx])
+        np.save(processed_path + '/fold{}/data'.format(i), data[idx])
+        np.save(processed_path + '/fold{}/user_label'.format(i), lu[idx])
+        np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
+        np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
 
 
 def split_balanced_data(lu, la, folders=10):
@@ -552,7 +573,7 @@ def split_balanced_data(lu, la, folders=10):
                     if len(temp_index_label_act) > 0:
                         indexes[str(folder)].append(temp_index_label_act[0])
                         del temp_index_label_act[0]
-                        if folder == folders-1:
+                        if folder == folders - 1:
                             last_folder = 0
                         else:
                             last_folder = folder
@@ -571,8 +592,8 @@ def plt_user_distribution(dict_indexes, lu):
     plt.style.use('seaborn-darkgrid')
 
     for folder in np.arange(len(dict_indexes)):
-        plt.subplot(2, 5, folder+1)
-        plt.title('folder {}'.format(folder+1))
+        plt.subplot(2, 5, folder + 1)
+        plt.title('folder {}'.format(folder + 1))
         folder_index = dict_indexes[str(folder)]
         user_distributions = []
         for user in np.unique(lu):
@@ -592,8 +613,8 @@ def plt_act_distribution(dict_indexes, la):
     plt.style.use('seaborn-darkgrid')
 
     for folder in np.arange(len(dict_indexes)):
-        plt.subplot(2, 5, folder+1)
-        plt.title('folder {}'.format(folder+1))
+        plt.subplot(2, 5, folder + 1)
+        plt.title('folder {}'.format(folder + 1))
         folder_index = dict_indexes[str(folder)]
         act_distributions = []
         for act in np.unique(la):
@@ -610,12 +631,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="preprocessing pipeline for signal")
 
-    parser.add_argument('-d', '--dataset', type=str, choices=[
-                        'unimib', 'sbhar', 'sbhar_six_adl', 'realdisp', 'ouisir'], help='dataset to preprocessing', required=False)
+    parser.add_argument(
+        '-dataset',
+        '--dataset',
+        type=str,
+        choices=[
+            'unimib',
+            'sbhar',
+            'sbhar_six_adl',
+            'realdisp',
+            'ouisir'],
+        help='dataset to preprocessing',
+        required=False)
     parser.add_argument('-p', '--path', type=str,
                         default='../data/datasets/', help='path to dataset')
-    parser.add_argument('-o', '--out', type=str, default='../data/datasets/UNIMIBDataset/',
-                        help='path to store data preprocessed')
     parser.add_argument('-win_len', '--win_len', type=int,
                         default=100, help='windows slice len')
     parser.add_argument(
@@ -624,7 +653,6 @@ if __name__ == '__main__':
         type=float,
         nargs='+',
         default=[0.5],
-        choices=[0.5, 0.6, 0.7, 0.8, 0.9],
         help='overlap in sliding window')
     parser.add_argument(
         '-magnitude',
@@ -637,8 +665,36 @@ if __name__ == '__main__':
     args = parser.parse_args()
     for magnitude in [args.magnitude]:
         for overlap in [*args.overlap]:
-            #preprocessing("unimib", "../data/datasets/", "../data/datasets/UNIMIBDataset/", magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len)
-            preprocessing("sbhar", "../data/datasets/", "../data/datasets/SBHAR_processed/",
-                          magnitude=magnitude, size_overlapping=overlap, win_len=args.win_len, six_adl=True)
-            # preprocessing('realdisp', "../data/datasets/", "../data/datasets/REALDISP_processed/", sensors_type="acc_gyro_magn",
-            #              save_dir='', positions="all", magnitude=magnitude, size_overlapping=overlap)
+            if args.dataset == 'unimib':
+                unimib_process(
+                    path_data="../data/datasets/unimib_dataset/",
+                    path_out="../data/datasets/UNIMIBDataset/",
+                    magnitude=magnitude,
+                    size_overlapping=overlap,
+                    win_len=args.win_len)
+            elif args.dataset == 'sbhar':
+                sbhar_process(
+                    path_data="../data/datasets/RawData/",
+                    path_out="../data/datasets/SBHAR_processed/",
+                    magnitude=magnitude,
+                    size_overlapping=overlap,
+                    win_len=args.win_len,
+                    six_adl=False)
+            elif args.dataset == 'sbhar_six_adl':
+                sbhar_process(
+                    path_data="../data/datasets/",
+                    path_out="../data/datasets/SBHAR_processed/",
+                    magnitude=magnitude,
+                    size_overlapping=overlap,
+                    win_len=args.win_len,
+                    six_adl=True)
+            elif args.dataset == 'realdisp':
+                realdisp_process(
+                    path_data="../data/datasets/REALDISP/",
+                    path_out="../data/datasets/REALDISP_processed/",
+                    sensors_type="acc_gyro_magn",
+                    save_dir='',
+                    positions="all",
+                    magnitude=magnitude,
+                    size_overlapping=overlap,
+                    win_len = args.win_len)
