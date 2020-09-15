@@ -18,7 +18,6 @@ from utils import str2bool
 def realdisp_process(
         path_data,
         path_out,
-        save_dir,
         sensors_type='acc_gyro_magn',
         positions='all',
         magnitude=True,
@@ -693,7 +692,6 @@ if __name__ == '__main__':
                     path_data="../data/datasets/REALDISP/",
                     path_out="../data/datasets/REALDISP_processed/",
                     sensors_type="acc_gyro_magn",
-                    save_dir='',
                     positions="all",
                     magnitude=magnitude,
                     size_overlapping=overlap,
