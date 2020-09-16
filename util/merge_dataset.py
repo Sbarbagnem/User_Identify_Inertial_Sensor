@@ -3,6 +3,7 @@ import os
 import shutil
 from sklearn import utils as skutils
 import matplotlib.pyplot as plt
+import sys
 
 from configuration import config
 from data_preprocessing import split_balanced_data, plt_user_distribution, plt_act_distribution
@@ -51,10 +52,13 @@ def read_outer_partition(dataset, path_outer, magnitude=True, overlap=5.0):
 def uniform_user_index(list_user, list_act, list_index):
 
     for i in range(len(list_user))[1:]:
+        # user
         max_temp = np.max(list_user[i-1])
         list_user[i] = list(list_user[i] + max_temp + 1)
+        # act
         max_temp = np.max(list_act[i-1])
         list_act[i] = list(list_act[i] + max_temp + 1)
+        # id sequence
         max_temp = np.max(list_index[i-1])
         list_index[i] = list(list_index[i] + max_temp)
 
@@ -62,6 +66,7 @@ def uniform_user_index(list_user, list_act, list_index):
     list_user = [item for sublist in list_user for item in sublist]
     list_index = [item for sublist in list_index for item in sublist]
     list_act = [item for sublist in list_act for item in sublist]
+
     return list_user, list_act, list_index
 
 def save_mergede_dataset(path_to_save, data, lu, la, idx):

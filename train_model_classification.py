@@ -128,7 +128,8 @@ if __name__ == '__main__':
             'resnet18_1D',
             'resnet18_2D',
             'resnet18_lstm_parallel',
-            'resnet18_lstm_consecutive'],
+            'resnet18_lstm_consecutive',
+            'resnet18_multi_branch'],
         default='resnet18_2D',
         help='define model to train')
     parser.add_argument('-init_lr', '--init_lr', type=float,
@@ -323,10 +324,11 @@ if __name__ == '__main__':
                             # tf dataset to weight sample in train set
                             model.tf_dataset(args.weighted_based_on, args.weighted)
 
+                            model.build_model()
+                            if args.print_model_summary:
+                                model.print_model_summary()
+
                             if args.train:
-                                model.build_model()
-                                if args.print_model_summary:
-                                    model.print_model_summary()
                                 model.loss_opt_metric()
                                 model.train_model(args.epochs)
                                 if args.plot_pred_base_act_val:
