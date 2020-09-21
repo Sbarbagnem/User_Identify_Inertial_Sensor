@@ -325,7 +325,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
     '''
 
     if n_func_to_apply > len(function_to_apply):
-        sys.exit('Fcuntion to apply must be <= to number of possible function choosen')
+        sys.exit('Function to apply must be <= to number of possible function choosen')
 
     to_add, distribution = samples_to_add(labels_user, labels_activity) # per avere lo stesso numero di esempi per ogni utente
 
@@ -436,6 +436,8 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                     if log and len(transformations) > 0:
                         plt.figure(figsize=(12, 3))
                         for j, sensor_axis in enumerate(idx):
+                            if sensor_axis == [3,4,5]:
+                                sensor_axis = [4,5,6]
                             plt.style.use('seaborn-darkgrid')
                             if only_compose:
                                 plt.subplot(len(idx), 2, 1+2*(j))
@@ -468,9 +470,6 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                             else:
                                 all_transf = functions_transformation[key_func](all_transf).reshape(
                                     1, seq.shape[1], len(idx_flatten))  # (1,100,6)
-
-                        # seq (1,100,axis)
-                        # seq[:,:,idx_flatten] (1,100,axis-magnitude)
                         
                         if not only_compose:
                             ret = functions_transformation[key_func](
@@ -486,6 +485,8 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                                                 sensor_axis[-1]+1] = magnitude
                             if log:
                                 for h, sensor_axis in enumerate(idx):
+                                    if sensor_axis == [3,4,5]:
+                                        sensor_axis = [4,5,6]
                                     plt.style.use('seaborn-darkgrid')
                                     if compose:
                                         plt.subplot(len(idx), n_func_to_apply + 2, j+2+( (n_func_to_apply + 2) * h ))
@@ -520,28 +521,32 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                     if log and applied and len(all_transf) > 0:
                         if not only_compose:
                             for j, sensor_axis in enumerate(idx):
+                                if sensor_axis == [3,4,5]:
+                                    sensor_axis = [4,5,6]
                                 plt.style.use('seaborn-darkgrid')
                                 plt.subplot(len(idx), n_func_to_apply + 2, (n_func_to_apply + 2) + (n_func_to_apply + 2)*(j))
                                 plt.title(
                                     'all transformations on same sequence acc')
                                 plt.plot(
-                                    steps, all_transf[0, :, sensor_axis[0]], 'b-', label='x')
+                                    steps, transformed[past-1, :, sensor_axis[0]], 'b-', label='x')
                                 plt.plot(
-                                    steps, all_transf[0, :, sensor_axis[1]], 'g-', label='y')
+                                    steps, transformed[past-1, :, sensor_axis[1]], 'g-', label='y')
                                 plt.plot(
-                                    steps, all_transf[0, :, sensor_axis[2]], 'r-', label='z')
+                                    steps, transformed[past-1, :, sensor_axis[2]], 'r-', label='z')
                         if only_compose:
                             for j, sensor_axis in enumerate(idx):
+                                if sensor_axis == [3,4,5]:
+                                    sensor_axis = [4,5,6]
                                 plt.style.use('seaborn-darkgrid')
                                 plt.subplot(len(idx), 2, 2+2*(j))
                                 plt.title(
                                     f'{", ".join(all_transf_label)} on the same sequence acc')
                                 plt.plot(
-                                    steps, all_transf[0, :, sensor_axis[0]], 'b-', label='x')
+                                    steps, transformed[past-1, :, sensor_axis[0]], 'b-', label='x')
                                 plt.plot(
-                                    steps, all_transf[0, :, sensor_axis[1]], 'g-', label='y')
+                                    steps, transformed[past-1, :, sensor_axis[1]], 'g-', label='y')
                                 plt.plot(
-                                    steps, all_transf[0, :, sensor_axis[2]], 'r-', label='z')                   
+                                    steps, transformed[past-1, :, sensor_axis[2]], 'r-', label='z')                   
 
                     if log and applied:
                         plt.tight_layout()

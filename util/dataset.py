@@ -110,7 +110,7 @@ class Dataset(object):
         TrainLA = TrainLA[idx_train]
         TrainLU = TrainLU[idx_train]
 
-        print('Shape train data after deleted overlap sequence from val set: ', TrainData.shape)
+        print('Shape train data after split train and val: ', TrainData.shape)
         print('Shape val data : ', ValidData.shape)
         print('Shape test data: ', TestData.shape)
         

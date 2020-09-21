@@ -12,7 +12,7 @@ data/datasets/unimib_dataset
 data/datasets/merged_unimib_sbhar
 data/datasets/REALDISP_processed/OuterPartition*
 data/datasets/SBHAR_processed/OuterPartition*
-data/datasets/UNIMIBDataset/OuterPartition*
+data/datasets/UNIMIB_processed/OuterPartition*
 data/parameters/
 log*
 prova_lr.py

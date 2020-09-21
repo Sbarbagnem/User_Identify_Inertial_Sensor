@@ -4,6 +4,8 @@ import zipfile
 import argparse
 import sys
 from tqdm import tqdm
+import pandas as pd
+from pprint import pprint
 
 import numpy as np
 from scipy import stats
@@ -18,51 +20,58 @@ from utils import str2bool
 def realdisp_process(
         path_data,
         path_out,
-        sensors_type='acc_gyro_magn',
-        positions='all',
+        sensors_type=['acc', 'gyro', 'magn'],
+        positions=['all'],
+        sensors_displacement=['ideal'],
         magnitude=True,
         size_overlapping=0.5,
         win_len=100):
     '''
-        positions:  list of positions sensor to consider in preprocessing.
-                    If "all" parameter is passed no filter to position will
-                    be apply.
+        positions:  list to filter positions on sensors. If "all" parameter is passed no filter to position will be apply.
     '''
 
     '''
-        structure of log file in dataset (120 columns):
-            1       -> trial's number
-            2       -> timestamp in microseconds
-            3:119   -> data from sensors
-                order positions -> RLA | RUA | BACK | LUA | LLA | RC | RT | LT | LC
-                    for every postion   -> acc:[x,y,z] gyr:[x,y,z] mag:[x,y,z] quat:[1,2,3,4]
-            120     -> id activity (0 if unknown)
+        Data in log file subject{id}_{sensors_displacement}.log
+        Structure of log file in dataset (120 columns):
+            0       -> trial's number (second)
+            1       -> timestamp in microseconds
+            2:118   -> data from sensors
+                        order positions     -> RLA | RUA | BACK | LUA | LLA | RC | RT | LT | LC
+                        for every postion   -> acc:[x,y,z] gyr:[x,y,z] mag:[x,y,z] quat:[1,2,3,4]
+            119     -> id activity (0 if unknown)
 
     '''
+
+    places = ['RLA', 'RUA', 'BACK', 'LUA', 'LLA', 'RC', 'RT', 'LT', 'LC']
+    sensors = ['acc', 'gyro', 'magn', 'quat']
+    axis = [['x', 'y', 'z'], ['x', 'y', 'z'],
+            ['x', 'y', 'z'], ['1', '2', '3', '4']]
+
+    HEADER = ['sec', 'microsec']
+    HEADER.extend(['_'.join([place, sensor, a]) for place in places  for sensor, ax in zip(sensors, axis) for a in ax])
+    HEADER.extend(['act'])
 
     print('Processing realdisp dataset')
 
     raw_data_path = path_data
     if magnitude:
         processed_path = path_out + \
-            'OuterPartition_magnitude_{}_{}'.format(
-                sensors_type, str(size_overlapping * 10))
+            'OuterPartition_magnitude_{}_{}_{}'.format(
+                '_'.join(sensors_type), '_'.join(sensors_displacement), str(size_overlapping * 10))
     else:
         processed_path = path_out + \
-            'OuterPartition_{}_{}'.format(
-                sensors_type, str(size_overlapping * 10))
+            'OuterPartition_{}_{}_{}'.format(
+                '_'.join(sensors_type), '_'.join(sensors_displacement), str(size_overlapping * 10))
 
-    win_len = 100
+    if win_len != 100:
+        processed_path = processed_path + f'_wl_{win_len}'
     channel = 3
     ID_generater = 1
 
     if magnitude:
         channel = 4
 
-    if sensors_type == 'acc_gyro_magn':
-        number_sensor = 3
-    else:
-        number_sensor = 2
+    number_sensor = len(sensors_type)
 
     data = []
     la = []
@@ -72,116 +81,68 @@ def realdisp_process(
     if not os.path.exists(processed_path):
         os.makedirs(processed_path)
 
+    zero_act = 0
+    total_data = 0
+
     for fl in tqdm(os.listdir(raw_data_path)):
-        if fl.startswith('subject'):
-            log_file = np.loadtxt(fname=raw_data_path + fl)
+        if fl.startswith('subject') and any(displace in fl for displace in sensors_displacement): # filter based on displacement choosen
+            log_file = pd.DataFrame(pd.read_table(raw_data_path + fl).values, columns=HEADER)
+            log_file.drop(['sec', 'microsec'], inplace=True, axis=1)
+            log_file = log_file.astype({"act": int})
             id_user = int(fl.split('_')[0].split('subject')[1])
+            zero_act += log_file[log_file['act'] == 0].shape[0]
+            total_data += log_file.shape[0]
+            # delete sample with act == 0 (unkwnown)
+            log_file = log_file[log_file.act != 0]
+            activities = np.unique(log_file.act)
 
-            # take only acc and gyro data
-            sensors = log_file[:, 2:-1]
-            activities = log_file[:, -1].astype('int32')
-            activities = activities.reshape(sensors.shape[0], 1)
+            # filter based on position sensor choosen (BACK, RLA, RUA, ...) and sensor tyep (acc, gyro, ...)
+            mask_place = [pos in positions for pos in places]
+            mask_sensor = [sensor in sensors_type for sensor in sensors]
 
-            step = 0
+            places_temp = np.array(places)[mask_place]
+            sensors_temp = np.array(sensors)[mask_sensor]
 
-            # take accelerometer, gyroscope
-            if sensors_type == 'acc_gyro':
-                offset = 6
-                to_del = 7
-            # take magnetometer too
-            elif sensors_type == 'acc_gyro_magn':
-                offset = 9
-                to_del = 4
+            col_name = HEADER[2:]
 
-            # delete orientation quaternion
-            for _ in range(9):
-                sensors = np.delete(
-                    sensors,
-                    np.arange(
-                        (offset * step) + offset,
-                        (offset * step) + offset + to_del),
-                    axis=1)
-                step += 1
-
-            step = 0
-
-            # filter positions based on parameter positions
-            if positions != 'all':
-                if 'RLA' not in positions:
-                    acc_gyro = acc_gyro[:, step * offset:]
-                else:
-                    step += 1
-                if 'RUA' not in positions:
-                    acc_gyro = acc_gyro[:, step * offset:]
-                else:
-                    step += 1
-                if 'BACK' not in positions:
-                    acc_gyro = acc_gyro[:, step * offset:]
-                else:
-                    step += 1
-                if 'LUA' not in positions:
-                    acc_gyro = acc_gyro[:, step * offset:]
-                else:
-                    step += 1
-                if 'LLA' not in positions:
-                    acc_gyro = acc_gyro[:, step * offset:]
-                else:
-                    step += 1
-                if 'RC' not in positions:
-                    acc_gyro = acc_gyro[:, step * offset:]
-                else:
-                    step += 1
-                if 'RT' not in positions:
-                    acc_gyro = acc_gyro[:, step * offset:]
-                else:
-                    step += 1
-                if 'LT' not in positions:
-                    acc_gyro = acc_gyro[:, step * offset:]
-                else:
-                    step += 1
-                if 'LC' not in positions:
-                    acc_gyro = acc_gyro[:, step * offset:]
-
-            sensors = np.concatenate((sensors, activities), axis=1)
-
-            # delete record with unknown activity label
-            sensors = np.delete(sensors, np.where(sensors[:, -1] == 0), axis=0)
-            activities = np.delete(np.unique(activities),
-                                   np.where(np.unique(activities) == 0))
-
-            use_magn = True if sensors_type == 'acc_gyro_magn' else False
+            mask = [(col.split('_')[0] in places_temp and col.split('_')[1] in sensors_temp) for col in col_name]
+            mask[-1] = True # act col
+            col_filter = np.array(col_name)[mask]
+            
+            log_file = log_file[col_filter]
 
             # cycle on activity
             for id_act in activities:
 
-                step = 0
+                temp = log_file[log_file['act'] == id_act]
 
-                temp = sensors[np.where(sensors[:, -1] == int(id_act))][:, :-1]
+                merge_sensor = []
 
                 # sliding window on every of 9 sensor
-                for i in range(9):
-
-                    acc = temp[:, offset * step:(step * offset) + 3]
-                    gyro = temp[:, 3 + (offset * step):(step * offset) + 6]
-
-                    if use_magn:
-                        magn = temp[:, 6 + (offset * step):(step * offset) + 9]
-
-                    if magnitude:
-                        acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
-                            np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)
-                        gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
-                            np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
-                        if use_magn:
+                for i in range(len(positions)):
+                    if 'acc' in sensors_type:
+                        acc = temp[[col for col in temp.columns if 'acc' in col]].to_numpy()
+                        if magnitude:
+                            acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
+                                np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)   
+                        merge_sensor.append(acc)                        
+                    if 'gyro' in sensors_type:
+                        acc = temp[[col for col in temp.columns if 'gyro' in col]].to_numpy()
+                        if magnitude:
+                            gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
+                                np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
+                        merge_sensor.append(gyro)
+                    if 'magn' in sensors_type:
+                        magn = temp[[col for col in temp.columns if 'magn' in col]].to_numpy()
+                        if magnitude:
                             magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(
                                 np.sum(np.power(x, 2))), axis=1, arr=magn).reshape(-1, 1)), axis=1)
+                        merge_sensor.append(magn)
 
                     # concat sensor and sliding only one time
-                    merge_sensor = np.concatenate(
-                        (acc, gyro), axis=1) if not use_magn else np.concatenate(
-                        (acc, gyro, magn), axis=1)
+                    merge_sensor = np.hstack(merge_sensor)
                     _data_windows = sliding_window(
-                        merge_sensor, (win_len, merge_sensor.shape[1]), (int(win_len / 2), 1))
+                        merge_sensor, (win_len, merge_sensor.shape[1]), (int(win_len * (1 - size_overlapping)), 1))
 
                     # id for every window
                     _id = np.arange(
@@ -190,10 +151,8 @@ def realdisp_process(
                     data.append(_data_windows)
                     ID.extend(_id)
 
-                    step += 1
-
-                # same id for same signal of 9 sensors
-                ID_generater = ID_generater + len(_data_windows) + 10
+                    # same id for same signal of 9 sensors
+                    ID_generater = ID_generater + len(_data_windows) + 10
 
                 # update la
                 _la = [int(id_act) - 1] * (len(ID) - len(la))
@@ -202,6 +161,8 @@ def realdisp_process(
             # update gloabl variabel lu
             _lu = [int(id_user) - 1] * (len(ID) - len(lu))
             lu.extend(_lu)
+
+    print('punti con attività sconosciuta ', zero_act, ' su ', total_data)
 
     # define array dimension for data and labels
     data_array = np.zeros(
@@ -641,7 +602,7 @@ if __name__ == '__main__':
             'realdisp',
             'ouisir'],
         help='dataset to preprocessing',
-        required=False)
+        required=True)
     parser.add_argument('-p', '--path', type=str,
                         default='../data/datasets/', help='path to dataset')
     parser.add_argument('-win_len', '--win_len', type=int,
@@ -660,18 +621,55 @@ if __name__ == '__main__':
         default=[True],
         nargs='+',
         help='bool use or not magnitude')
+    parser.add_argument(
+        '-sensor_place',
+        '--sensor_place',
+        type=str,
+        nargs='+',
+        default=[],
+        choices=['LC', 'RC', 'LT', 'RT', 'LLA', 'RLA', 'LUA', 'RUA', 'BACK'],
+        help='choose sensor\'s place to used',
+        required=False)
+    parser.add_argument(
+        '-sensors',
+        '--sensors',
+        choices=['acc', 'gyro', 'magn'],
+        default=['acc'],
+        nargs='+',
+        type=str,
+        help='which sensor using',
+        required=False)
+    parser.add_argument(
+        '-sensor_displacement',
+        '--sensor_displacement',
+        type=str,
+        nargs='+',
+        default=['ideal'],
+        choices=['ideal', 'self', 'mutual'],
+        help='for only realdisp dataset, choose types of sensor displacemente using'
+    )
 
     args = parser.parse_args()
-    for magnitude in [args.magnitude]:
+
+    if args.dataset == 'realdisp' and args.sensor_place == []:
+        parser.error("Realdisp required sensor placed to use")
+
+    for magnitude in [*args.magnitude]:
         for overlap in [*args.overlap]:
             if args.dataset == 'unimib':
+                if args.sensors != ['acc']:
+                    parser.error(
+                        'Please in unimib dataset there is only accelerometer data')
                 unimib_process(
                     path_data="../data/datasets/unimib_dataset/",
-                    path_out="../data/datasets/UNIMIBDataset/",
+                    path_out="../data/datasets/UNIMIB_processed/",
                     magnitude=magnitude,
                     size_overlapping=overlap,
                     win_len=args.win_len)
             elif args.dataset == 'sbhar':
+                if args.sensors == ['acc', 'magn']:
+                    parser.error(
+                        'Please in sbahr dataset there is only accelerometer and gyriscope data')
                 sbhar_process(
                     path_data="../data/datasets/RawData/",
                     path_out="../data/datasets/SBHAR_processed/",
@@ -680,6 +678,9 @@ if __name__ == '__main__':
                     win_len=args.win_len,
                     six_adl=False)
             elif args.dataset == 'sbhar_six_adl':
+                if args.sensors == ['acc', 'magn']:
+                    parser.error(
+                        'Please in sbahr dataset there is only accelerometer and gyriscope data')
                 sbhar_process(
                     path_data="../data/datasets/",
                     path_out="../data/datasets/SBHAR_processed/",
@@ -690,9 +691,10 @@ if __name__ == '__main__':
             elif args.dataset == 'realdisp':
                 realdisp_process(
                     path_data="../data/datasets/REALDISP/",
-                    path_out="../data/datasets/REALDISP_processed/",
-                    sensors_type="acc_gyro_magn",
-                    positions="all",
+                    path_out=f"../data/datasets/REALDISP_processed_{'_'.join(args.sensor_place)}/",
+                    sensors_type=args.sensors,
+                    positions=args.sensor_place,
+                    sensors_displacement=args.sensor_displacement,
                     magnitude=magnitude,
                     size_overlapping=overlap,
-                    win_len = args.win_len)
+                    win_len=args.win_len)

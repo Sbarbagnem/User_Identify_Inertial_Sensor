@@ -7,7 +7,7 @@ LATENT_DIM = 128
 # parameters based on dataset
 config = {
     'unimib': {
-        'PATH_OUTER_PARTITION': './data/datasets/UNIMIBDataset/',
+        'PATH_OUTER_PARTITION': './data/datasets/UNIMIB_processed/',
         'NUM_CLASSES_ACTIVITY': 9,
         'NUM_CLASSES_USER': 30,
         'WINDOW_AXES': 3,  # number of sample for window
@@ -19,7 +19,7 @@ config = {
         }
     },
     'unimib_75w': {
-        'PATH_OUTER_PARTITION': './data/datasets/UNIMIBDataset/',
+        'PATH_OUTER_PARTITION': './data/datasets/UNIMIB_processed/',
         'NUM_CLASSES_ACTIVITY': 9,
         'NUM_CLASSES_USER': 30,
         'WINDOW_AXES': 3,  # number of sample for window
@@ -31,7 +31,7 @@ config = {
         }
     },
     'unimib_128w': {
-        'PATH_OUTER_PARTITION': './data/datasets/UNIMIBDataset/',
+        'PATH_OUTER_PARTITION': './data/datasets/UNIMIB_processed/',
         'NUM_CLASSES_ACTIVITY': 9,
         'NUM_CLASSES_USER': 30,
         'WINDOW_AXES': 3,  # number of sample for window

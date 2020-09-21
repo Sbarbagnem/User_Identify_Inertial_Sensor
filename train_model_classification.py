@@ -274,6 +274,8 @@ if __name__ == '__main__':
                                 save_dir = FOLDER_LOG + 'log_magnitude'
                             else:
                                 outer_dir = 'OuterPartition_'
+                                if dataset_name == 'unimib_128w':
+                                    outer_dir = 'OuterPartition_wl_128_'
                                 save_dir = FOLDER_LOG + 'log_no_magnitude'
 
                             save_dir = 'log'
