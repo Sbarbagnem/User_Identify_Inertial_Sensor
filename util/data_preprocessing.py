@@ -14,7 +14,7 @@ from sklearn import utils as skutils
 import matplotlib.pyplot as plt
 
 from sliding_window import sliding_window
-from utils import str2bool
+from utils import str2bool, split_balanced_data
 
 
 def realdisp_process(
@@ -22,24 +22,44 @@ def realdisp_process(
         path_out,
         sensors_type=['acc', 'gyro', 'magn'],
         positions=['all'],
-        sensors_displacement=['ideal'],
+        sensors_displacement=['ideal', 'self'],
         magnitude=True,
         size_overlapping=0.5,
         win_len=100):
-    '''
-        positions:  list to filter positions on sensors. If "all" parameter is passed no filter to position will be apply.
-    '''
+
+    """
+    Create 10 folds for dataset REALDISP.
+    
+    Parameters
+    ----------
+    path_data : str
+        Path to raw data.
+    path_out : str
+        Path to store folds processed.
+    sensors_type : list[str]
+        A list to choose sensors from acceleromenter, gyroscope and magnetometer.
+    positons : list[str]
+        A list of positions to maintain from total 9 positions.
+    sensors_displacement : list[str]
+        A list of sensor displacement to mantain.
+    magnitude : bool
+        User or not magnitude
+    size_overlapping : float between 0 and 1
+        Percentage of overlapping used in sliding windows
+    win_len : int
+        Length of window used in sliding window.
+    """
+
 
     '''
-        Data in log file subject{id}_{sensors_displacement}.log
-        Structure of log file in dataset (120 columns):
-            0       -> trial's number (second)
-            1       -> timestamp in microseconds
-            2:118   -> data from sensors
-                        order positions     -> RLA | RUA | BACK | LUA | LLA | RC | RT | LT | LC
-                        for every postion   -> acc:[x,y,z] gyr:[x,y,z] mag:[x,y,z] quat:[1,2,3,4]
-            119     -> id activity (0 if unknown)
-
+    Data in log file subject{id}_{sensors_displacement}.log
+    Structure of log file in dataset (120 columns):
+        0       -> trial's number (second)
+        1       -> timestamp in microseconds
+        2:118   -> data from sensors
+                    order positions     -> RLA | RUA | BACK | LUA | LLA | RC | RT | LT | LC
+                    for every postion   -> acc:[x,y,z] gyr:[x,y,z] mag:[x,y,z] quat:[1,2,3,4]
+        119     -> id activity (0 if unknown)
     '''
 
     places = ['RLA', 'RUA', 'BACK', 'LUA', 'LLA', 'RC', 'RT', 'LT', 'LC']
@@ -56,12 +76,12 @@ def realdisp_process(
     raw_data_path = path_data
     if magnitude:
         processed_path = path_out + \
-            'OuterPartition_magnitude_{}_{}_{}'.format(
-                '_'.join(sensors_type), '_'.join(sensors_displacement), str(size_overlapping * 10))
+            'OuterPartition_magnitude_{}_{}'.format(
+                '_'.join(sensors_displacement), str(size_overlapping * 10))
     else:
         processed_path = path_out + \
-            'OuterPartition_{}_{}_{}'.format(
-                '_'.join(sensors_type), '_'.join(sensors_displacement), str(size_overlapping * 10))
+            'OuterPartition_{}_{}'.format(
+                '_'.join(sensors_displacement), str(size_overlapping * 10))
 
     if win_len != 100:
         processed_path = processed_path + f'_wl_{win_len}'
@@ -76,6 +96,7 @@ def realdisp_process(
     data = []
     la = []
     lu = []
+    di = [] # list of displacement type, to split balanced also based on this
     ID = []
 
     if not os.path.exists(processed_path):
@@ -89,9 +110,19 @@ def realdisp_process(
             log_file = pd.DataFrame(pd.read_table(raw_data_path + fl).values, columns=HEADER)
             log_file.drop(['sec', 'microsec'], inplace=True, axis=1)
             log_file = log_file.astype({"act": int})
+
             id_user = int(fl.split('_')[0].split('subject')[1])
+
+            if 'ideal' in fl.split('_')[1]:
+                disp = 0
+            if 'self' in fl.split('_')[1]:
+                disp = 1
+            if 'mutual' in fl.split('_')[1]:
+                disp = 2
+
             zero_act += log_file[log_file['act'] == 0].shape[0]
             total_data += log_file.shape[0]
+
             # delete sample with act == 0 (unkwnown)
             log_file = log_file[log_file.act != 0]
             activities = np.unique(log_file.act)
@@ -99,77 +130,68 @@ def realdisp_process(
             # filter based on position sensor choosen (BACK, RLA, RUA, ...) and sensor tyep (acc, gyro, ...)
             mask_place = [pos in positions for pos in places]
             mask_sensor = [sensor in sensors_type for sensor in sensors]
-
             places_temp = np.array(places)[mask_place]
             sensors_temp = np.array(sensors)[mask_sensor]
-
             col_name = HEADER[2:]
-
             mask = [(col.split('_')[0] in places_temp and col.split('_')[1] in sensors_temp) for col in col_name]
             mask[-1] = True # act col
             col_filter = np.array(col_name)[mask]
-            
             log_file = log_file[col_filter]
 
             # cycle on activity
             for id_act in activities:
-
                 temp = log_file[log_file['act'] == id_act]
-
                 merge_sensor = []
-
                 # sliding window on every of 9 sensor
-                for i in range(len(positions)):
+                for pos in positions:
                     if 'acc' in sensors_type:
-                        acc = temp[[col for col in temp.columns if 'acc' in col]].to_numpy()
+                        acc = temp[[col for col in temp.columns if ('acc' in col and pos in col)]].to_numpy()
                         if magnitude:
                             acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
                                 np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)   
                         merge_sensor.append(acc)                        
                     if 'gyro' in sensors_type:
-                        acc = temp[[col for col in temp.columns if 'gyro' in col]].to_numpy()
+                        gyro = temp[[col for col in temp.columns if ('gyro' in col and pos in col)]].to_numpy()
                         if magnitude:
                             gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
                                 np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
                         merge_sensor.append(gyro)
                     if 'magn' in sensors_type:
-                        magn = temp[[col for col in temp.columns if 'magn' in col]].to_numpy()
+                        magn = temp[[col for col in temp.columns if ('magn' in col and pos in col)]].to_numpy()
                         if magnitude:
                             magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(
                                 np.sum(np.power(x, 2))), axis=1, arr=magn).reshape(-1, 1)), axis=1)
                         merge_sensor.append(magn)
-
                     # concat sensor and sliding only one time
                     merge_sensor = np.hstack(merge_sensor)
                     _data_windows = sliding_window(
                         merge_sensor, (win_len, merge_sensor.shape[1]), (int(win_len * (1 - size_overlapping)), 1))
-
                     # id for every window
                     _id = np.arange(
                         ID_generater, ID_generater + len(_data_windows))
                     # concat verticaly every window
                     data.append(_data_windows)
                     ID.extend(_id)
-
-                    # same id for same signal of 9 sensors
+                    # different ID for different sensor position
                     ID_generater = ID_generater + len(_data_windows) + 10
-
                 # update la
                 _la = [int(id_act) - 1] * (len(ID) - len(la))
                 la.extend(_la)
-
-            # update gloabl variabel lu
+            # update gloabl variabel lu and di
             _lu = [int(id_user) - 1] * (len(ID) - len(lu))
+            _di = [disp] * (len(ID) - len(di))
             lu.extend(_lu)
+            di.extend(_di)
 
     print('punti con attività sconosciuta ', zero_act, ' su ', total_data)
 
     # define array dimension for data and labels
     data_array = np.zeros(
         [len(lu), win_len, channel * number_sensor], dtype=np.float)
-    la_array = np.zeros([len(lu)], dtype=np.int32)
+    la_array = np.zeros([len(la)], dtype=np.int32)
     lu_array = np.zeros([len(lu)], dtype=np.int32)
-    ID_array = np.zeros([len(lu)], dtype=np.int32)
+    di_array = np.zeros([len(di)], dtype=np.int32)
+    ID_array = np.zeros([len(ID)], dtype=np.int32)
 
     idx = 0
     for i, el in enumerate(data):
@@ -177,14 +199,15 @@ def realdisp_process(
         ID_array[idx:idx + n] = ID[idx:idx + n]
         lu_array[idx:idx + n] = lu[idx:idx + n]
         la_array[idx:idx + n] = la[idx:idx + n]
+        di_array[idx:idx + n] = di[idx:idx + n]
         data_array[idx:idx + n, :, :] = el
         idx += n
 
     # shuffle
-    data, la, lu, ID = skutils.shuffle(
-        data_array, la_array, lu_array, ID_array)
-    data, la, lu, ID = skutils.shuffle(
-        data, la, lu, ID)
+    data, la, lu, di, ID = skutils.shuffle(
+        data_array, la_array, lu_array, di_array, ID_array)
+    data, la, lu, di, ID = skutils.shuffle(
+        data, la, lu, di, ID)
 
     print(f'shape data {data.shape}')
 
@@ -208,6 +231,7 @@ def realdisp_process(
         np.save(processed_path + '/fold{}/user_label'.format(i), lu[idx])
         np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
         np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
+        np.save(processed_path + '/fold{}/di'.format(i), di[idx])
 
 
 def sbhar_process(
@@ -506,46 +530,6 @@ def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len):
         np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
         np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
 
-
-def split_balanced_data(lu, la, folders=10):
-
-    print('Numero totale di esempi: {}'.format(len(lu)))
-
-    # dict to save indexes' example for every folder
-    indexes = {}
-    for i in np.arange(folders):
-        indexes[str(i)] = []
-
-    last_folder = 0
-
-    # balance split label user-activity in every folders
-    for user in np.unique(lu):  # specific user
-        temp_index_label_user = [index for index, x in enumerate(
-            lu) if x == user]  # index of specific user
-
-        for act in np.unique(la):  # specific activity
-            temp_index_label_act = [index for index, x in enumerate(
-                la) if x == act and index in temp_index_label_user]  # index of specific activity of user
-
-            # same percentage data in every folder
-            while(len(temp_index_label_act) > 0):
-                for folder in range(last_folder, folders):
-                    if len(temp_index_label_act) > 0:
-                        indexes[str(folder)].append(temp_index_label_act[0])
-                        del temp_index_label_act[0]
-                        if folder == folders - 1:
-                            last_folder = 0
-                        else:
-                            last_folder = folder
-                    else:
-                        continue
-
-    for key in indexes.keys():
-        print(f'Numero campioni nel folder {key}: {len(indexes[key])}')
-
-    return indexes
-
-
 def plt_user_distribution(dict_indexes, lu):
 
     plt.figure(figsize=(12, 3))
@@ -634,7 +618,7 @@ if __name__ == '__main__':
         '-sensors',
         '--sensors',
         choices=['acc', 'gyro', 'magn'],
-        default=['acc'],
+        default=['acc', 'gyro', 'magn'],
         nargs='+',
         type=str,
         help='which sensor using',

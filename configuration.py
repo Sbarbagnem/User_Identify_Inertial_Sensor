@@ -68,8 +68,50 @@ config = {
             'gyroscope': 3
         } 
     },
-    'realdisp': {
-        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed/',
+    'realdisp_RT': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
+    'realdisp_acc_gyro_magn_self_RT': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
+    'realdisp_acc_gyro_magn_ideal_self_RT': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
+    'realdisp_acc_gyro_magn_ideal_self_mutual_RT': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
         'NUM_CLASSES_ACTIVITY': 33,
         'NUM_CLASSES_USER': 17,
         'WINDOW_AXES': 9,  # number of sample for window

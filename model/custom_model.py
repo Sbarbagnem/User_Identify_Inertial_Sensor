@@ -107,11 +107,15 @@ class Model():
                                outer_dir=self.outer_dir,
                                config_file=self.configuration)
 
-    def load_data(self, only_acc=False, normalize=True):
+    def load_data(self, only_acc=False, only_acc_gyro=False, realdisp=False):
 
         # gat data [examples, window_samples, axes, channel]
-        TrainData, TrainLA, TrainLU, ValidData, ValidLA, ValidLU, TestData, TestLA, TestLU = self.dataset.load_data(
-            fold_test=self.fold_test, overlapping=self.overlap)
+        if realdisp:
+            TrainData, TrainLA, TrainLU, TrainDI, ValidData, ValidLA, ValidLU, ValidDI, TestData, TestLA, TestLU, TestDI = self.dataset.load_data(
+                fold_test=self.fold_test, overlapping=self.overlap, realdisp=realdisp)
+        else:
+            TrainData, TrainLA, TrainLU, ValidData, ValidLA, ValidLU, TestData, TestLA, TestLU = self.dataset.load_data(
+                fold_test=self.fold_test, overlapping=self.overlap, realdisp=realdisp)
 
         # if true only accelerometer will be used
         if only_acc:
@@ -125,18 +129,37 @@ class Model():
                 ValidData = ValidData[:, :, [0, 1, 2]]
                 TestData = TestData[:, :, [0, 1, 2]]
                 self.axes = 3
+        
+        # if true only accelerometer and gyroscope will be used
+        if only_acc_gyro:
+            if self.magnitude:
+                TrainData = TrainData[:, :, [0,1,2,3,4,5,6,7]]
+                ValidData = ValidData[:, :, [0,1,2,3,4,5,6,7]]
+                TestData = TestData[:, :, [0,1,2,3,4,5,6,7,]]
+                self.axes = 4
+            else:
+                TrainData = TrainData[:, :, [0,1,2,3,4,5]]
+                ValidData = ValidData[:, :, [0,1,2,3,4,5]]
+                TestData = TestData[:, :, [0,1,2,3,4,5]]
+                self.axes = 3
 
         self.dataset._channel = self.axes
 
         self.train = TrainData
         self.train_user = TrainLU
         self.train_act = TrainLA
+        if realdisp:
+            self.train_di = TrainDI
         self.val = ValidData
         self.val_user = ValidLU
         self.val_act = ValidLA
+        if realdisp:
+            self.val_di = ValidDI
         self.test = TestData
         self.test_user = TestLU
         self.test_act = TestLA
+        if realdisp:
+            self.test_di = TestDI
 
     def normalize_data(self):
         # normalize data
@@ -854,6 +877,11 @@ class Model():
         plt.legend(loc='upper left')
         plt.tight_layout()
         plt.show()
+
+    def plot_pred_based_displacement(self):
+
+        # TODO
+        raise NotImplementedError
 
     def unify_act(self, mapping):
         num_class_return, act_train, act_test = self.dataset.unify_act_class(

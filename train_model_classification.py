@@ -75,9 +75,9 @@ if __name__ == '__main__':
             'unimib_128w',
             'sbhar',
             'sbhar_128w',
-            'realdisp',
             'unimib_sbhar',
-            'sbhar_six_adl'],
+            'sbhar_six_adl',
+            'realdisp_RT'],
         help='on which dataset train and test model',
         required=True)
     parser.add_argument(
@@ -194,6 +194,13 @@ if __name__ == '__main__':
         help='bool to indicate to use only accelerometer data or all data'
     )
     parser.add_argument(
+        '-only_acc_gyro',
+        '--only_acc_gyro',
+        type=str2bool,
+        default=False,
+        help='bool to indicate to use only accelerometer and gyroscope data or all data'
+    )
+    parser.add_argument(
         '-run_colab',
         '--run_colab',
         type=str2bool,
@@ -248,6 +255,16 @@ if __name__ == '__main__':
         help='bool, if true print confusion matrix on test set',
         default=False
     )
+    ### FOR REALDISP ###
+    parser.add_argument(
+        '-sensor_displace',
+        '--sensor_displace',
+        type=str,
+        nargs='+',
+        default=['ideal', 'self', 'mutual'],
+        choices=['ideal', 'self', 'mutual'],
+        help='for realdisp dataset, chose type of sensor displacement one or more'
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -269,6 +286,8 @@ if __name__ == '__main__':
                                     outer_dir = 'OuterPartition_magnitude_wl_75_'
                                 elif dataset_name == 'unimib_128w' or dataset_name == 'sbhar_128w':
                                     outer_dir = 'OuterPartition_magnitude_wl_128_'
+                                elif 'realdisp' in dataset_name:
+                                    outer_dir = f"OuterPartition_magnitude_{'_'.join(args.sensor_displace)}_"
                                 else:
                                     outer_dir = 'OuterPartition_magnitude_'
                                 save_dir = FOLDER_LOG + 'log_magnitude'
@@ -276,9 +295,9 @@ if __name__ == '__main__':
                                 outer_dir = 'OuterPartition_'
                                 if dataset_name == 'unimib_128w':
                                     outer_dir = 'OuterPartition_wl_128_'
+                                elif 'realdisp' in dataset_name:
+                                    outer_dir = f"OuterPartition_{'_'.join(args.sensor_displace)}_"
                                 save_dir = FOLDER_LOG + 'log_no_magnitude'
-
-                            save_dir = 'log'
 
                             model = Model(dataset_name=dataset_name,
                                         configuration_file=configuration,
@@ -300,7 +319,9 @@ if __name__ == '__main__':
                             model.create_dataset(args.run_colab, args.colab_path)
 
                             model.load_data(
-                                only_acc=args.only_acc)
+                                only_acc=args.only_acc,
+                                only_acc_gyro=args.only_acc_gyro,
+                                realdisp='realdisp' in dataset_name)
 
                             if args.unify:
                                 model.unify_act(

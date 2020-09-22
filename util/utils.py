@@ -32,7 +32,10 @@ def str2bool(v):
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
         return False
 
-def split_balanced_data(lu, la, folders=10):
+def split_balanced_data(lu, la, folders, di=None, log=True):
+
+    if log:
+        print('Numero totale di esempi: {}'.format(len(lu)))
 
     # dict to save indexes' example for every folder
     indexes = {}
@@ -41,27 +44,51 @@ def split_balanced_data(lu, la, folders=10):
 
     last_folder = 0
 
-    # balance split label user-activity in every folders
-    for user in np.unique(lu):  # specific user
-        temp_index_label_user = [index for index, x in enumerate(
-            lu) if x == user]  # index of specific user
-
-        for act in np.unique(la):  # specific activity
-            temp_index_label_act = [index for index, x in enumerate(
-                la) if x == act and index in temp_index_label_user]  # index of specific activity of user
-
-            # same percentage data in every folder
-            while(len(temp_index_label_act) > 0):
-                for folder in range(last_folder, folders):
-                    if len(temp_index_label_act) > 0:
-                        indexes[str(folder)].append(temp_index_label_act[0])
-                        del temp_index_label_act[0]
-                        if folder == folders-1:
-                            last_folder = 0
+    if di is not None:
+        for displace in np.unique(di):
+            temp_index_label_displace = [index for index, x in enumerate(
+                di) if x == displace]  # index of specific displace
+            for user in np.unique(lu): 
+                temp_index_label_user = [index for index, x in enumerate(
+                    lu) if x == user and index in temp_index_label_displace]  # index of specific user
+                for act in np.unique(la):
+                    temp_index_label_act = [index for index, x in enumerate(
+                        la) if x == act and index in temp_index_label_user]  # index of specific activity of user
+                    # same percentage data in every folder
+                    while(len(temp_index_label_act) > 0):
+                        for folder in range(last_folder, folders):
+                            if len(temp_index_label_act) > 0:
+                                indexes[str(folder)].append(temp_index_label_act[0])
+                                del temp_index_label_act[0]
+                                if folder == folders - 1:
+                                    last_folder = 0
+                                else:
+                                    last_folder = folder
+                            else:
+                                continue
+    else:
+        for user in np.unique(lu): 
+            temp_index_label_user = [index for index, x in enumerate(
+                lu) if x == user]  # index of specific user
+            for act in np.unique(la):
+                temp_index_label_act = [index for index, x in enumerate(
+                    la) if x == act and index in temp_index_label_user]  # index of specific activity of user
+                # same percentage data in every folder
+                while(len(temp_index_label_act) > 0):
+                    for folder in range(last_folder, folders):
+                        if len(temp_index_label_act) > 0:
+                            indexes[str(folder)].append(temp_index_label_act[0])
+                            del temp_index_label_act[0]
+                            if folder == folders - 1:
+                                last_folder = 0
+                            else:
+                                last_folder = folder
                         else:
-                            last_folder = folder
-                    else:
-                        continue
+                            continue       
+    if log:
+        for key in indexes.keys():
+            print(f'Numero campioni nel folder {key}: {len(indexes[key])}')
+
     return indexes
 
 def delete_overlap(train_id, val_id, distances_to_delete):
@@ -97,4 +124,5 @@ def to_delete(overlapping):
     if overlapping == 8.0:
         return [1, 2, 3, 4]
     if overlapping == 9.0:
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9]   
+

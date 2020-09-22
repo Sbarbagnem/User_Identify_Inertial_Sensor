@@ -36,7 +36,7 @@ class Dataset(object):
         }
         self.config_file = config_file
 
-    def load_data(self, fold_test, overlapping):
+    def load_data(self, fold_test, overlapping, realdisp=False):
 
         """
         Load train, validation and test data based on path and datataset name passed in Dataset object.
@@ -55,12 +55,16 @@ class Dataset(object):
         TrainLA = np.empty([0], dtype=np.int32)
         TrainLU = np.empty([0], dtype=np.int32)
         TrainID = np.empty([0], dtype=np.int32)
+        if realdisp:
+            TrainDI = np.empty([0], dtype=np.int32)
 
         # test data
         TestData = np.empty([0, self._winlen, self._channel], dtype=np.float)
         TestLA = np.empty([0], dtype=np.int32)
         TestLU = np.empty([0], dtype=np.int32)
         TestID = np.empty([0], dtype=np.int32)
+        if realdisp:
+            TestDI = np.empty([0], dtype=np.int32)
 
         for i in range(10):
             Data = np.load(self._path + self.outer_dir +
@@ -71,18 +75,25 @@ class Dataset(object):
                          'fold{}/user_label.npy'.format(i))
             ID = np.load(self._path + self.outer_dir +
                          'fold{}/id.npy'.format(i))
+            if realdisp:
+                DI = np.load(self._path + self.outer_dir +
+                            'fold{}/di.npy'.format(i))
 
             if i == fold_test:
                 TestData = np.concatenate((TestData, Data), axis=0)
                 TestLA = np.concatenate((TestLA, LA), axis=0)
                 TestLU = np.concatenate((TestLU, LU), axis=0)
-                TestID = np.concatenate((TestID, ID), axis=0)         
+                TestID = np.concatenate((TestID, ID), axis=0)    
+                if realdisp:
+                    TestDI = np.concatenate((TestDI, DI), axis=0)
             else:
                 TrainData = np.concatenate((TrainData, Data), axis=0)
                 TrainLA = np.concatenate((TrainLA, LA), axis=0)
                 TrainLU = np.concatenate((TrainLU, LU), axis=0)
                 TrainID = np.concatenate((TrainID, ID), axis=0)
-                
+                if realdisp:
+                    TrainDI = np.concatenate((TrainDI, DI), axis=0)  
+
         print('Shape train data before delete overlap sequence: ', TrainData.shape)
 
         # delete overlap samples between train and test based on overlap percentage
@@ -92,11 +103,18 @@ class Dataset(object):
         TrainLA = np.delete(TrainLA, invalid_idx, axis=0)
         TrainLU = np.delete(TrainLU, invalid_idx, axis=0)
         TrainID = np.delete(TrainID, invalid_idx, axis=0)
+        if realdisp:
+            TrainDI = np.delete(TrainDI, invalid_idx, axis=0)
+
         print('Shape train data after deleted overlap sequence from test set: ', TrainData.shape)
 
         # split train data in 80% train and 20% validation
-        TrainData, TrainLU, TrainLA, TrainID = skutils.shuffle(TrainData, TrainLU, TrainLA, TrainID)
-        indexes = split_balanced_data(TrainLU, TrainLA, folders=5)
+        if realdisp:
+            TrainData, TrainLU, TrainLA, TrainID, TrainDI = skutils.shuffle(TrainData, TrainLU, TrainLA, TrainID, TrainDI)
+            indexes = split_balanced_data(TrainLU, TrainLA, folders=5, di=TrainDI, log=False)
+        else:
+            TrainData, TrainLU, TrainLA, TrainID = skutils.shuffle(TrainData, TrainLU, TrainLA, TrainID)
+            indexes = split_balanced_data(TrainLU, TrainLA, folders=5, log=False)           
 
         idx_val = indexes[str(0)]
         idx_train = [indexes[str(i)] for i in [1,2,3,4]]
@@ -105,16 +123,23 @@ class Dataset(object):
         ValidData = TrainData[idx_val,:,:]
         ValidLA = TrainLA[idx_val]
         ValidLU = TrainLU[idx_val]
+        if realdisp:
+            ValidDI = TrainDI[idx_val]
 
         TrainData = TrainData[idx_train,:,:]
         TrainLA = TrainLA[idx_train]
         TrainLU = TrainLU[idx_train]
+        if realdisp:
+            TrainDI = TrainDI[idx_train]
 
         print('Shape train data after split train and val: ', TrainData.shape)
         print('Shape val data : ', ValidData.shape)
         print('Shape test data: ', TestData.shape)
         
-        return TrainData, TrainLA, TrainLU, ValidData, ValidLA, ValidLU, TestData, TestLA, TestLU
+        if realdisp:
+            return TrainData, TrainLA, TrainLU, TrainDI, ValidData, ValidLA, ValidLU, ValidDI, TestData, TestLA, TestLU, TestDI
+        else:
+            return TrainData, TrainLA, TrainLU, ValidData, ValidLA, ValidLU, TestData, TestLA, TestLU
 
     def normalize_data(self, train, val, test=None):
 
