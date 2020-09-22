@@ -124,11 +124,13 @@ class Model():
                 ValidData = ValidData[:, :, [0, 1, 2, 3]]
                 TestData = TestData[:, :, [0, 1, 2, 3]]
                 self.axes = 4
+                self.dataset._channel = 4
             else:
                 TrainData = TrainData[:, :, [0, 1, 2]]
                 ValidData = ValidData[:, :, [0, 1, 2]]
                 TestData = TestData[:, :, [0, 1, 2]]
                 self.axes = 3
+                self.dataset._channel = 3
         
         # if true only accelerometer and gyroscope will be used
         if only_acc_gyro:
@@ -136,12 +138,14 @@ class Model():
                 TrainData = TrainData[:, :, [0,1,2,3,4,5,6,7]]
                 ValidData = ValidData[:, :, [0,1,2,3,4,5,6,7]]
                 TestData = TestData[:, :, [0,1,2,3,4,5,6,7,]]
-                self.axes = 4
+                self.axes = 8
+                self.dataset._channel = 8
             else:
                 TrainData = TrainData[:, :, [0,1,2,3,4,5]]
                 ValidData = ValidData[:, :, [0,1,2,3,4,5]]
                 TestData = TestData[:, :, [0,1,2,3,4,5]]
-                self.axes = 3
+                self.axes = 6
+                self.dataset._channel = 6
 
         self.dataset._channel = self.axes
 
@@ -288,8 +292,13 @@ class Model():
 
         shape_original = self.train.shape[0]
 
+        if self.magnitude:
+            n_sensor = self.train.shape[2] / 4
+        else:
+            n_sensor = self.train.shape[2] / 3
+
         train_augmented, label_user_augmented, label_act_augmented = self.dataset.augment_data(
-            self.train, self.train_user, self.train_act, self.magnitude, augmented_par, function_to_apply, compose, only_compose, plot_augmented, ratio_random_transformations, n_func_to_apply)
+            self.train, self.train_user, self.train_act, self.magnitude, augmented_par, function_to_apply, compose, only_compose, plot_augmented, ratio_random_transformations, n_func_to_apply, n_sensor)
 
         self.train = train_augmented
         self.train_user = label_user_augmented
@@ -852,22 +861,25 @@ class Model():
             else:
                 self.final_pred_wrong_act[act_label] += 1
 
-    def total_sample_for_act(self):
+    def total_sample_for_act(self, test):
         total_for_act = [0 for _ in np.arange(0, self.num_act)]
         for act in np.arange(0, self.num_act):
-            total_for_act[act] += np.unique(self.test_act,
-                                            return_counts=True)[1][act]
+            if test:
+                total_for_act[act] += np.unique(self.test_act,
+                                                return_counts=True)[1][act]
+            else:
+                total_for_act[act] += np.unique(self.val_act,
+                                                return_counts=True)[1][act]                
         return total_for_act
 
-    def plot_pred_based_act(self, title):
+    def plot_pred_based_act(self, title, test):
         plt.figure()
         plt.title(title)
         plt.xlabel('Activity')
         plt.ylabel('%')
         step = np.arange(0, self.num_act)
-        total_for_act = self.total_sample_for_act()
-        # pred_right = np.asarray(self.final_pred_right)/np.sum(self.final_pred_right)
-        # pred_wrong = np.asarray(self.final_pred_wrong)/np.sum(self.final_pred_wrong)
+        total_for_act = self.total_sample_for_act(test)
+        #total_for_act = self.total_sample_for_act(test)
         pred_right = np.asarray(self.final_pred_right_act) / \
             np.asarray(total_for_act)
         pred_wrong = np.asarray(self.final_pred_wrong_act) / \

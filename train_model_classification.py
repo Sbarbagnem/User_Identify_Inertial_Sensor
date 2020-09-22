@@ -355,8 +355,8 @@ if __name__ == '__main__':
                                 model.loss_opt_metric()
                                 model.train_model(args.epochs)
                                 if args.plot_pred_base_act_val:
-                                    model.plot_pred_based_act(title='percentage error in validation best seen')
+                                    model.plot_pred_based_act(title='percentage error in validation best seen', test=False)
                                 model.test_model(log=args.confusion_matrix)
-                                model.plot_pred_based_act(title='percentage error in test set')
+                                model.plot_pred_based_act(title='percentage error in test set', test=True)
                                 if args.save_best_model:
                                     model.best_model.save_weights(filepath=args.path_best_model, overwrite=True, save_format=None)

@@ -135,7 +135,11 @@ class Dataset(object):
         print('Shape train data after split train and val: ', TrainData.shape)
         print('Shape val data : ', ValidData.shape)
         print('Shape test data: ', TestData.shape)
-        
+
+        if len(np.intersect1d(TrainID, TestID)):
+            print('overlap between test and train or train and val')
+            sys.exit('there is overlap between train/val and test, this affect (improve) performance on test')
+
         if realdisp:
             return TrainData, TrainLA, TrainLU, TrainDI, ValidData, ValidLA, ValidLU, ValidDI, TestData, TestLA, TestLU, TestDI
         else:
@@ -156,7 +160,7 @@ class Dataset(object):
         test = np.expand_dims(test, 3)
         return train, val, test
 
-    def augment_data(self, data, lu, la, magnitude, augmented_par, function_to_apply, compose, only_compose, plot_augmented, ratio_random_transformations, n_func_to_apply):
+    def augment_data(self, data, lu, la, magnitude, augmented_par, function_to_apply, compose, only_compose, plot_augmented, ratio_random_transformations, n_func_to_apply, n_sensor):
         if augmented_par != []:
             for t,ratio in zip(augmented_par, ratio_random_transformations):
                 if t == 'random_transformations': 
@@ -165,8 +169,7 @@ class Dataset(object):
                                                                                            lu,
                                                                                            la,
                                                                                            n_axis=self._channel,
-                                                                                           n_sensor=len(
-                                                                                               self.config_file.config[self._name]['SENSOR_DICT']),
+                                                                                           n_sensor=n_sensor,
                                                                                            use_magnitude=magnitude,
                                                                                            log=plot_augmented,
                                                                                            ratio=ratio,

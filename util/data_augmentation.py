@@ -337,7 +337,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
 
     functions_transformation = {str(func): BASE_FUNCTION[str(func)] for func in function_to_apply}
 
-    idx, idx_flatten = compute_sub_seq(n_axis, n_sensor, use_magnitude)
+    idx, idx_flatten, idx_plot = compute_sub_seq(n_axis, n_sensor, use_magnitude)
 
     transformed_final = np.empty(
         [0, data.shape[1], data.shape[2]], dtype=np.float)
@@ -435,9 +435,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                     # plot original signal
                     if log and len(transformations) > 0:
                         plt.figure(figsize=(12, 3))
-                        for j, sensor_axis in enumerate(idx):
-                            if sensor_axis == [3,4,5]:
-                                sensor_axis = [4,5,6]
+                        for j, sensor_axis in enumerate(idx_plot):
                             plt.style.use('seaborn-darkgrid')
                             if only_compose:
                                 plt.subplot(len(idx), 2, 1+2*(j))
@@ -484,9 +482,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                                     transformed[past, :,
                                                 sensor_axis[-1]+1] = magnitude
                             if log:
-                                for h, sensor_axis in enumerate(idx):
-                                    if sensor_axis == [3,4,5]:
-                                        sensor_axis = [4,5,6]
+                                for h, sensor_axis in enumerate(idx_plot):
                                     plt.style.use('seaborn-darkgrid')
                                     if compose:
                                         plt.subplot(len(idx), n_func_to_apply + 2, j+2+( (n_func_to_apply + 2) * h ))
@@ -520,9 +516,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                     
                     if log and applied and len(all_transf) > 0:
                         if not only_compose:
-                            for j, sensor_axis in enumerate(idx):
-                                if sensor_axis == [3,4,5]:
-                                    sensor_axis = [4,5,6]
+                            for j, sensor_axis in enumerate(idx_plot):
                                 plt.style.use('seaborn-darkgrid')
                                 plt.subplot(len(idx), n_func_to_apply + 2, (n_func_to_apply + 2) + (n_func_to_apply + 2)*(j))
                                 plt.title(
@@ -534,9 +528,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                                 plt.plot(
                                     steps, transformed[past-1, :, sensor_axis[2]], 'r-', label='z')
                         if only_compose:
-                            for j, sensor_axis in enumerate(idx):
-                                if sensor_axis == [3,4,5]:
-                                    sensor_axis = [4,5,6]
+                            for j, sensor_axis in enumerate(idx_plot):
                                 plt.style.use('seaborn-darkgrid')
                                 plt.subplot(len(idx), 2, 2+2*(j))
                                 plt.title(
@@ -606,8 +598,9 @@ def compute_sub_seq(n_axis, n_sensor=1, use_magnitude=True):
     '''
         based on number of axis and using of magnitude return list of index for every sensor
     '''
-    idx = []
-    idx_flatten = []
+    idx = [] # axis index to calculate magnitude
+    idx_flatten = [] # axis index to apply transformations
+    idx_plot = [] # axis index to plot single sensor
 
     if use_magnitude:
         step = 4
@@ -619,6 +612,8 @@ def compute_sub_seq(n_axis, n_sensor=1, use_magnitude=True):
         idx_flatten.extend(list(np.arange(i, i+3)))
 
     for i in np.arange(0, n_sensor*3, 3):
-        idx.append(list(np.arange(i, i+3)))
+        idx.append(list(np.arange(int(i), int(i)+3)))
 
-    return idx, idx_flatten
+    idx_plot = np.split(np.array(idx_flatten), n_sensor)
+
+    return idx, idx_flatten, idx_plot

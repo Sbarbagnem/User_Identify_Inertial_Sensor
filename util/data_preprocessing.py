@@ -140,10 +140,13 @@ def realdisp_process(
 
             # cycle on activity
             for id_act in activities:
+
                 temp = log_file[log_file['act'] == id_act]
                 merge_sensor = []
+
                 # sliding window on every of 9 sensor
                 for pos in positions:
+
                     if 'acc' in sensors_type:
                         acc = temp[[col for col in temp.columns if ('acc' in col and pos in col)]].to_numpy()
                         if magnitude:
@@ -162,21 +165,27 @@ def realdisp_process(
                             magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(
                                 np.sum(np.power(x, 2))), axis=1, arr=magn).reshape(-1, 1)), axis=1)
                         merge_sensor.append(magn)
+
                     # concat sensor and sliding only one time
                     merge_sensor = np.hstack(merge_sensor)
                     _data_windows = sliding_window(
                         merge_sensor, (win_len, merge_sensor.shape[1]), (int(win_len * (1 - size_overlapping)), 1))
+
                     # id for every window
                     _id = np.arange(
                         ID_generater, ID_generater + len(_data_windows))
+
                     # concat verticaly every window
                     data.append(_data_windows)
                     ID.extend(_id)
-                    # different ID for different sensor position
-                    ID_generater = ID_generater + len(_data_windows) + 10
+
+                # different ID for different sensor position (if there are more than one position)
+                ID_generater = ID_generater + len(_data_windows) + 10
+
                 # update la
                 _la = [int(id_act) - 1] * (len(ID) - len(la))
                 la.extend(_la)
+
             # update gloabl variabel lu and di
             _lu = [int(id_user) - 1] * (len(ID) - len(lu))
             _di = [disp] * (len(ID) - len(di))
