@@ -66,24 +66,20 @@ def rotation(x):
 
 def permutation(x, nPerm=4, minSegLength=20):
     x = x[0,:,:]
-    diff = False
-    while diff == False:
-        X_new = np.zeros(x.shape)
-        idx = np.random.permutation(nPerm)
-        bWhile = True
-        while bWhile == True:
-            segs = np.zeros(nPerm+1, dtype=int)
-            segs[1:-1] = np.sort(np.random.randint(minSegLength, x.shape[0]-minSegLength, nPerm-1))
-            segs[-1] = x.shape[0]
-            if np.min(segs[1:]-segs[0:-1]) > minSegLength:
-                bWhile = False
-        pp = 0
-        for ii in range(nPerm):
-            x_temp = x[segs[idx[ii]]:segs[idx[ii]+1],:]
-            X_new[pp:pp+len(x_temp),:] = x_temp
-            pp += len(x_temp)
-        if bool(np.asarray(x != X_new).any()):
-            diff = True
+    X_new = np.zeros(x.shape)
+    idx = np.random.permutation(nPerm)
+    bWhile = True
+    while bWhile == True:
+        segs = np.zeros(nPerm+1, dtype=int)
+        segs[1:-1] = np.sort(np.random.randint(minSegLength, x.shape[0]-minSegLength, nPerm-1))
+        segs[-1] = x.shape[0]
+        if np.min(segs[1:]-segs[0:-1]) > minSegLength:
+            bWhile = False
+    pp = 0
+    for ii in range(nPerm):
+        x_temp = x[segs[idx[ii]]:segs[idx[ii]+1],:]
+        X_new[pp:pp+len(x_temp),:] = x_temp
+        pp += len(x_temp)
     return X_new[np.newaxis,:,:]
 
 def random_sampling(x, nSample=90):    
@@ -513,7 +509,7 @@ def random_transformation(data, labels_user, labels_activity, log=False, n_axis=
                         la[past] = act
                         lu[past] = user
                         past += 1
-                    
+
                     if log and applied and len(all_transf) > 0:
                         if not only_compose:
                             for j, sensor_axis in enumerate(idx_plot):
