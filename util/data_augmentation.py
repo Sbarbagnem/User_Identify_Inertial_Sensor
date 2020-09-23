@@ -60,9 +60,13 @@ def time_warp(x, sigma=0.2):
 
 def rotation(x):
     x = x[0,:,:]
-    axis = np.random.uniform(low=-1, high=1, size=x.shape[1])
-    angle = np.random.uniform(low=-np.pi, high=np.pi)
-    return np.matmul(x , axangle2mat(axis,angle))[np.newaxis,:,:]
+    n_sensor = x.shape[1] / 3
+    original_sensor = np.split(x, n_sensor, axis=1)
+    for axis,sensor in zip(np.arange(0,x.shape[1],3), original_sensor):
+        axis_temp = np.random.uniform(low=-1, high=1, size=3)
+        angle_temp = np.random.uniform(low=-np.pi, high=np.pi)
+        x[:,[axis,axis+1,axis+2]] = np.matmul(sensor , axangle2mat(axis_temp,angle_temp))
+    return x[np.newaxis,:,:]
 
 def permutation(x, nPerm=4, minSegLength=20):
     x = x[0,:,:]
