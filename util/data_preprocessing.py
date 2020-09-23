@@ -93,10 +93,11 @@ def realdisp_process(
 
     number_sensor = len(sensors_type)
 
-    data = []
-    la = []
-    lu = []
+    data = [] #list of data window
+    la = [] # list of label activity for every user
+    lu = [] # list of label user for every window
     di = [] # list of displacement type, to split balanced also based on this
+    id_pos = [] # list of position for every window (LT,RT,....)
     ID = []
 
     if not os.path.exists(processed_path):
@@ -142,10 +143,13 @@ def realdisp_process(
             for id_act in activities:
 
                 temp = log_file[log_file['act'] == id_act]
-                merge_sensor = []
 
                 # sliding window on every of 9 sensor
                 for pos in positions:
+
+                    merge_sensor = []
+
+                    p = positions.index(pos)
 
                     if 'acc' in sensors_type:
                         acc = temp[[col for col in temp.columns if ('acc' in col and pos in col)]].to_numpy()
@@ -174,12 +178,15 @@ def realdisp_process(
                     # id for every window
                     _id = np.arange(
                         ID_generater, ID_generater + len(_data_windows))
-
-                    # concat verticaly every window
-                    data.append(_data_windows)
                     ID.extend(_id)
 
-                # different ID for different sensor position (if there are more than one position)
+                    # concat verticaly every window 
+                    data.append(_data_windows)
+
+                    # id position
+                    id_pos.extend([p]*(len(_data_windows)))
+
+                # different position are take like same dataset (example given dataset LT_RT delete overlap sequ between train and test in LT and RT)
                 ID_generater = ID_generater + len(_data_windows) + 10
 
                 # update la
@@ -201,6 +208,7 @@ def realdisp_process(
     lu_array = np.zeros([len(lu)], dtype=np.int32)
     di_array = np.zeros([len(di)], dtype=np.int32)
     ID_array = np.zeros([len(ID)], dtype=np.int32)
+    id_pos_array = np.zeros([len(id_pos)], dtype=np.int32)
 
     idx = 0
     for i, el in enumerate(data):
@@ -209,18 +217,19 @@ def realdisp_process(
         lu_array[idx:idx + n] = lu[idx:idx + n]
         la_array[idx:idx + n] = la[idx:idx + n]
         di_array[idx:idx + n] = di[idx:idx + n]
+        id_pos_array[idx:idx+n] = id_pos[idx:idx+n]
         data_array[idx:idx + n, :, :] = el
         idx += n
 
     # shuffle
-    data, la, lu, di, ID = skutils.shuffle(
-        data_array, la_array, lu_array, di_array, ID_array)
-    data, la, lu, di, ID = skutils.shuffle(
-        data, la, lu, di, ID)
+    data, la, lu, di, id_pos, ID = skutils.shuffle(
+        data_array, la_array, lu_array, di_array, id_pos_array, ID_array)
+    data, la, lu, di, id_pos, ID = skutils.shuffle(
+        data, la, lu, di, id_pos, ID)
 
     print(f'shape data {data.shape}')
 
-    indexes = split_balanced_data(lu, la, folders=10)
+    indexes = split_balanced_data(lu, la, folders=10, di=di)
 
     #plt_user_distribution(indexes, lu)
 
@@ -241,6 +250,7 @@ def realdisp_process(
         np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
         np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
         np.save(processed_path + '/fold{}/di'.format(i), di[idx])
+        np.save(processed_path + '/fold{}/pos'.format(i), id_pos[idx])
 
 
 def sbhar_process(
