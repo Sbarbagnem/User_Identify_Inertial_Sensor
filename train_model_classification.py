@@ -77,7 +77,9 @@ if __name__ == '__main__':
             'sbhar_128w',
             'unimib_sbhar',
             'sbhar_six_adl',
-            'realdisp_RT'],
+            'realdisp_RT',
+            'realdisp_LT',
+            'realdisp_RT_LT'],
         help='on which dataset train and test model',
         required=True)
     parser.add_argument(
