@@ -111,7 +111,7 @@ config = {
         }
     },
     'realdisp_RLA': {
-        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RLA/',
         'NUM_CLASSES_ACTIVITY': 33,
         'NUM_CLASSES_USER': 17,
         'WINDOW_AXES': 9,  # number of sample for window
@@ -125,7 +125,7 @@ config = {
         }
     },
     'realdisp_LLA': {
-        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_LLA/',
         'NUM_CLASSES_ACTIVITY': 33,
         'NUM_CLASSES_USER': 17,
         'WINDOW_AXES': 9,  # number of sample for window
@@ -139,7 +139,7 @@ config = {
         }
     },
     'realdisp_RLA_LLA': {
-        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RLA_LLA/',
         'NUM_CLASSES_ACTIVITY': 33,
         'NUM_CLASSES_USER': 17,
         'WINDOW_AXES': 9,  # number of sample for window
