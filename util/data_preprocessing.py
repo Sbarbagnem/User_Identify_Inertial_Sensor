@@ -179,15 +179,13 @@ def realdisp_process(
                     _id = np.arange(
                         ID_generater, ID_generater + len(_data_windows))
                     ID.extend(_id)
+                    ID_generater = ID_generater + len(_data_windows) + 10
 
                     # concat verticaly every window 
                     data.append(_data_windows)
 
                     # id position
                     id_pos.extend([p]*(len(_data_windows)))
-
-                # different position are take like same dataset (example given dataset LT_RT delete overlap sequ between train and test in LT and RT)
-                ID_generater = ID_generater + len(_data_windows) + 10
 
                 # update la
                 _la = [int(id_act) - 1] * (len(ID) - len(la))

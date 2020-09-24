@@ -136,8 +136,7 @@ class Dataset(object):
         print('Shape val data : ', ValidData.shape)
         print('Shape test data: ', TestData.shape)
 
-        if len(np.intersect1d(TrainID, TestID)):
-            print('overlap between test and train or train and val')
+        if len(np.intersect1d(TrainID, TestID))>0:
             sys.exit('there is overlap between train/val and test, this affect (improve) performance on test')
 
         if realdisp:

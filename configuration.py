@@ -110,6 +110,48 @@ config = {
             'magnetometer': 3
         }
     },
+    'realdisp_RLA': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
+    'realdisp_LLA': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
+    'realdisp_RLA_LLA': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RT/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
     'unimib_sbhar': {
         'PATH_OUTER_PARTITION': './data/datasets/merged_unimib_sbhar/',
         'NUM_CLASSES_ACTIVITY': 21,
