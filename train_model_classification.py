@@ -79,7 +79,10 @@ if __name__ == '__main__':
             'sbhar_six_adl',
             'realdisp_RT',
             'realdisp_LT',
-            'realdisp_RT_LT'],
+            'realdisp_RT_LT',
+            'realdisp_RLA',
+            'realdisp_LLA',
+            'realdisp_RLA_LLA'],
         help='on which dataset train and test model',
         required=True)
     parser.add_argument(
