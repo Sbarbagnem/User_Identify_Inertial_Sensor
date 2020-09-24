@@ -82,7 +82,14 @@ if __name__ == '__main__':
             'realdisp_RT_LT',
             'realdisp_RLA',
             'realdisp_LLA',
-            'realdisp_RLA_LLA'],
+            'realdisp_RLA_LLA',
+            'realdisp_RUA',
+            'realdisp_LUA',
+            'reladisp_RUA_LUA',
+            'realdisp_RC',
+            'realdisp_LC',
+            'realdisp_RC_LC',
+            'realdisp_BACK'],
         help='on which dataset train and test model',
         required=True)
     parser.add_argument(
