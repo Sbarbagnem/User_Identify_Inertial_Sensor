@@ -138,6 +138,76 @@ config = {
             'magnetometer': 3
         }
     },
+    'realdisp_LUA': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_LUA/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
+    'realdisp_RUA': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RUA/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
+    'realdisp_BACK': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_BACK/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
+    'realdisp_LC': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_LC/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
+    'realdisp_RC': {
+        'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RC/',
+        'NUM_CLASSES_ACTIVITY': 33,
+        'NUM_CLASSES_USER': 17,
+        'WINDOW_AXES': 9,  # number of sample for window
+        'WINDOW_SAMPLES': 100,    # number of axes' sensor
+        'AXIS': 9,
+        'AXIS_MAGNITUDE': 3,
+        'SENSOR_DICT':          {
+            'accelerometer': 3,
+            'gyroscope': 3,
+            'magnetometer': 3
+        }
+    },
     'realdisp_RLA_LLA': {
         'PATH_OUTER_PARTITION': './data/datasets/REALDISP_processed_RLA_LLA/',
         'NUM_CLASSES_ACTIVITY': 33,
