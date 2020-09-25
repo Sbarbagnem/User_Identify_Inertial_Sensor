@@ -129,22 +129,17 @@ def realdisp_process(
             activities = np.unique(log_file.act)
 
             # filter based on position sensor choosen (BACK, RLA, RUA, ...) and sensor tyep (acc, gyro, ...)
-            mask_place = [pos in positions for pos in places]
-            mask_sensor = [sensor in sensors_type for sensor in sensors]
-            places_temp = np.array(places)[mask_place]
-            sensors_temp = np.array(sensors)[mask_sensor]
-            col_name = HEADER[2:]
-            mask = [(col.split('_')[0] in places_temp and col.split('_')[1] in sensors_temp) for col in col_name]
-            mask[-1] = True # act col
-            col_filter = np.array(col_name)[mask]
+            mask = [(col.split('_')[0] in positions and col.split('_')[1] in sensors_type) for col in log_file.columns.tolist()[:-1]]
+            mask.append(True)
+            col_filter = log_file.columns[mask]
             log_file = log_file[col_filter]
 
             # cycle on activity
             for id_act in activities:
 
-                temp = log_file[log_file['act'] == id_act]
+                temp = log_file[log_file.act == id_act]
 
-                # sliding window on every of 9 sensor
+                # sliding window on different position choose
                 for pos in positions:
 
                     merge_sensor = []
