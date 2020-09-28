@@ -23,6 +23,7 @@ from util.dataset import Dataset
 from util.tf_metrics import custom_metrics
 from util.data_augmentation import random_transformation
 from util.data_augmentation import random_guided_warp_multivariate
+from util.utils import mapping_act_label, plot_pred_based_act
 import seaborn as sn
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -99,13 +100,11 @@ class Model():
             path = colab_path + ''.join(path.split('.')[1:])
 
         self.dataset = Dataset(path=path,
-                               name=self.dataset_name,
                                channel=channel,
                                winlen=self.configuration.config[self.dataset_name]['WINDOW_SAMPLES'],
                                user_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_USER'],
                                act_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_ACTIVITY'],
-                               outer_dir=self.outer_dir,
-                               config_file=self.configuration)
+                               outer_dir=self.outer_dir)
 
     def load_data(self, only_acc=False, only_acc_gyro=False, realdisp=False):
 
@@ -873,27 +872,14 @@ class Model():
         return total_for_act
 
     def plot_pred_based_act(self, title, test):
-        plt.figure()
-        plt.title(title)
-        plt.xlabel('Activity')
-        plt.ylabel('%')
-        step = np.arange(0, self.num_act)
+
         total_for_act = self.total_sample_for_act(test)
-        #total_for_act = self.total_sample_for_act(test)
         pred_right = np.asarray(self.final_pred_right_act) / \
             np.asarray(total_for_act)
-        pred_wrong = np.asarray(self.final_pred_wrong_act) / \
-            np.asarray(total_for_act)
-        plt.plot(step, pred_right, 'g', label='Correct pred')
-        plt.plot(step, pred_wrong, 'r', label='Wrong pred')
-        plt.legend(loc='upper left')
-        plt.tight_layout()
-        plt.show()
 
-    def plot_pred_based_displacement(self):
+        plot_pred_based_act(correct_predictions=pred_right, label_act=self.mapping_act_label(), title=title)
 
-        # TODO
-        raise NotImplementedError
+        return pred_right
 
     def unify_act(self, mapping):
         num_class_return, act_train, act_test = self.dataset.unify_act_class(
@@ -904,3 +890,6 @@ class Model():
         self.num_act = num_class_return
         self.final_pred_right_act = [0 for _ in np.arange(0, self.num_act)]
         self.final_pred_wrong_act = [0 for _ in np.arange(0, self.num_act)]
+
+    def mapping_act_label(self):
+        return mapping_act_label(self.dataset_name)

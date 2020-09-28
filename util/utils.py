@@ -126,3 +126,43 @@ def to_delete(overlapping):
     if overlapping == 9.0:
         return [1, 2, 3, 4, 5, 6, 7, 8, 9]   
 
+def mapping_act_label(dataset_name):
+    if 'unimib' in dataset_name:
+        return ['StandingUpFS', 'StandingUpFL', 'Walking', 'Running', 'GoingUpS', 
+                'Jumping', 'GoingDownS', 'LyingDownFS', 'SittingDown']
+    if 'sbhar' in dataset_name:
+        return ['Walking', 'Walking upstairs', 'Walking downstairs', 'Sitting', 'Standing',          
+                'Laying', 'Stand to sit', 'Sit to stand', 'Sit to lie', 'Lie to sit',        
+                'Stand to lie', 'Lie to stan']
+    if 'realdisp' in dataset_name:
+        return ['Walking', 'Jogging', 'Running', 'Jump up', 'Jump front & back', 'Jump sideways', 'Jump leg/arms open/closed',
+                'Jump rope', 'Trunk twist (arms outstretched)', 'Trunk twist (elbows bended)', 'Waist bends forward', 'Waist rotation',
+                'Waist bends opposite hands', 'Reach heels backwards', 'Lateral bend', 'Lateral bend arm up', 'Repetitive forward stretching',
+                'Upper trunk and lower body', 'Arms lateral elevation', 'Arms frontal elevation', 'Frontal hand claps', 'Arms frontal crossing',
+                'Shoulders high rotation', 'Shoulders low rotation', 'Arms inner rotation', 'Knees to breast', 'Heels to backside', 'Nkees bending',
+                'Knees bend forward', 'Rotation on knees', 'Rowing', 'Elliptic bike', 'Cycling']
+
+def plot_pred_based_act(correct_predictions, label_act, folds=1, title=''):
+    
+    if np.array(correct_predictions).ndim == 1: 
+        correct = correct_predictions
+    else:
+        correct = np.sum(correct_predictions, axis=0)/folds
+
+    width = 0.35
+
+    plt.bar(np.arange(0, len(label_act)), correct, width, color='g', label='Correct prediction')
+    plt.ylabel('%')
+    plt.xlabel('Activity')
+    plt.title(title)
+
+    if len(label_act)<15:
+        plt.xticks(np.arange(0, len(label_act)), label_act)
+    else:
+        plt.xticks(np.arange(0, len(label_act)), label_act, rotation='vertical')
+
+    plt.yticks(np.arange(0, 1.01, 0.05))
+    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    plt.tight_layout()
+    plt.show()
+

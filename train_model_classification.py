@@ -2,10 +2,15 @@ from __future__ import absolute_import, division, print_function
 import tensorflow as tf
 import argparse
 import sys
+from pprint import pprint
 
 import configuration
 from model.custom_model import Model
 from util.utils import str2bool
+import matplotlib.pyplot as plt
+import numpy as np
+
+from util.utils import plot_pred_based_act
 
 FOLDER_LOG = 'log/'
 
@@ -277,7 +282,16 @@ if __name__ == '__main__':
         choices=['ideal', 'self', 'mutual'],
         help='for realdisp dataset, chose type of sensor displacement one or more'
     )
+    parser.add_argument(
+        '-mean_perfomance_cross_validation',
+        '--mean_perfomance_cross_validation',
+        type=str2bool,
+        default=True,
+        help='mean, on cross validation, performance on user classification based on activity'
+    )
     args = parser.parse_args()
+
+    performance_for_activity = []  # list of shape (n_fold, n_activity)
 
     # GPU settings
     gpus = tf.config.list_physical_devices("GPU")
@@ -310,25 +324,26 @@ if __name__ == '__main__':
                                 elif 'realdisp' in dataset_name:
                                     outer_dir = f"OuterPartition_{'_'.join(args.sensor_displace)}_"
                                 save_dir = FOLDER_LOG + 'log_no_magnitude'
-
+                            save_dir = 'log_prova'
                             model = Model(dataset_name=dataset_name,
-                                        configuration_file=configuration,
-                                        multi_task=multitask,
-                                        lr='dynamic',
-                                        model_type=model_type,
-                                        fold_test=fold_test,
-                                        save_dir=save_dir,
-                                        outer_dir=outer_dir +
-                                        str(overlap) + '/',
-                                        overlap=overlap,
-                                        magnitude=magnitude,
-                                        init_lr=args.init_lr,
-                                        drop_factor=args.drop_factor,
-                                        drop_epoch=args.drop_epoch,
-                                        path_best_model=args.path_best_model,
-                                        log=args.log)
+                                          configuration_file=configuration,
+                                          multi_task=multitask,
+                                          lr='dynamic',
+                                          model_type=model_type,
+                                          fold_test=fold_test,
+                                          save_dir=save_dir,
+                                          outer_dir=outer_dir +
+                                          str(overlap) + '/',
+                                          overlap=overlap,
+                                          magnitude=magnitude,
+                                          init_lr=args.init_lr,
+                                          drop_factor=args.drop_factor,
+                                          drop_epoch=args.drop_epoch,
+                                          path_best_model=args.path_best_model,
+                                          log=args.log)
 
-                            model.create_dataset(args.run_colab, args.colab_path)
+                            model.create_dataset(
+                                args.run_colab, args.colab_path)
 
                             model.load_data(
                                 only_acc=args.only_acc,
@@ -357,7 +372,8 @@ if __name__ == '__main__':
                             model.normalize_data()
 
                             # tf dataset to weight sample in train set
-                            model.tf_dataset(args.weighted_based_on, args.weighted)
+                            model.tf_dataset(
+                                args.weighted_based_on, args.weighted)
 
                             model.build_model()
                             if args.print_model_summary:
@@ -367,8 +383,20 @@ if __name__ == '__main__':
                                 model.loss_opt_metric()
                                 model.train_model(args.epochs)
                                 if args.plot_pred_base_act_val:
-                                    model.plot_pred_based_act(title='percentage error in validation best seen', test=False)
+                                    _ = model.plot_pred_based_act(
+                                        title='Classification accuracy based on activity on val set', test=False)
                                 model.test_model(log=args.confusion_matrix)
-                                model.plot_pred_based_act(title='percentage error in test set', test=True)
+                                pred_right = model.plot_pred_based_act(
+                                    title='Classification accuracy based on activity on test set', test=True)
+                                performance_for_activity.append(pred_right)
                                 if args.save_best_model:
-                                    model.best_model.save_weights(filepath=args.path_best_model, overwrite=True, save_format=None)
+                                    model.best_model.save_weights(
+                                        filepath=args.path_best_model, overwrite=True, save_format=None)
+
+                        # mean performance for activity on different fold
+                        if args.mean_perfomance_cross_validation:
+                            plot_pred_based_act(
+                                correct_predictions=performance_for_activity,
+                                label_act=model.mapping_act_label(),
+                                folds=len([*args.fold_test]),
+                                title='Mean 10-cross classification accuracy based on activity')

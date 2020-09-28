@@ -19,9 +19,8 @@ from util.data_augmentation import random_transformation, random_guided_warp_mul
 
 class Dataset(object):
 
-    def __init__(self, path, name, channel, winlen, user_num, act_num, config_file, outer_dir='OuterPartition/'):
+    def __init__(self, path, channel, winlen, user_num, act_num, outer_dir='OuterPartition/'):
         self._path = path
-        self._name = name
         self._channel = channel
         self._winlen = winlen
         self._user_num = user_num
@@ -34,7 +33,6 @@ class Dataset(object):
             'random_transformations': random_transformation,
             'random_warped': random_guided_warp_multivariate
         }
-        self.config_file = config_file
 
     def load_data(self, fold_test, overlapping, realdisp=False):
 
