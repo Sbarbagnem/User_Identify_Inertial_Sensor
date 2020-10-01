@@ -312,8 +312,8 @@ if __name__ == '__main__':
     performance_for_activity = []  # list of shape (n_fold, n_activity)
     mean_performances = {
         'acc': 0,
-        'precision': 0,
-        'recall': 0,
+        #'precision': 0,
+        #'recall': 0,
         'f1': 0
     }
 
@@ -453,8 +453,7 @@ if __name__ == '__main__':
                         for k in list(mean_performances.keys()):
                             mean_performances[k] /= len([*args.fold_test])
 
-                        print("Mean accuracy, precision, recall and f1 after cross validation: {} {} {} {}".format(
-                                mean_performances['acc'], mean_performances['precision'], mean_performances['recall'], mean_performances['f1']))
+                        print("Mean accuracy, f1 after cross validation: {} {} {} {}".format(mean_performances['acc'], mean_performances['f1']))
                               
                         if args.save_mean_perfomance_cross_validation:
                             save_mean_performance_txt(
