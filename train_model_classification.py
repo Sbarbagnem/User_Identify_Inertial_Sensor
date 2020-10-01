@@ -384,7 +384,7 @@ if __name__ == '__main__':
                                     model.configuration.sbhar_mapping[args.unify_method])
 
                             # plot original distribution data train and test
-                            if args.plot:
+                            if args.plot_distribution:
                                 model.plot_distribution_data(val_test=True)
 
                             if args.augmented:
