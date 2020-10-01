@@ -447,7 +447,7 @@ if __name__ == '__main__':
                         for k in list(mean_performances.keys()):
                             mean_performances[k] /= len([*args.fold_test])
 
-                        print(f"Mean accuracy, precision, recall and f1 after cross validation: {mean_performances['acc']}, {mean_performances['precision']},
+                        print(f"Mean accuracy, precision, recall and f1 after cross validation: {mean_performances['acc']}, {mean_performances['precision']},\
                               {mean_performances['recall']}, {mean_performances['f1']}")
                               
                         if args.save_mean_perfomance_cross_validation:
