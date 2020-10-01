@@ -54,7 +54,7 @@ class ResNet18SingleBranch(tf.keras.Model):
 
     def call(self, inputs, training=None):
 
-        print('shape input: {}'.format(inputs.shape))
+        #print('shape input: {}'.format(inputs.shape))
 
         ### CNN ###
         x = self.conv1(inputs)
