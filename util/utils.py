@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+import sys
 
 
 def plot_performance(ActivityAccuracy, UserAccuracy, fold, path_to_save, save=False):
@@ -142,7 +144,7 @@ def mapping_act_label(dataset_name):
                 'Shoulders high rotation', 'Shoulders low rotation', 'Arms inner rotation', 'Knees to breast', 'Heels to backside', 'Nkees bending',
                 'Knees bend forward', 'Rotation on knees', 'Rowing', 'Elliptic bike', 'Cycling']
 
-def plot_pred_based_act(correct_predictions, label_act, folds=1, title=''):
+def plot_pred_based_act(correct_predictions, label_act, folds=1, title='', dataset_name='', file_name='', colab_path=None, save_plot=False, save_txt=False, show_plot=False):
     
     if np.array(correct_predictions).ndim == 1: 
         correct = correct_predictions
@@ -151,18 +153,51 @@ def plot_pred_based_act(correct_predictions, label_act, folds=1, title=''):
 
     width = 0.35
 
-    plt.bar(np.arange(0, len(label_act)), correct, width, color='g', label='Correct prediction')
-    plt.ylabel('%')
+    plt.bar(np.arange(0, len(label_act)), correct, width, color='g')
+    plt.ylabel('% correct prediction')
     plt.xlabel('Activity')
-    plt.title(title)
-
-    if len(label_act)<15:
-        plt.xticks(np.arange(0, len(label_act)), label_act)
-    else:
-        plt.xticks(np.arange(0, len(label_act)), label_act, rotation='vertical')
-
+    plt.title(title, pad=5)
+    plt.xticks(np.arange(0, len(label_act)), label_act, rotation='vertical')
     plt.yticks(np.arange(0, 1.01, 0.05))
-    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
     plt.tight_layout()
-    plt.show()
+
+    if colab_path is not None:
+        path_to_save = colab_path + f'/plot/{dataset_name}/'
+    else:
+        path_to_save = f'plot/{dataset_name}/'
+
+    if save_plot:
+        if not os.path.exists(path_to_save):
+            os.makedirs(path_to_save)
+        plt.savefig(path_to_save + f'{file_name}.png')
+
+    if save_txt:
+        if os.path.isfile(path_to_save + 'performance_based_act.txt'):
+            f=open(path_to_save + 'performance_based_act.txt', 'a+')
+        else:
+            f= open(path_to_save + 'performance_based_act.txt', 'w+')
+        for l,p in zip(label_act, correct):
+            f.write(f"{l}: {p}\r\n")
+        f.close()
+    if show_plot:
+        plt.show()
+
+def save_mean_performance_txt(performances, dataset_name, colab_path):
+
+    if colab_path is not None:
+        path_to_save = colab_path + f'/mean_performance/{dataset_name}/'
+    else:
+        path_to_save = f'mean_performance/{dataset_name}/'
+
+    if not os.path.exists(path_to_save):
+        os.makedirs(path_to_save)
+
+    if os.path.isfile(path_to_save + 'mean_performance.txt'):
+        f=open(path_to_save + 'mean_performance.txt', 'a+')
+    else:
+        f= open(path_to_save + 'mean_performance.txt', 'w+')
+
+    for key in list(performances.keys()):
+        f.write(f"{key}: {performances[key]}\r\n")
+    f.close()
 

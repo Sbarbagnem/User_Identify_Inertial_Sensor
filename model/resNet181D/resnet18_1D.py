@@ -1,4 +1,5 @@
 import tensorflow as tf
+import sys
 
 
 '''
@@ -17,27 +18,27 @@ class ResNet18SingleBranch(tf.keras.Model):
             self.num_act = num_act
         self.num_user = num_user
 
-        self.conv1 = tf.keras.layers.Conv1D(filters=32,
-                                            kernel_size=5,
+        self.conv1 = tf.keras.layers.Conv2D(filters=32,
+                                            kernel_size=(1,5),
                                             strides=1,
                                             padding="valid",
                                             kernel_regularizer=tf.keras.regularizers.l2)
         self.bn1 = tf.keras.layers.BatchNormalization()
         
-        self.pool1 = tf.keras.layers.MaxPool1D(pool_size=3,
+        self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(1,3),
                                                strides=2,
                                                padding="valid")
         self.layer1 = make_basic_block_layer(filter_num=32,
                                              blocks=2,
                                              name='residual_block_1',
-                                             kernel=3)
+                                             kernel=(3))
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
                                              name='residual_block_2',
-                                             kernel=3,
+                                             kernel=(3),
                                              downsample=True,
-                                             stride=1)
-        self.avgpool = tf.keras.layers.GlobalAveragePooling1D()
+                                             stride=(1))
+        self.avgpool = tf.keras.layers.GlobalAveragePooling2D()
 
         if multi_task:
             # activity classification
@@ -55,9 +56,9 @@ class ResNet18SingleBranch(tf.keras.Model):
         #print('shape input: {}'.format(inputs.shape))
 
         # reshape input for conv1d layer (delete channel=1)
-        x = tf.reshape(inputs, [-1, inputs.shape[1], inputs.shape[2]])
+        x = tf.reshape(inputs, [-1, 1, inputs.shape[1], inputs.shape[2]])
 
-        #print('shape after reshape and transpose: {}'.format(x.shape))
+        print('shape after reshape and transpose: {}'.format(x.shape))
 
         ### CNN ###
         x = self.conv1(x)
@@ -69,7 +70,6 @@ class ResNet18SingleBranch(tf.keras.Model):
         #print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
         #print('shape res_2: {}'.format(x.shape))
-
 
         x = self.avgpool(x)
         
@@ -86,13 +86,13 @@ class BasicBlock(tf.keras.layers.Layer):
 
     def __init__(self, filter_num, kernel, stride=1, downsample=False):
         super(BasicBlock, self).__init__()
-        self.conv1 = tf.keras.layers.Conv1D(filters=filter_num,
+        self.conv1 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=stride,
                                             padding='same',
                                             kernel_regularizer=tf.keras.regularizers.l2)
         self.bn1 = tf.keras.layers.BatchNormalization()
-        self.conv2 = tf.keras.layers.Conv1D(filters=filter_num,
+        self.conv2 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=1,
                                             padding="same",
@@ -101,7 +101,7 @@ class BasicBlock(tf.keras.layers.Layer):
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
         if downsample:
             self.downsample = tf.keras.Sequential()
-            self.downsample.add(tf.keras.layers.Conv1D(filters=filter_num,
+            self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
                                                        kernel_size=1,
                                                        strides=stride))
             self.downsample.add(tf.keras.layers.BatchNormalization())

@@ -10,7 +10,7 @@ from util.utils import str2bool
 import matplotlib.pyplot as plt
 import numpy as np
 
-from util.utils import plot_pred_based_act
+from util.utils import plot_pred_based_act, save_mean_performance_txt
 
 FOLDER_LOG = 'log/'
 
@@ -20,7 +20,7 @@ if __name__ == '__main__':
         description="Arguments for train classification model")
 
     parser.add_argument(
-        '-p',
+        '-plot',
         '--plot',
         type=str2bool,
         default=False,
@@ -286,12 +286,35 @@ if __name__ == '__main__':
         '-mean_perfomance_cross_validation',
         '--mean_perfomance_cross_validation',
         type=str2bool,
-        default=True,
+        default=False,
         help='mean, on cross validation, performance on user classification based on activity'
+    )
+    parser.add_argument(
+        '-save_mean_perfomance_cross_validation',
+        '--save_mean_perfomance_cross_validation',
+        type=str2bool,
+        default=False,
+        help='save mean, on cross validation, performance on user classification')
+    parser.add_argument(
+        '-save_plot',
+        '--save_plot',
+        type=str2bool,
+        default=False
     )
     args = parser.parse_args()
 
     performance_for_activity = []  # list of shape (n_fold, n_activity)
+    mean_performances = {
+        'acc': 0,
+        'precision': 0,
+        'recall': 0,
+        'f1': 0
+    }
+
+    if args.run_colab:
+        colab_path = args.colab_path
+    else:
+        colab_path = None
 
     # GPU settings
     gpus = tf.config.list_physical_devices("GPU")
@@ -384,19 +407,51 @@ if __name__ == '__main__':
                                 model.train_model(args.epochs)
                                 if args.plot_pred_base_act_val:
                                     _ = model.plot_pred_based_act(
-                                        title='Classification accuracy based on activity on val set', test=False)
-                                model.test_model(log=args.confusion_matrix)
+                                        title='User classification accuracy based on activity on val set',
+                                        test=False,
+                                        colab_path=colab_path,
+                                        file_name=f'val_fold_{fold_test}',
+                                        save_plot=args.save_plot,
+                                        show_plot=True)
+                                performances = model.test_model(
+                                    log=args.confusion_matrix)
+                                for p, key in zip(
+                                    performances, list(
+                                        mean_performances.keys())):
+                                    mean_performances[key] += p
                                 pred_right = model.plot_pred_based_act(
-                                    title='Classification accuracy based on activity on test set', test=True)
+                                    title='User classification accuracy based on activity on test set',
+                                    test=True,
+                                    colab_path=colab_path,
+                                    file_name=f'test_fold_{fold_test}',
+                                    save_plot=args.save_plot,
+                                    show_plot=args.plot)
                                 performance_for_activity.append(pred_right)
                                 if args.save_best_model:
                                     model.best_model.save_weights(
                                         filepath=args.path_best_model, overwrite=True, save_format=None)
 
                         # mean performance for activity on different fold
-                        if args.mean_perfomance_cross_validation:
+                        if args.mean_perfomance_cross_validation and args.train:
                             plot_pred_based_act(
                                 correct_predictions=performance_for_activity,
                                 label_act=model.mapping_act_label(),
                                 folds=len([*args.fold_test]),
-                                title='Mean 10-cross classification accuracy based on activity')
+                                title='Mean 10-cross user classification accuracy based on activity',
+                                dataset_name=model.dataset_name_plot,
+                                colab_path=colab_path,
+                                file_name='mean',
+                                save_plot=args.save_plot,
+                                save_txt=True)
+
+                        for k in list(mean_performances.keys()):
+                            mean_performances[k] /= len([*args.fold_test])
+
+                        print(f"Mean accuracy, precision, recall and f1 after cross validation: {mean_performances['acc']}, {mean_performances['precision']},
+                              {mean_performances['recall']}, {mean_performances['f1']}")
+                              
+                        if args.save_mean_perfomance_cross_validation:
+                            save_mean_performance_txt(
+                                mean_performances,
+                                dataset_name=model.dataset_name_plot,
+                                colab_path=colab_path)

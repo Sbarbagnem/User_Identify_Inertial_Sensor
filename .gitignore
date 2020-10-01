@@ -22,3 +22,4 @@ save_show_plot.py
 test_metrics.py
 metrics_original_unimib.pickle
 *.png
+mean_performance

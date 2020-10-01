@@ -116,6 +116,8 @@ class Model():
             TrainData, TrainLA, TrainLU, ValidData, ValidLA, ValidLU, TestData, TestLA, TestLU = self.dataset.load_data(
                 fold_test=self.fold_test, overlapping=self.overlap, realdisp=realdisp)
 
+        self.dataset_name_plot = self.dataset_name + f'_magnitude_{str(self.magnitude).lower()}' + f'_overlap_{self.overlap}'
+
         # if true only accelerometer will be used
         if only_acc:
             if self.magnitude:
@@ -130,6 +132,7 @@ class Model():
                 TestData = TestData[:, :, [0, 1, 2]]
                 self.axes = 3
                 self.dataset._channel = 3
+            self.dataset_name_plot = self.dataset_name_plot + 'only_acc'
         
         # if true only accelerometer and gyroscope will be used
         if only_acc_gyro:
@@ -145,6 +148,7 @@ class Model():
                 TestData = TestData[:, :, [0,1,2,3,4,5]]
                 self.axes = 6
                 self.dataset._channel = 6
+            self.dataset_name_plot = self.dataset_name_plot + 'only_acc_gyro'
 
         self.dataset._channel = self.axes
 
@@ -305,6 +309,8 @@ class Model():
 
         print('data before augmented {}, data after augmented {}'.format(
             shape_original, train_augmented.shape[0]))
+
+        self.dataset_name_plot = self.dataset_name_plot + '_augmented'
 
     def build_model(self):
         print('using model: ', self.model_type)
@@ -722,6 +728,8 @@ class Model():
             sn.heatmap(df_cm, annot=True)
             plt.show()
 
+        return self.valid_accuracy_user.result().numpy(), metrics['macro_f1']
+
     def plot_distribution_data(self, val_test=True):
 
         if val_test:
@@ -871,13 +879,15 @@ class Model():
                                                 return_counts=True)[1][act]                
         return total_for_act
 
-    def plot_pred_based_act(self, title, test):
+    def plot_pred_based_act(self, title, test, colab_path, save_plot, file_name, show_plot):
 
         total_for_act = self.total_sample_for_act(test)
         pred_right = np.asarray(self.final_pred_right_act) / \
             np.asarray(total_for_act)
 
-        plot_pred_based_act(correct_predictions=pred_right, label_act=self.mapping_act_label(), title=title)
+        plot_pred_based_act(correct_predictions=pred_right, label_act=self.mapping_act_label(), 
+                            title=title, colab_path=colab_path, dataset_name=self.dataset_name_plot, 
+                            save_plot=save_plot, file_name=file_name, show_plot=show_plot)
 
         return pred_right
 
