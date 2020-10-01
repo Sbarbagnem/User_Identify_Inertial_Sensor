@@ -158,7 +158,7 @@ def plot_pred_based_act(correct_predictions, label_act, folds=1, title='', datas
     plt.xlabel('Activity')
     plt.title(title, pad=5)
     plt.xticks(np.arange(0, len(label_act)), label_act, rotation='vertical')
-    plt.yticks(np.arange(0, 1.01, 0.05))
+    plt.yticks(np.arange(0,1.1,0.1))
     plt.tight_layout()
 
     if colab_path is not None:

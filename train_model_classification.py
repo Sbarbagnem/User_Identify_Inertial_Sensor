@@ -20,13 +20,19 @@ if __name__ == '__main__':
         description="Arguments for train classification model")
 
     parser.add_argument(
-        '-plot',
-        '--plot',
+        '-plot_distribution',
+        '--plot_distribution',
         type=str2bool,
         default=False,
-        help='bool to plot or not distribution of train and test')
+        help='bool to plot or not distribution of train, val and test')
     parser.add_argument('-t', '--train', type=str2bool,
                         default=True, help='bool to train or not model')
+    parser.add_argument(
+        '-plot_pred_based_act_test',
+        '--plot_pred_based_act_test',
+        type=str2bool,
+        default=False,
+        help='bool to plot or not accuracy based on activity on test fold')
     parser.add_argument(
         '-a',
         '--augmented',
@@ -424,8 +430,8 @@ if __name__ == '__main__':
                                     test=True,
                                     colab_path=colab_path,
                                     file_name=f'test_fold_{fold_test}',
-                                    save_plot=args.save_plot,
-                                    show_plot=args.plot)
+                                    save_plot=False,
+                                    show_plot=args.plot_pred_based_act_test)
                                 performance_for_activity.append(pred_right)
                                 if args.save_best_model:
                                     model.best_model.save_weights(
