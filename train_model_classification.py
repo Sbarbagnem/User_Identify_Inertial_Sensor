@@ -396,7 +396,7 @@ if __name__ == '__main__':
                                     plot_augmented=args.plot_augmented,
                                     ratio_random_transformations=args.ratio,
                                     n_func_to_apply=args.n_func_to_apply)
-                                model.plot_distribution_data(val_test=False)
+                                #model.plot_distribution_data(val_test=False)
 
                             model.normalize_data()
 
