@@ -99,12 +99,12 @@ class Model():
         if run_colab:
             path = colab_path + ''.join(path.split('.')[1:])
 
-        if '128' not in self.dataset_name:
+        if '128' not in self.outer_dir:
             winlen = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
         else:
             winlen = 128
             
-        self.winlen = winlen
+        self.winlen = 128
 
         self.dataset = Dataset(path=path,
                                channel=channel,
