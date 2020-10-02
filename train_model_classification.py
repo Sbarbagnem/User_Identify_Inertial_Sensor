@@ -448,7 +448,7 @@ if __name__ == '__main__':
                         # mean performance for activity on different fold
                         if args.mean_perfomance_cross_validation and args.train:
                             if 'realdisp' in dataset_name:
-                                dataset_name_plot = model.dataset_name_plot + f"_{'_'.join(args.sensor_displace)}"
+                                dataset_name_plot = model.dataset_name_plot + f"_{'_'.join(args.sensor_displace)}_wl_{model.winlen}"
                             else:
                                 dataset_name_plot = model.dataset_name_plot
                             plot_pred_based_act(
