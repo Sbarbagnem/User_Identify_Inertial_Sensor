@@ -343,6 +343,8 @@ if __name__ == '__main__':
                                     outer_dir = 'OuterPartition_magnitude_wl_128_'
                                 elif 'realdisp' in dataset_name:
                                     outer_dir = f"OuterPartition_magnitude_{'_'.join(args.sensor_displace)}_"
+                                elif 'realdisp_128w' in dataset_name:
+                                    outer_dir = f"OuterPartition_magnitude_{'_'.join(args.sensor_displace)}_wl_128_"
                                 else:
                                     outer_dir = 'OuterPartition_magnitude_'
                                 save_dir = FOLDER_LOG + 'log_magnitude'
@@ -439,12 +441,16 @@ if __name__ == '__main__':
 
                         # mean performance for activity on different fold
                         if args.mean_perfomance_cross_validation and args.train:
+                            if 'realdisp' in dataset_name:
+                                dataset_name_plot = model.dataset_name_plot + f"_{'_'.join(args.sensor_displace)}"
+                            else:
+                                dataset_name_plot = model.dataset_name_plot
                             plot_pred_based_act(
                                 correct_predictions=performance_for_activity,
                                 label_act=model.mapping_act_label(),
                                 folds=len([*args.fold_test]),
                                 title='Mean 10-cross user classification accuracy based on activity',
-                                dataset_name=model.dataset_name_plot,
+                                dataset_name=dataset_name_plot,
                                 colab_path=colab_path,
                                 file_name='mean',
                                 save_plot=args.save_plot,
@@ -458,5 +464,5 @@ if __name__ == '__main__':
                         if args.save_mean_perfomance_cross_validation:
                             save_mean_performance_txt(
                                 mean_performances,
-                                dataset_name=model.dataset_name_plot,
+                                dataset_name=dataset_name_plot,
                                 colab_path=colab_path)

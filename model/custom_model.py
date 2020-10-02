@@ -99,9 +99,16 @@ class Model():
         if run_colab:
             path = colab_path + ''.join(path.split('.')[1:])
 
+        if '128' not in self.dataset_name:
+            winlen = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
+        else:
+            winlen = 128
+            
+        self.winlen = winlen
+
         self.dataset = Dataset(path=path,
                                channel=channel,
-                               winlen=self.configuration.config[self.dataset_name]['WINDOW_SAMPLES'],
+                               winlen=winlen,
                                user_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_USER'],
                                act_num=self.configuration.config[self.dataset_name]['NUM_CLASSES_ACTIVITY'],
                                outer_dir=self.outer_dir)
@@ -311,6 +318,8 @@ class Model():
             shape_original, train_augmented.shape[0]))
 
         self.dataset_name_plot = self.dataset_name_plot + '_augmented'
+        if self.winlen != 100:
+            self.dataset_name_plot = self.dataset_name_plot + '_w_128'
 
     def build_model(self):
         print('using model: ', self.model_type)
@@ -334,7 +343,7 @@ class Model():
                 self.num_act, self.num_user
             )
 
-        samples = self.configuration.config[self.dataset_name]['WINDOW_SAMPLES']
+        samples = self.winlen
         self.model.build(input_shape=(None, samples, self.axes, 1))
 
     def print_model_summary(self):
