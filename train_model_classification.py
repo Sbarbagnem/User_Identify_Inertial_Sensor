@@ -444,12 +444,11 @@ if __name__ == '__main__':
                                 if args.save_best_model:
                                     model.best_model.save_weights(
                                         filepath=args.path_best_model, overwrite=True, save_format=None)
-                        print(model.dataset_name_plot + f"_{'_'.join(args.sensor_displace)}_wl_{model.winlen}")
-                        sys.exit()
+                        print(model.dataset_name_plot + f"_{'_'.join(args.sensor_displace)}_wl_{args.win_len}")
                         # mean performance for activity on different fold
                         if args.mean_perfomance_cross_validation and args.train:
                             if 'realdisp' in dataset_name:
-                                dataset_name_plot = model.dataset_name_plot + f"_{'_'.join(args.sensor_displace)}_wl_{model.winlen}"
+                                dataset_name_plot = model.dataset_name_plot + f"_{'_'.join(args.sensor_displace)}_wl_{args.win_len}"
                             else:
                                 dataset_name_plot = model.dataset_name_plot
                             plot_pred_based_act(
