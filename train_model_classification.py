@@ -453,7 +453,7 @@ if __name__ == '__main__':
                         for k in list(mean_performances.keys()):
                             mean_performances[k] /= len([*args.fold_test])
 
-                        print("Mean accuracy, f1 after cross validation: {} {} {} {}".format(mean_performances['acc'], mean_performances['f1']))
+                        print("Mean accuracy, f1 after cross validation: {} {}".format(mean_performances['acc'], mean_performances['f1']))
                               
                         if args.save_mean_perfomance_cross_validation:
                             save_mean_performance_txt(
