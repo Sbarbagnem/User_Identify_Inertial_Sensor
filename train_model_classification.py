@@ -462,13 +462,13 @@ if __name__ == '__main__':
                                 save_plot=args.save_plot,
                                 save_txt=True)
 
-                        for k in list(mean_performances.keys()):
-                            mean_performances[k] /= len([*args.fold_test])
+                            for k in list(mean_performances.keys()):
+                                mean_performances[k] /= len([*args.fold_test])
 
-                        print("Mean accuracy, f1 after cross validation: {} {}".format(mean_performances['acc'], mean_performances['f1']))
-                              
-                        if args.save_mean_perfomance_cross_validation:
-                            save_mean_performance_txt(
-                                mean_performances,
-                                dataset_name=dataset_name_plot,
-                                colab_path=colab_path)
+                            print("Mean accuracy, f1 after cross validation: {} {}".format(mean_performances['acc'], mean_performances['f1']))
+                                
+                            if args.save_mean_perfomance_cross_validation:
+                                save_mean_performance_txt(
+                                    mean_performances,
+                                    dataset_name=dataset_name_plot,
+                                    colab_path=colab_path)
