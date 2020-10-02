@@ -104,7 +104,7 @@ class Model():
         else:
             winlen = 128
             
-        self.winlen = 128
+        self.winlen = winlen
 
         self.dataset = Dataset(path=path,
                                channel=channel,
