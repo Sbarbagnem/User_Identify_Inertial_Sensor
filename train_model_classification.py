@@ -307,6 +307,12 @@ if __name__ == '__main__':
         type=str2bool,
         default=False
     )
+    parser.add_argument(
+        '-win_len',
+        '--win_len',
+        type=int,
+        default=100
+    )
     args = parser.parse_args()
 
     performance_for_activity = []  # list of shape (n_fold, n_activity)
@@ -343,7 +349,7 @@ if __name__ == '__main__':
                                     outer_dir = 'OuterPartition_magnitude_wl_128_'
                                 elif 'realdisp' in dataset_name:
                                     outer_dir = f"OuterPartition_magnitude_{'_'.join(args.sensor_displace)}_"
-                                elif 'realdisp_128w' in dataset_name:
+                                elif 'realdisp' in dataset_name and args.win_len == 128:
                                     outer_dir = f"OuterPartition_magnitude_{'_'.join(args.sensor_displace)}_wl_128_"
                                 else:
                                     outer_dir = 'OuterPartition_magnitude_'
