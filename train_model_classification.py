@@ -451,6 +451,11 @@ if __name__ == '__main__':
                                     model.best_model.save_weights(
                                         filepath=args.path_best_model, overwrite=True, save_format=None)
 
+                        for k in list(mean_performances.keys()):
+                            mean_performances[k] /= len([*args.fold_test])
+
+                        print("Mean accuracy, f1 after cross validation: {} {}".format(mean_performances['acc'], mean_performances['f1']))
+
                         # mean performance for activity on different fold
                         if args.mean_perfomance_cross_validation and args.train:
                             if 'realdisp' in dataset_name:
@@ -467,11 +472,6 @@ if __name__ == '__main__':
                                 file_name='mean',
                                 save_plot=args.save_plot,
                                 save_txt=True)
-
-                            for k in list(mean_performances.keys()):
-                                mean_performances[k] /= len([*args.fold_test])
-
-                            print("Mean accuracy, f1 after cross validation: {} {}".format(mean_performances['acc'], mean_performances['f1']))
                                 
                             if args.save_mean_perfomance_cross_validation:
                                 save_mean_performance_txt(
