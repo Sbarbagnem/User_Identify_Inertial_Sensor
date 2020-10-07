@@ -321,11 +321,11 @@ class Model():
         if self.winlen != 100:
             self.dataset_name_plot = self.dataset_name_plot + '_w_128'
 
-    def build_model(self):
+    def build_model(self, stride=1):
         print('using model: ', self.model_type)
         if self.model_type == 'resnet18_2D':
             self.model = resnet2D(
-                self.multi_task, self.num_act, self.num_user)
+                self.multi_task, self.num_act, self.num_user, stride=stride)
         if self.model_type == 'resnet18_multi_branch':
             self.model = resnet18MultiBranch(
                 self.sensor_dict, self.num_user, self.magnitude)

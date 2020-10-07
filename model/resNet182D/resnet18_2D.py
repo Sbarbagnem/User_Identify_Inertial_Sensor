@@ -7,7 +7,7 @@ import sys
 
 
 class ResNet18SingleBranch(tf.keras.Model):
-    def __init__(self, layer_params, multi_task, num_act, num_user):
+    def __init__(self, multi_task, num_act, num_user, stride=1):
         super(ResNet18SingleBranch, self).__init__()
 
         self.multi_task = multi_task
@@ -37,7 +37,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         self.layer2 = make_basic_block_layer(filter_num=64,
                                              blocks=2,
                                              name='residual_block_2',
-                                             stride=1,
+                                             stride=stride,
                                              kernel=(3,3))
         self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
 
@@ -131,5 +131,5 @@ def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1):
     return res_block
 
 
-def resnet18(multi_task, num_act, num_user):
-    return ResNet18SingleBranch(layer_params=[2, 2, 2, 2], multi_task=multi_task, num_act=num_act, num_user=num_user)
+def resnet18(multi_task, num_act, num_user, stride):
+    return ResNet18SingleBranch(multi_task=multi_task, num_act=num_act, num_user=num_user, stride=stride)

@@ -313,6 +313,12 @@ if __name__ == '__main__':
         type=int,
         default=100
     )
+    parser.add_argument(
+    '-stride',
+    '--stride',
+    type=int,
+    default=1
+    )
     args = parser.parse_args()
 
     performance_for_activity = []  # list of shape (n_fold, n_activity)
@@ -412,7 +418,7 @@ if __name__ == '__main__':
                             model.tf_dataset(
                                 args.weighted_based_on, args.weighted)
 
-                            model.build_model()
+                            model.build_model(stride=args.stride)
                             if args.print_model_summary:
                                 model.print_model_summary()
 
