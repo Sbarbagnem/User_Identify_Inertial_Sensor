@@ -12,7 +12,7 @@ from util.tf_metrics import custom_metrics
 class ModelGait():
     def __init__(self, config, colab_path):
         if colab_path != '':
-            self.path_data = colab_path + config['ouisir']['PATH_DATA']
+            self.path_data = colab_path + ''.join(config['ouisir']['PATH_DATA'].split('.')[1:])
         else:
             self.path_data = colab_path + config['ouisir']['PATH_DATA']
         self.num_user = config['ouisir']['NUM_CLASSES_USER']
