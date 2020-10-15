@@ -22,19 +22,19 @@ if __name__ == '__main__':
         '-summary_model',
         '--summary_model',
         type=str2bool, 
-        deafult=False
+        default=False
     )
     parser.add_argument(
         '-init_lr',
         '--init_lr',
         type=int, 
-        deafult=0.001
+        default=0.001
     )
     parser.add_argument(
         '-log_train',
         '--log_train',
         type=str2bool, 
-        deafult=False
+        default=False
     )    
     args = parser.parse_args()
 
