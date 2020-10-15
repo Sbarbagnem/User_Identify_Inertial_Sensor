@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-init_lr',
         '--init_lr',
-        type=int, 
+        type=float, 
         default=0.001
     )
     parser.add_argument(
