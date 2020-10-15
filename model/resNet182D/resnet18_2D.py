@@ -14,6 +14,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         if multi_task:
             self.num_act = num_act
         self.num_user = num_user
+        self.fc = fc
 
         # features about single axis sensor (kernel len from metier paper)
 
@@ -47,6 +48,9 @@ class ResNet18SingleBranch(tf.keras.Model):
                                                      activation=tf.keras.activations.softmax,
                                                      name='fc_act')
 
+        if self.fc:
+            self.fc1 = tf.keras.layers.Dense(int(self.num_user*1.5), activation='relu')
+            self.drpoout = tf.keras.layers.Dropout(0.2)
         # user classification
         self.fc_user = tf.keras.layers.Dense(units=num_user,
                                              activation=tf.keras.activations.softmax,
@@ -69,6 +73,10 @@ class ResNet18SingleBranch(tf.keras.Model):
         #print('shape res_2: {}'.format(x.shape))
         out_cnn = self.avgpool_2d(x)
         #print('shape avg_pool: {}'.format(out_cnn.shape))
+        if self.fc:
+            out_cnn = self.fc1(out_cnn)
+            out_cnn = self.drpoout(out_cnn)
+            #print('shape dense: {}'.format(out_cnn.shape))
 
         if self.multi_task:
             output_activity = self.fc_activity(out_cnn)

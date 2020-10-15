@@ -260,11 +260,12 @@ def smooth(coef):
     return y
 
 def detectGaitCycle(data, plot_peak=False):
+
     data = data[:,2] # z axis
-    t = 0.4 #1/2
-    alpha = 0.5 #1/4
-    beta = 0.7 #3/4 0.7
-    gamma = 0.35 #1/6
+    t = 0.4 #0.4 1/2
+    alpha = 0.5 #0.5 1/4
+    beta = 0.7 #0.7 3/4
+    gamma = 0.35 #0.35 1/6
 
     # all peaks 
     all_peak_pos = []
@@ -339,7 +340,8 @@ def detectGaitCycle(data, plot_peak=False):
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(data.shape[0]), data, 'b-')
-        plt.scatter(filter_peaks_pos, data[filter_peaks_pos], c='red')
+        #plt.scatter(filter_peaks_pos, data[filter_peaks_pos], c='red')
+        plt.vlines(filter_peaks_pos, ymin=min(data)*0.95, ymax=max(data)*0.95, color='r', ls='--')
         plt.tight_layout()
         plt.show()
 

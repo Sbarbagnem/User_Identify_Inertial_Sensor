@@ -36,6 +36,23 @@ if __name__ == '__main__':
         type=str2bool, 
         default=False
     )    
+    parser.add_argument(
+        '-stride',
+        '--stride',
+        default=1,
+        type=int)
+    parser.add_argument(
+        '-fc',
+        '--fc',
+        type=str2bool,
+        default=False
+    )
+    parser.add_argument(
+        '-train',
+        '--train',
+        type=str2bool,
+        default=True
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -49,7 +66,8 @@ if __name__ == '__main__':
     model.split_train_test()
     model.normalize_data()
     model.create_tf_dataset()
-    model.build_model(summary=args.summary_model)
-    model.loss_metric(init_lr=args.init_lr)
-    model.train_model(log=args.log_train)
-    model.test_model()
+    model.build_model(stride=args.stride, fc=args.fc, summary=args.summary_model)
+    if args.train:
+        model.loss_metric(init_lr=args.init_lr)
+        model.train_model(log=args.log_train)
+        model.test_model()

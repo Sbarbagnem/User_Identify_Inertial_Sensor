@@ -54,8 +54,8 @@ class ModelGait():
                 self.test), tf.data.Dataset.from_tensor_slices(
                 self.test_label))).batch(1)
 
-    def build_model(self, summary=False):
-        self.model = resnet18(False, 1, self.num_user)
+    def build_model(self, stride, fc, summary=False):
+        self.model = resnet18(False, 1, self.num_user, stride, fc)
         self.model.build(input_shape=(None, self.window_sample, self.axis, 1))
         if summary:
             self.model.summary()
