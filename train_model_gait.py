@@ -40,7 +40,8 @@ if __name__ == '__main__':
         '-stride',
         '--stride',
         default=1,
-        type=int)
+        type=int
+    )
     parser.add_argument(
         '-fc',
         '--fc',
@@ -52,6 +53,12 @@ if __name__ == '__main__':
         '--train',
         type=str2bool,
         default=True
+    )
+    parser.add_argument(
+        '-epochs',
+        '--epochs',
+        default=1,
+        type=int
     )
     args = parser.parse_args()
 
@@ -69,5 +76,5 @@ if __name__ == '__main__':
     model.build_model(stride=args.stride, fc=args.fc, summary=args.summary_model)
     if args.train:
         model.loss_metric(init_lr=args.init_lr)
-        model.train_model(log=args.log_train)
+        model.train_model(log=args.log_train, epochs=args.epochs)
         model.test_model()
