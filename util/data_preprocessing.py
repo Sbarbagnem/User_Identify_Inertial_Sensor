@@ -10,11 +10,88 @@ from pprint import pprint
 import numpy as np
 from scipy import stats
 from scipy.io import loadmat
+from scipy.interpolate import UnivariateSpline
 from sklearn import utils as skutils
 import matplotlib.pyplot as plt
+import pywt
 
 from sliding_window import sliding_window
-from utils import str2bool, split_balanced_data
+from utils import str2bool, split_balanced_data, denoiseData, detectGaitCycle, segment2GaitCycle
+
+def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, plot_interpolated=False):
+
+    # define variables
+    data = []
+    lu = []
+    lu_temp = 0
+
+    # read files
+    print('Read csv file')
+    for f in tqdm(os.listdir(path_data)):
+        # read only acc data
+        df = pd.read_csv(path_data + '/' + f, header=None, skiprows=2, usecols=[3,4,5])
+
+        # stack data and label user
+        data.append(df.values)
+        lu.append(lu_temp)
+
+        if 'seq1' in f:
+            lu_temp += 1
+
+    # noise remove with Daubechies wavelet level 2
+    print('Denoising data')
+    data = denoiseData(data, plot_denoise)
+
+    # compute peak gait cycle 
+    print('Find peaks gait cycles')
+    peaks = []
+    for d in tqdm(data):
+        peak_position = detectGaitCycle(d, plot_peak)
+        peaks.append(peak_position)
+
+    # divide data in gait cycle based on peak position found 
+    print('Split segment in gayt cycles')
+    data_gait_cycle = []
+    label_user_cycle = []
+    for peak,segment,user in zip(peaks, data, lu):
+        cycles = segment2GaitCycle(peak,segment)
+        data_gait_cycle.extend(cycles)
+        label_user_cycle.extend([user]*len(cycles))
+
+    # spline interpolation to 120 samples for gait
+    print('Interpole cycle to 120 fixed sample')
+    cycles_interpolated = []
+    for cycle in data_gait_cycle:
+        interpolated = np.zeros((1,120,cycle.shape[2]))
+        for dim in np.arange(cycle.shape[2]):
+            interpolated[0,:,dim] = UnivariateSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim], k=3,s=0)(np.linspace(0,cycle.shape[1]-1,120))
+            if plot_interpolated:
+                plt.figure(figsize=(12, 3))
+                plt.style.use('seaborn-darkgrid')
+                plt.subplot(1, 2, 1)
+                plt.title(f'original')
+                plt.plot(np.arange(cycle.shape[1]), cycle[0,:,dim], 'b-', label='noise')
+                plt.subplot(1, 2, 2)
+                plt.title(f'interpolated')
+                plt.plot(np.arange(interpolated.shape[1]), interpolated[0,:,dim], 'b-', label='denoise')
+                plt.tight_layout()
+                plt.show()
+        cycles_interpolated.append(interpolated)
+
+    cycles_interpolated = np.concatenate(cycles_interpolated, axis=0)
+
+    print(f'Found {cycles_interpolated.shape[0]} gait cycles')
+
+    # compute magnitude
+    print('Compute magnitude')
+    cycles_interpolated = np.concatenate((cycles_interpolated, np.sqrt(np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True))), axis=2)
+
+    if os.path.exists(path_out):
+        shutil.rmtree(path_out)
+    os.mkdir(path_out)
+
+    np.save(path_out + '/data', cycles_interpolated)
+    np.save(path_out + '/user_label', label_user_cycle)
 
 
 def realdisp_process(
@@ -587,6 +664,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="preprocessing pipeline for signal")
 
+    # for all dataset
     parser.add_argument(
         '-dataset',
         '--dataset',
@@ -617,6 +695,8 @@ if __name__ == '__main__':
         default=[True],
         nargs='+',
         help='bool use or not magnitude')
+
+    # for realdisp dataset
     parser.add_argument(
         '-sensor_place',
         '--sensor_place',
@@ -643,6 +723,26 @@ if __name__ == '__main__':
         default=['ideal'],
         choices=['ideal', 'self', 'mutual'],
         help='for only realdisp dataset, choose types of sensor displacemente using'
+    )
+
+    # for ouisir dataset
+    parser.add_argument(
+        '-plot_denoise',
+        '--plot_denoise',
+        type=str2bool,
+        default=False
+    )
+    parser.add_argument(
+        '-plot_peak',
+        '--plot_peak',
+        type=str2bool,
+        default=False
+    )
+    parser.add_argument(
+        '-plot_interpolated',
+        '--plot_interpolated',
+        type=str2bool,
+        default=False
     )
 
     args = parser.parse_args()
@@ -694,3 +794,11 @@ if __name__ == '__main__':
                     magnitude=magnitude,
                     size_overlapping=overlap,
                     win_len=args.win_len)
+            elif args.dataset == 'ouisir':
+                ou_isir_process(
+                    path_data = '../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
+                    path_out = '../data/datasets/OUISIR_processed/', 
+                    plot_denoise=args.plot_denoise,
+                    plot_peak=args.plot_peak,
+                    plot_interpolated=args.plot_interpolated
+                )

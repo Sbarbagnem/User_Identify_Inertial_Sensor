@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import sys
+import pywt
+from pprint import pprint
+from sklearn import utils as skutils
 
 
 def plot_performance(ActivityAccuracy, UserAccuracy, fold, path_to_save, save=False):
@@ -42,7 +45,7 @@ def split_balanced_data(lu, la, folders, di=None, log=True):
     # dict to save indexes' example for every folder
     indexes = {}
     for i in np.arange(folders):
-        indexes[str(i)] = []
+        indexes[str[i]] = []
 
     last_folder = 0
 
@@ -200,4 +203,213 @@ def save_mean_performance_txt(performances, dataset_name, colab_path):
     for key in list(performances.keys()):
         f.write(f"{key}: {performances[key]}\r\n")
     f.close()
+
+def denoiseData(data, plot=False):
+    for i,x in enumerate(data):       
+        if x.shape[0] % 2 != 0:
+            x = x[1:,:]           
+        n = x.shape[0]   
+        for dim in np.arange(x.shape[1]):
+            coeffs = pywt.wavedec(x[:,dim], 'db6', level=2)
+            # set high coef to 0
+            coeffs[-1] = np.zeros_like(coeffs[-1])
+            coeffs[-2] = np.zeros_like(coeffs[-2])
+            temp = pywt.waverec(coeffs, 'db6')
+            if plot:
+                plt.figure(figsize=(12, 3))
+                plt.style.use('seaborn-darkgrid')
+                plt.subplot(1, 2, 1)
+                plt.title(f'noise')
+                plt.plot(np.arange(n), x[:,dim], 'b-', label='noise')
+                plt.subplot(1, 2, 2)
+                plt.title(f'denoise')
+                plt.plot(np.arange(temp.shape[0]), temp, 'b-', label='denoise')
+                plt.tight_layout()
+                plt.show()
+            x[:,dim] = temp
+        data[i] = x
+    return data
+
+def calAutoCorrelation(data):
+    n = len(data)
+    autocorrelation_coeff = np.zeros(n)
+
+    '''
+    den = np.sum(data[:]**2)
+
+    for t in range(0,n-1):
+        for j in range(0,n-t):
+            autocorrelation_coeff[t] = autocorrelation_coeff[t] + data[j]*data[j+t]
+        autocorrelation_coeff[t] = (n/n-t)*(autocorrelation_coeff[t]/den)
+    '''
+
+    autocorrelation_coeff[0]= np.sum(data[:]**2)/n
+    for t in range(1,n-1):
+        for j in range(1,n-t):
+            autocorrelation_coeff[t]= autocorrelation_coeff[t] + data[j]*data[j+t]
+        autocorrelation_coeff[t]= autocorrelation_coeff[t] /(n-t)
+    
+    autocorrelation_coeff = autocorrelation_coeff/np.max(autocorrelation_coeff)
+    return autocorrelation_coeff
+
+def smooth(coef):
+    window_len = 5
+    s=np.r_[coef[window_len-1:0:-1],coef,coef[-1:-window_len:-1]]
+    w=np.ones(window_len,'d')
+    y=np.convolve(w/w.sum(),s,mode='valid')
+    return y
+
+def detectGaitCycle(data, plot_peak=False):
+    data = data[:,2] # z axis
+    t = 0.4 #1/2
+    alpha = 0.5 #1/4
+    beta = 0.7 #3/4 0.7
+    gamma = 0.35 #1/6
+
+    # all peaks 
+    all_peak_pos = []
+    for i in range(1, data.shape[0]-1):
+        if(data[i] < data[i-1] and data[i] < data[i+1]):
+            all_peak_pos.append(i)
+
+    # filter list of peaks based on mean and standard deviation
+    std_allPeak = np.std(data[all_peak_pos])
+    mean_allPeak = np.mean(data[all_peak_pos])
+    threshold = mean_allPeak + std_allPeak*t
+    filter_peaks_pos = []
+    for peak in all_peak_pos:
+        if(data[peak] < threshold):
+            filter_peaks_pos.append(peak)
+
+    # compute autcorrelation to estimate len cycle
+    auto_corr_coeff = calAutoCorrelation(data)
+
+    # smooth the auto_correlation_coefficient
+    for i in range(5):
+        auto_corr_coeff = smooth(auto_corr_coeff)
+
+    # approximate the length of a gait cycle by selecting the 2nd peak (positive) in the auto correlation signal
+    gcLen = 0
+    flag = 0
+    for i in range(1,auto_corr_coeff.shape[0]-1):
+        if(auto_corr_coeff[i] >auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1]):
+            flag += 1
+            if flag ==1:
+                continue
+            elif flag ==2:
+                gcLen = i-1
+                break
+
+    # find first candidate peak
+    i=1
+    while i < len(filter_peaks_pos)-1:
+        if filter_peaks_pos[i] - filter_peaks_pos[i-1] < gcLen and data[filter_peaks_pos[i]] < data[filter_peaks_pos[i-1]]:
+            filter_peaks_pos.remove(filter_peaks_pos[i-1])
+        else:
+            break
+        i += 1
+
+    # find all candidate peak
+    i = 1
+    while i < len(filter_peaks_pos)-1:
+        if filter_peaks_pos[i]-filter_peaks_pos[i-1] < alpha*gcLen:
+            if data[filter_peaks_pos[i]] <= data[filter_peaks_pos[i-1]]:
+                filter_peaks_pos.remove(filter_peaks_pos[i-1])
+                continue
+            else:
+                filter_peaks_pos.remove(filter_peaks_pos[i])
+                continue
+        elif filter_peaks_pos[i]-filter_peaks_pos[i-1] < beta*gcLen:
+            if filter_peaks_pos[i+1] - filter_peaks_pos[i] < gamma*gcLen:
+                if data[filter_peaks_pos[i+1]] <= data[filter_peaks_pos[i]]:
+                    filter_peaks_pos.remove(filter_peaks_pos[i])
+                    continue
+                else:
+                    filter_peaks_pos.remove(filter_peaks_pos[i+1])
+                    continue
+            else:
+                filter_peaks_pos.remove(filter_peaks_pos[i])
+                continue
+        i=i+1
+
+    if filter_peaks_pos[-1]-filter_peaks_pos[-2] < beta*gcLen:
+        filter_peaks_pos.remove(filter_peaks_pos[-1])
+
+    if plot_peak:
+        plt.figure(figsize=(12, 3))
+        plt.style.use('seaborn-darkgrid')
+        plt.plot(np.arange(data.shape[0]), data, 'b-')
+        plt.scatter(filter_peaks_pos, data[filter_peaks_pos], c='red')
+        plt.tight_layout()
+        plt.show()
+
+    return filter_peaks_pos
+
+def segment2GaitCycle(peaks,segment):
+    cycles = []
+    for i in range(0,len(peaks)-1):
+        cycle = segment[peaks[i]:peaks[i+1],:]
+        cycle = cycle[np.newaxis,:,:]
+        cycles.append(cycle)
+    return cycles
+
+
+def split_data_tran_val_test_gait(data, label_user, train_gait=8, val_test=0.5):
+
+    # shuffle data and label
+    data, label_user = skutils.shuffle(data, label_user)
+    data, label_user = skutils.shuffle(data, label_user)
+
+    data_for_user = []
+    label_for_user = []
+
+    for user in np.unique(label_user):
+        data_for_user.append(data[np.where(label_user == user)])
+        label_for_user.append(label_user[np.where(label_user == user)])
+
+    train_data = []
+    val_data = []
+    test_data = []
+    train_label = []
+    val_label = []
+    test_label = []
+
+    # take a number of train_gait cycle for every user
+    for i,gait in enumerate(data_for_user):
+        train_data.append(gait[:train_gait,:,:])
+        train_label.extend(label_for_user[i][:train_gait])
+        data_for_user[i] = np.delete(gait, np.arange(train_gait), 0)
+        label_for_user[i] = label_for_user[i][train_gait:]
+
+    # val_test percentage for validation and test set
+    for i,gait in enumerate(data_for_user):
+        stop = int(gait.shape[0]/2)
+        val_data.append(gait[:stop,:,:])
+        val_label.extend(label_for_user[i][:stop])  
+        test_data.append(gait[stop:,:,:])
+        test_label.extend(label_for_user[i][stop:])  
+
+    train_data = np.concatenate(train_data, axis=0)
+    val_data = np.concatenate(val_data, axis=0)
+    test_data = np.concatenate(test_data, axis=0)
+    train_label = np.asarray(train_label)
+    val_label = np.asarray(val_label)
+    test_label = np.asarray(test_label)
+
+    return train_data, val_data, test_data, train_label, val_label, test_label
+
+def normalize_data(train, val, test, axis):
+
+    mean = np.mean(np.reshape(train, [-1, axis]), axis=0)
+    std = np.std(np.reshape(train, [-1, axis]), axis=0)
+
+    train = (train - mean)/std
+    val = (val - mean)/std
+    test = (test - mean)/std
+
+    train = np.expand_dims(train, 3)
+    val = np.expand_dims(val,  3)     
+    test = np.expand_dims(test, 3)
+    
+    return train, val, test
 
