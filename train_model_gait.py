@@ -49,7 +49,7 @@ if __name__ == '__main__':
     model.split_train_test()
     model.normalize_data()
     model.create_tf_dataset()
-    model.build_model(summary=args.summary)
+    model.build_model(summary=args.summary_model)
     model.loss_metric(init_lr=args.init_lr)
     model.train_model(log=args.log_train)
     model.test_model()
