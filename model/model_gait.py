@@ -5,6 +5,7 @@ import pandas as pd
 import seaborn as sn
 
 from model.resNet182D.resnet18_2D import resnet18
+from model.model_paper.model import ModelPaper
 from util.utils import split_data_tran_val_test_gait, normalize_data
 from util.tf_metrics import custom_metrics
 
@@ -54,8 +55,11 @@ class ModelGait():
                 self.test), tf.data.Dataset.from_tensor_slices(
                 self.test_label))).batch(1)
 
-    def build_model(self, stride, fc, summary=False):
-        self.model = resnet18(False, 1, self.num_user, stride, fc)
+    def build_model(self, stride, fc, summary=False, name='our'):
+        if name == 'our':
+            self.model = resnet18(False, 1, self.num_user, stride, fc)
+        else:
+            self.model = ModelPaper(self.num_user)
         self.model.build(input_shape=(None, self.window_sample, self.axis, 1))
         if summary:
             self.model.summary()

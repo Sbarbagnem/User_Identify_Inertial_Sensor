@@ -73,7 +73,7 @@ if __name__ == '__main__':
     model.split_train_test()
     model.normalize_data()
     model.create_tf_dataset()
-    model.build_model(stride=args.stride, fc=args.fc, summary=args.summary_model)
+    model.build_model(stride=args.stride, fc=args.fc, summary=args.summary_model, name='paper')
     if args.train:
         model.loss_metric(init_lr=args.init_lr)
         model.train_model(log=args.log_train, epochs=args.epochs)

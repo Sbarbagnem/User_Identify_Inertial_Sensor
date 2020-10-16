@@ -421,5 +421,5 @@ def normalize_data(train, val, test, axis):
     train = np.expand_dims(train, 3)
     val = np.expand_dims(val,  3)     
     test = np.expand_dims(test, 3)
-    
+
     return train, val, test
