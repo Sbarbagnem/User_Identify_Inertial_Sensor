@@ -234,15 +234,6 @@ def calAutoCorrelation(data):
     n = len(data)
     autocorrelation_coeff = np.zeros(n)
 
-    '''
-    den = np.sum(data[:]**2)
-
-    for t in range(0,n-1):
-        for j in range(0,n-t):
-            autocorrelation_coeff[t] = autocorrelation_coeff[t] + data[j]*data[j+t]
-        autocorrelation_coeff[t] = (n/n-t)*(autocorrelation_coeff[t]/den)
-    '''
-
     autocorrelation_coeff[0]= np.sum(data[:]**2)/n
     for t in range(1,n-1):
         for j in range(1,n-t):
@@ -293,7 +284,7 @@ def detectGaitCycle(data, plot_peak=False):
     gcLen = 0
     flag = 0
     for i in range(1,auto_corr_coeff.shape[0]-1):
-        if(auto_corr_coeff[i] >auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1]):
+        if(auto_corr_coeff[i] > auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1]):
             flag += 1
             if flag ==1:
                 continue
@@ -336,6 +327,23 @@ def detectGaitCycle(data, plot_peak=False):
     if filter_peaks_pos[-1]-filter_peaks_pos[-2] < beta*gcLen:
         filter_peaks_pos.remove(filter_peaks_pos[-1])
 
+    # final check on len on gait found
+    # if there is a gait grater then gcLen*1.7 must be probabily divided in two gait
+    med_len = [filter_peaks_pos[i+1] - filter_peaks_pos[i]  for i,_ in enumerate(filter_peaks_pos[:-1])]
+    med_len = np.sum(med_len)/len(med_len)
+
+    i = 1
+    j = 0
+    peak_pos_modified = filter_peaks_pos[:]
+    while i < len(filter_peaks_pos):
+        if filter_peaks_pos[i] - filter_peaks_pos[i-1] > 1.5*med_len:
+            peak_pos_modified[i+j:i+j] = [int((filter_peaks_pos[i] - filter_peaks_pos[i-1])/2) + filter_peaks_pos[i-1]]
+            i += 1
+            j += 1
+            continue
+        i += 1
+    filter_peaks_pos = peak_pos_modified
+
     if plot_peak:
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
@@ -366,8 +374,9 @@ def split_data_tran_val_test_gait(data, label_user, train_gait=8, val_test=0.5):
     label_for_user = []
 
     for user in np.unique(label_user):
-        data_for_user.append(data[np.where(label_user == user)])
-        label_for_user.append(label_user[np.where(label_user == user)])
+        idx_user = np.where(label_user == user)
+        data_for_user.append(data[idx_user])
+        label_for_user.append(label_user[idx_user])
 
     train_data = []
     val_data = []
@@ -378,7 +387,7 @@ def split_data_tran_val_test_gait(data, label_user, train_gait=8, val_test=0.5):
 
     # take a number of train_gait cycle for every user
     for i,gait in enumerate(data_for_user):
-        train_data.append(gait[:train_gait,:,:])
+        train_data.append(gait[:train_gait])
         train_label.extend(label_for_user[i][:train_gait])
         data_for_user[i] = np.delete(gait, np.arange(train_gait), 0)
         label_for_user[i] = label_for_user[i][train_gait:]
@@ -386,9 +395,9 @@ def split_data_tran_val_test_gait(data, label_user, train_gait=8, val_test=0.5):
     # val_test percentage for validation and test set
     for i,gait in enumerate(data_for_user):
         stop = int(gait.shape[0]/2)
-        val_data.append(gait[:stop,:,:])
+        val_data.append(gait[:stop])
         val_label.extend(label_for_user[i][:stop])  
-        test_data.append(gait[stop:,:,:])
+        test_data.append(gait[stop:])
         test_label.extend(label_for_user[i][stop:])  
 
     train_data = np.concatenate(train_data, axis=0)
@@ -414,4 +423,3 @@ def normalize_data(train, val, test, axis):
     test = np.expand_dims(test, 3)
     
     return train, val, test
-

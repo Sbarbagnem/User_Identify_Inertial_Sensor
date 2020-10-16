@@ -46,20 +46,22 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     print('Find peaks gait cycles')
     peaks = []
     for d in tqdm(data):
-        peak_position = detectGaitCycle(d, plot_peak)
-        peaks.append(peak_position)
+        peaks.append(detectGaitCycle(d, plot_peak))
 
     # divide data in gait cycle based on peak position found 
     print('Split segment in gayt cycles')
     data_gait_cycle = []
     label_user_cycle = []
     for peak,segment,user in zip(peaks, data, lu):
-        cycles = segment2GaitCycle(peak,segment)
-        data_gait_cycle.extend(cycles)
-        label_user_cycle.extend([user]*len(cycles))
+        data_gait_cycle.extend(segment2GaitCycle(peak,segment))
+        label_user_cycle.extend([user]*(len(peak)-1))
+
+    # compute magnitude
+    print('Compute magnitude')
+    data_gait_cycle = [np.concatenate((gait, np.sum(np.power(gait, 2), 2, keepdims=True)), 2) for gait in data_gait_cycle]
 
     # spline interpolation to 120 samples for gait
-    print('Interpole cycle to 120 fixed sample')
+    print('Interpolate cycle to 120 fixed sample')
     cycles_interpolated = []
     for cycle in data_gait_cycle:
         interpolated = np.zeros((1,120,cycle.shape[2]))
@@ -81,10 +83,6 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     cycles_interpolated = np.concatenate(cycles_interpolated, axis=0)
 
     print(f'Found {cycles_interpolated.shape[0]} gait cycles')
-
-    # compute magnitude
-    print('Compute magnitude')
-    cycles_interpolated = np.concatenate((cycles_interpolated, np.sqrt(np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True))), axis=2)
 
     if os.path.exists(path_out):
         shutil.rmtree(path_out)
