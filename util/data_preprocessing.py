@@ -10,7 +10,7 @@ from pprint import pprint
 import numpy as np
 from scipy import stats
 from scipy.io import loadmat
-from scipy.interpolate import UnivariateSpline
+from scipy.interpolate import UnivariateSpline, CubicSpline
 from sklearn import utils as skutils
 import matplotlib.pyplot as plt
 import pywt
@@ -66,7 +66,7 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     for cycle in data_gait_cycle:
         interpolated = np.zeros((1,120,cycle.shape[2]))
         for dim in np.arange(cycle.shape[2]):
-            interpolated[0,:,dim] = UnivariateSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim], k=3,s=0)(np.linspace(0,cycle.shape[1]-1,120))
+            interpolated[0,:,dim] = CubicSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim])(np.linspace(0,cycle.shape[1]-1,120))
             if plot_interpolated:
                 plt.figure(figsize=(12, 3))
                 plt.style.use('seaborn-darkgrid')

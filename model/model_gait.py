@@ -21,9 +21,16 @@ class ModelGait():
         self.axis = config['ouisir']['AXIS']
         self.best_model = None
 
-    def load_data(self):
+    def load_data(self, filter_num_user=None):
         self.data = np.load(self.path_data + 'data.npy')
         self.label = np.load(self.path_data + 'user_label.npy')
+
+        if filter_num_user != None:
+            idx = np.isin(self.label, np.arange(filter_num_user))
+            self.data = self.data[idx]
+            self.label = self.label[idx]
+        
+        print(f'found {np.unique(self.label).shape[0]} user')
 
     def split_train_test(self, train_gait=8, val_test=0.5):
         self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_tran_val_test_gait(

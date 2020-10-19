@@ -60,6 +60,25 @@ if __name__ == '__main__':
         default=100,
         type=int
     )
+    parser.add_argument(
+        '-filter_num_user',
+        '--filter_num_user',
+        default=None,
+        type=int
+    )
+    parser.add_argument(
+        '-model'
+        '--model',
+        type=str,
+        default='our',
+        choices=['our', 'paper']
+    )
+    parser.add_argument(
+        '-batch_size',
+        '--batch_size',
+        type=int,
+        default=128
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -69,11 +88,11 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(gpu, True)
 
     model = ModelGait(config, args.colab_path)
-    model.load_data()
+    model.load_data(filter_num_user=args.filter_num_user)
     model.split_train_test()
     model.normalize_data()
-    model.create_tf_dataset()
-    model.build_model(stride=args.stride, fc=args.fc, summary=args.summary_model, name='paper')
+    model.create_tf_dataset(batch_size=args.batch_size)
+    model.build_model(stride=args.stride, fc=args.fc, summary=args.summary_model, name=args.model)
     if args.train:
         model.loss_metric(init_lr=args.init_lr)
         model.train_model(log=args.log_train, epochs=args.epochs)
