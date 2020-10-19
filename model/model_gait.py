@@ -29,8 +29,8 @@ class ModelGait():
             idx = np.isin(self.label, np.arange(filter_num_user))
             self.data = self.data[idx]
             self.label = self.label[idx]
-        
-        print(f'found {np.unique(self.label).shape[0]} user')
+            self.num_user = np.unique(self.label).shape[0]
+            print(f'found {np.unique(self.label).shape[0]} user')
 
     def split_train_test(self, train_gait=8, val_test=0.5):
         self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_tran_val_test_gait(
