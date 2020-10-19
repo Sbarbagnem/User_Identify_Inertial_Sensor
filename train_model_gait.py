@@ -79,6 +79,12 @@ if __name__ == '__main__':
         type=int,
         default=128
     )
+    parser.add_argument(
+        '-flatten',
+        '--flatten',
+        default=False,
+        type=str2bool
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -92,7 +98,7 @@ if __name__ == '__main__':
     model.split_train_test()
     model.normalize_data()
     model.create_tf_dataset(batch_size=args.batch_size)
-    model.build_model(stride=args.stride, fc=args.fc, summary=args.summary_model, name=args.model)
+    model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten, summary=args.summary_model, name=args.model)
     if args.train:
         model.loss_metric(init_lr=args.init_lr)
         model.train_model(log=args.log_train, epochs=args.epochs)

@@ -38,6 +38,9 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
         if 'seq1' in f:
             lu_temp += 1
 
+    # create list labels seq 0/1 to take signal from both for train set
+    seqs = [0,1] * len(np.unique(lu))
+
     # noise remove with Daubechies wavelet level 2
     print('Denoising data')
     data = denoiseData(data, plot_denoise)
@@ -52,13 +55,12 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     print('Split segment in gayt cycles')
     data_gait_cycle = []
     label_user_cycle = []
-    for peak,segment,user in zip(peaks, data, lu):
+    label_seq_cycle = []
+    for peak,segment,user, seq in zip(peaks, data, lu, seqs):
         data_gait_cycle.extend(segment2GaitCycle(peak,segment))
         label_user_cycle.extend([user]*(len(peak)-1))
+        label_seq_cycle.extend([seq]*(len(peak)-1))
 
-    # compute magnitude
-    print('Compute magnitude')
-    data_gait_cycle = [np.concatenate((gait, np.sum(np.power(gait, 2), 2, keepdims=True)), 2) for gait in data_gait_cycle]
 
     # spline interpolation to 120 samples for gait
     print('Interpolate cycle to 120 fixed sample')
@@ -82,6 +84,10 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
 
     cycles_interpolated = np.concatenate(cycles_interpolated, axis=0)
 
+    # compute magnitude
+    print('Compute magnitude')
+    cycles_interpolated = np.concatenate((cycles_interpolated, np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True)), 2) 
+
     print(f'Found {cycles_interpolated.shape[0]} gait cycles')
 
     if os.path.exists(path_out):
@@ -90,6 +96,7 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
 
     np.save(path_out + '/data', cycles_interpolated)
     np.save(path_out + '/user_label', label_user_cycle)
+    np.save(path_out + '/sequences_label', label_seq_cycle)
 
 
 def realdisp_process(
@@ -739,6 +746,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '-plot_interpolated',
         '--plot_interpolated',
+        type=str2bool,
+        default=False
+    )
+    parser.add_argument(
+        '-plot_signal',
+        '--plot_signal',
         type=str2bool,
         default=False
     )

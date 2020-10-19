@@ -364,19 +364,21 @@ def segment2GaitCycle(peaks,segment):
     return cycles
 
 
-def split_data_tran_val_test_gait(data, label_user, train_gait=8, val_test=0.5):
+def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait=8, val_test=0.5):
 
     # shuffle data and label
-    data, label_user = skutils.shuffle(data, label_user)
-    data, label_user = skutils.shuffle(data, label_user)
+    data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
+    data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
 
     data_for_user = []
     label_for_user = []
+    sequences_for_user = []
 
     for user in np.unique(label_user):
         idx_user = np.where(label_user == user)
         data_for_user.append(data[idx_user])
         label_for_user.append(label_user[idx_user])
+        sequences_for_user.append(label_sequences[idx_user])
 
     train_data = []
     val_data = []
@@ -385,20 +387,34 @@ def split_data_tran_val_test_gait(data, label_user, train_gait=8, val_test=0.5):
     val_label = []
     test_label = []
 
-    # take a number of train_gait cycle for every user
-    for i,gait in enumerate(data_for_user):
-        train_data.append(gait[:train_gait])
-        train_label.extend(label_for_user[i][:train_gait])
-        data_for_user[i] = np.delete(gait, np.arange(train_gait), 0)
-        label_for_user[i] = label_for_user[i][train_gait:]
+    n = int(train_gait / len(np.unique(label_sequences)))
 
-    # val_test percentage for validation and test set
-    for i,gait in enumerate(data_for_user):
-        stop = int(gait.shape[0]/2)
-        val_data.append(gait[:stop])
-        val_label.extend(label_for_user[i][:stop])  
-        test_data.append(gait[stop:])
-        test_label.extend(label_for_user[i][stop:])  
+    # split train val and test
+    for cycles, label, sequences in zip(data_for_user, label_for_user, sequences_for_user):
+
+        # same number of cycle from sequence 0 and sequence 1 for every subject
+        for seq in np.unique(sequences):
+            idx = np.where(sequences == seq)
+            temp_cycles = cycles[idx]
+            temp_label = label[idx]
+
+            # train
+            train_data.append(temp_cycles[:n])
+            train_label.extend(temp_label[:n])
+
+            # delete used values
+            temp_cycles = np.delete(temp_cycles, np.arange(n), 0)
+            temp_label = temp_label[n:]
+
+            stop = int(temp_cycles.shape[0]/2)
+
+            # val
+            val_data.append(temp_cycles[:stop])
+            val_label.extend(temp_label[:stop])
+
+            # test
+            test_data.append(temp_cycles[stop:])
+            test_label.extend(temp_label[stop:])
 
     train_data = np.concatenate(train_data, axis=0)
     val_data = np.concatenate(val_data, axis=0)

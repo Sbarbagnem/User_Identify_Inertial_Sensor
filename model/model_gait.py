@@ -6,7 +6,7 @@ import seaborn as sn
 
 from model.resNet182D.resnet18_2D import resnet18
 from model.model_paper.model import ModelPaper
-from util.utils import split_data_tran_val_test_gait, normalize_data
+from util.utils import split_data_train_val_test_gait, normalize_data
 from util.tf_metrics import custom_metrics
 
 
@@ -24,6 +24,7 @@ class ModelGait():
     def load_data(self, filter_num_user=None):
         self.data = np.load(self.path_data + 'data.npy')
         self.label = np.load(self.path_data + 'user_label.npy')
+        self.sequences = np.load(self.path_data + 'sequences_label.npy')
 
         if filter_num_user != None:
             idx = np.isin(self.label, np.arange(filter_num_user))
@@ -33,8 +34,8 @@ class ModelGait():
             print(f'found {np.unique(self.label).shape[0]} user')
 
     def split_train_test(self, train_gait=8, val_test=0.5):
-        self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_tran_val_test_gait(
-            self.data, self.label, train_gait, val_test)
+        self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
+            self.data, self.label, self.sequences, train_gait, val_test)
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
         print(f'{self.test.shape[0]} gait cycles for test')
@@ -62,9 +63,9 @@ class ModelGait():
                 self.test), tf.data.Dataset.from_tensor_slices(
                 self.test_label))).batch(1)
 
-    def build_model(self, stride, fc, summary=False, name='our'):
+    def build_model(self, stride, fc, flatten, summary=False, name='our'):
         if name == 'our':
-            self.model = resnet18(False, 1, self.num_user, stride, fc)
+            self.model = resnet18(False, 1, self.num_user, stride, fc, flatten)
         else:
             self.model = ModelPaper(self.num_user)
         self.model.build(input_shape=(None, self.window_sample, self.axis, 1))
@@ -108,8 +109,7 @@ class ModelGait():
         loss_batch = self.loss(y_true=label_user, y_pred=predictions_user)
 
         self.metric_loss.update_state(values=loss_batch)
-        self.accuracy.update_state(
-            y_true=label_user, y_pred=predictions_user)
+        self.accuracy.update_state(y_true=label_user, y_pred=predictions_user)
 
         # calculate precision, recall and f1 from confusion matrix
         cm = tf.math.confusion_matrix(label_user, tf.math.argmax(
@@ -134,8 +134,11 @@ class ModelGait():
 
         for epoch in range(1, epochs + 1):
 
+            self.metric_loss.reset_states()
+            self.accuracy.reset_states()
             cm = tf.zeros(shape=(self.num_user, self.num_user), dtype=tf.int32)
 
+            # train
             for batch, label_user in self.train_tf:
                 cm_batch = self.train_step(batch, label_user, self.num_user)
                 cm = cm + cm_batch
@@ -154,8 +157,7 @@ class ModelGait():
 
             # validation
             for batch, label_user in self.val_tf:
-                cm_batch = self.valid_step(
-                    batch, label_user, self.num_user)
+                cm_batch = self.valid_step(batch, label_user, self.num_user)
                 cm = cm + cm_batch
             metrics = custom_metrics(cm)
 
@@ -173,27 +175,23 @@ class ModelGait():
                 best_seen['time_not_improved'] = 0
             else:
                 best_seen['time_not_improved'] += 1
-                if best_seen['time_not_improved'] >= 6 and epoch > 20:
+                if best_seen['time_not_improved'] >= early_stop and epoch > 20:
                     print('early stop')
-                    self.metric_loss.reset_states()
-                    self.accuracy.reset_states()
                     break
-                elif best_seen['time_not_improved'] == 5:
+                elif best_seen['time_not_improved'] == drop_patience:
                     new_lr = self.optimizer.learning_rate * drop_factor
                     if new_lr < 0.000001:
                         print('min lr reached')
-                        self.metric_loss.reset_states()
-                        self.accuracy.reset_states()
                         break
                     self.optimizer.learning_rate.assign(new_lr)
                     print(f'reduce learning rate on plateau to {new_lr}')
 
-            self.metric_loss.reset_states()
-            self.accuracy.reset_states()
-
         self.best_model = best_seen['model']
 
     def test_model(self, plot_cm=False):
+
+        self.metric_loss.reset_states()
+        self.accuracy.reset_states()
 
         cm = tf.zeros(shape=(self.num_user,
                              self.num_user), dtype=tf.int32)

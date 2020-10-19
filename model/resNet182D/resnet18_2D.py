@@ -7,7 +7,7 @@ import sys
 
 
 class ResNet18SingleBranch(tf.keras.Model):
-    def __init__(self, multi_task, num_act, num_user, stride=1, fc=False):
+    def __init__(self, multi_task, num_act, num_user, stride=1, fc=False, flatten=False):
         super(ResNet18SingleBranch, self).__init__()
 
         self.multi_task = multi_task
@@ -15,6 +15,7 @@ class ResNet18SingleBranch(tf.keras.Model):
             self.num_act = num_act
         self.num_user = num_user
         self.fc = fc
+        self.flatten = flatten
 
         # features about single axis sensor (kernel len from metier paper)
 
@@ -40,7 +41,11 @@ class ResNet18SingleBranch(tf.keras.Model):
                                              name='residual_block_2',
                                              stride=stride,
                                              kernel=(3,3))
-        self.avgpool_2d = tf.keras.layers.GlobalAveragePooling2D()
+
+        if flatten:
+            self.flatten = tf.keras.layers.Flatten()
+        else:
+            self.flatten = tf.keras.layers.GlobalAveragePooling2D()
 
         if multi_task:
             # activity classification
@@ -71,7 +76,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         #print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
         #print('shape res_2: {}'.format(x.shape))
-        out_cnn = self.avgpool_2d(x)
+        out_cnn = self.flatten(x)
         #print('shape avg_pool: {}'.format(out_cnn.shape))
         if self.fc:
             out_cnn = self.fc1(out_cnn)
@@ -139,5 +144,5 @@ def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1):
     return res_block
 
 
-def resnet18(multi_task, num_act, num_user, stride=1, fc=False):
-    return ResNet18SingleBranch(multi_task=multi_task, num_act=num_act, num_user=num_user, stride=stride, fc=fc)
+def resnet18(multi_task, num_act, num_user, stride=1, fc=False, flatten=False):
+    return ResNet18SingleBranch(multi_task=multi_task, num_act=num_act, num_user=num_user, stride=stride, fc=fc, flatten=flatten)
