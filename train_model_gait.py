@@ -67,7 +67,7 @@ if __name__ == '__main__':
         type=int
     )
     parser.add_argument(
-        '-model'
+        '-model',
         '--model',
         type=str,
         default='our',
