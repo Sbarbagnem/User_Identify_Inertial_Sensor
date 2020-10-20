@@ -45,23 +45,13 @@ class ModelGait():
             self.train, self.val, self.test, self.axis)
 
     def create_tf_dataset(self, batch_size=128):
-        train_tf = tf.data.Dataset.zip(
-            (tf.data.Dataset.from_tensor_slices(
-                self.train), tf.data.Dataset.from_tensor_slices(
-                self.train_label)))
-        self.train_tf = train_tf.shuffle(
-            buffer_size=self.train.shape[0],
-            reshuffle_each_iteration=True).batch(
-            batch_size,
-            drop_remainder=True)
-        self.val_tf = tf.data.Dataset.zip(
-            (tf.data.Dataset.from_tensor_slices(
-                self.val), tf.data.Dataset.from_tensor_slices(
-                self.val_label))).batch(1)
-        self.test_tf = tf.data.Dataset.zip(
-            (tf.data.Dataset.from_tensor_slices(
-                self.test), tf.data.Dataset.from_tensor_slices(
-                self.test_label))).batch(1)
+        train_tf = tf.data.Dataset.from_tensor_slices(self.train, self.train_label)
+        train_tf = train_tf.shuffle(buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
+        val_tf = tf.data.Dataset.from_tensor_slices(self.val, self.val_label)
+        test_tf = tf.data.Dataset.from_tensor_slices(self.test, self.test_label)
+        self.train_tf = train_tf.batch(batch_size, drop_remainder=True)
+        self.val_tf = val_tf.batch(1)
+        self.test_tf = test_tf.batch(1)
 
     def build_model(self, stride, fc, flatten, summary=False, name='our'):
         if name == 'our':
@@ -149,7 +139,7 @@ class ModelGait():
                 mean_loss = self.metric_loss.result().numpy()
                 accuracy = self.accuracy.result().numpy()
                 print(
-                    f"TRAIN epoch_ {epoch}/{epochs}, loss: {mean_loss}, acc: {accuracy}, prec: {metrics['macro_precision']}, rec :{metrics['macro_recall']}, f1: {metrics['macro_f1']}")
+                    f"TRAIN epoch: {epoch}/{epochs}, loss: {mean_loss}, acc: {accuracy}, prec: {metrics['macro_precision']}, rec :{metrics['macro_recall']}, f1: {metrics['macro_f1']}")
 
             self.metric_loss.reset_states()
             self.accuracy.reset_states()
@@ -165,7 +155,7 @@ class ModelGait():
                 mean_loss = self.metric_loss.result().numpy()
                 accuracy = self.accuracy.result().numpy()
                 print(
-                    f"VALIDATION epoch_ {epoch}/{epochs}, loss: {mean_loss}, acc: {accuracy}, prec: {metrics['macro_precision']}, rec :{metrics['macro_recall']}, f1: {metrics['macro_f1']}")
+                    f"VALIDATION epoch: {epoch}/{epochs}, loss: {mean_loss}, acc: {accuracy}, prec: {metrics['macro_precision']}, rec :{metrics['macro_recall']}, f1: {metrics['macro_f1']}")
 
             # update best seen and reduce lr
             if self.metric_loss.result().numpy() < best_seen['loss']:
@@ -203,7 +193,7 @@ class ModelGait():
         metrics = custom_metrics(cm)
 
         print(
-            "\nTEST FINAL: loss: {:.5f}, acc: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
+            "\nTEST FINAL loss: {:.5f}, acc: {:.5f}, macro_precision: {:.5f}, macro_recall: {:.5f}, macro_f1: {:.5f}".format(
                 self.metric_loss.result().numpy(),
                 self.accuracy.result().numpy(),
                 metrics['macro_precision'],
