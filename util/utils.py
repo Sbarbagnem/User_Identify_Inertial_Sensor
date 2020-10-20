@@ -277,7 +277,7 @@ def detectGaitCycle(data, plot_peak=False):
     auto_corr_coeff = calAutoCorrelation(data)
 
     # smooth the auto_correlation_coefficient
-    for i in range(5):
+    for i in range(7):
         auto_corr_coeff = smooth(auto_corr_coeff)
 
     # approximate the length of a gait cycle by selecting the 2nd peak (positive) in the auto correlation signal
