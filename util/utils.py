@@ -364,7 +364,7 @@ def segment2GaitCycle(peaks,segment):
     return cycles
 
 
-def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait=8, val_test=0.5):
+def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait=8, val_test=0.5, plot=False):
 
     # shuffle data and label
     data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
@@ -415,6 +415,25 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait
             # test
             test_data.append(temp_cycles[stop:])
             test_label.extend(temp_label[stop:])
+
+            if plot:
+                plt.figure(figsize=(12, 3))
+                plt.style.use('seaborn-darkgrid')
+                n = train_data[-1].shape[0]
+                for i in range(n):
+                    plt.subplot(3, n, i+1)
+                    plt.title(f'train')
+                    plt.plot(np.arange(train_data[-1][i].shape[0]), train_data[-1][i,:,2], 'b-', label='noise')
+                for i in range(val_data[-1].shape[0]):
+                    plt.subplot(3, n, i+1+4)
+                    plt.title(f'val')
+                    plt.plot(np.arange(val_data[-1][i].shape[0]), val_data[-1][i,:,2], 'b-', label='noise')
+                for i in range(test_data[-1].shape[0]):
+                    plt.subplot(3, n, i+1+8)
+                    plt.title(f'test')
+                    plt.plot(np.arange(test_data[-1][i].shape[0]), test_data[-1][i,:,2], 'b-', label='noise')
+                plt.tight_layout()
+                plt.show()
 
     train_data = np.concatenate(train_data, axis=0)
     val_data = np.concatenate(val_data, axis=0)

@@ -314,10 +314,16 @@ if __name__ == '__main__':
         default=100
     )
     parser.add_argument(
-    '-stride',
-    '--stride',
-    type=int,
-    default=1
+        '-stride',
+        '--stride',
+        type=int,
+        default=1
+    )
+    parser.add_argument(
+        '-fc',
+        '--fc',
+        type=str2bool,
+        default=False
     )
     args = parser.parse_args()
 
@@ -418,7 +424,7 @@ if __name__ == '__main__':
                             model.tf_dataset(
                                 args.weighted_based_on, args.weighted)
 
-                            model.build_model(stride=args.stride)
+                            model.build_model(stride=args.stride, fc=args.fc)
                             if args.print_model_summary:
                                 model.print_model_summary()
 

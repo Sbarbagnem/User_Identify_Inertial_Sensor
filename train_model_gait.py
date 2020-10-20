@@ -85,6 +85,12 @@ if __name__ == '__main__':
         default=False,
         type=str2bool
     )
+    parser.add_argument(
+        '-plot_split',
+        '--plot_split',
+        type=str2bool,
+        default=False
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -95,7 +101,7 @@ if __name__ == '__main__':
 
     model = ModelGait(config, args.colab_path)
     model.load_data(filter_num_user=args.filter_num_user)
-    model.split_train_test()
+    model.split_train_test(plot=args.plot_split)
     model.normalize_data()
     model.create_tf_dataset(batch_size=args.batch_size)
     model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten, summary=args.summary_model, name=args.model)

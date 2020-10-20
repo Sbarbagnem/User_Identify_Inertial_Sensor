@@ -33,9 +33,9 @@ class ModelGait():
             self.num_user = np.unique(self.label).shape[0]
             print(f'found {np.unique(self.label).shape[0]} user')
 
-    def split_train_test(self, train_gait=8, val_test=0.5):
+    def split_train_test(self, train_gait=8, val_test=0.5, plot=False):
         self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-            self.data, self.label, self.sequences, train_gait, val_test)
+            self.data, self.label, self.sequences, train_gait, val_test, plot)
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
         print(f'{self.test.shape[0]} gait cycles for test')
