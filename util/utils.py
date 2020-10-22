@@ -205,37 +205,42 @@ def save_mean_performance_txt(performances, dataset_name, colab_path):
     f.close()
 
 def denoiseData(data, plot=False):
-    for i,x in enumerate(data):       
-        if x.shape[0] % 2 != 0:
-            x = x[1:,:]           
-        n = x.shape[0]   
+    data_denoise = data.copy()
+    for i,x in enumerate(data):  
         for dim in np.arange(x.shape[1]):
-            coeffs = pywt.wavedec(x[:,dim], 'db6', level=2)
-            # set high coef to 0
-            coeffs[-1] = np.zeros_like(coeffs[-1])
-            coeffs[-2] = np.zeros_like(coeffs[-2])
-            temp = pywt.waverec(coeffs, 'db6')
+            # decompostion 
+            d1 = pywt.downcoef('d', x[:,dim], 'db6', level=1)
+            a1 = pywt.downcoef('a', x[:,dim], 'db6', level=1)
+            d2 = pywt.downcoef('d', x[:,dim], 'db6', level=2)
+            a2 = pywt.downcoef('a', x[:,dim], 'db6', level=2)
+            # set deatails coef to 0
+            d1 = np.zeros_like(d1)
+            d2 = np.zeros_like(d2)
+            # recostruction
+            temp = pywt.upcoef('a', a1, 'db6', level=1, take=x.shape[0]) + \
+                   pywt.upcoef('d', d1, 'db6', level=1, take=x.shape[0]) + \
+                   pywt.upcoef('a', a2, 'db6', level=2, take=x.shape[0]) + \
+                   pywt.upcoef('d', d2, 'db6', level=2, take=x.shape[0]) 
             if plot:
                 plt.figure(figsize=(12, 3))
                 plt.style.use('seaborn-darkgrid')
                 plt.subplot(1, 2, 1)
                 plt.title(f'noise')
-                plt.plot(np.arange(n), x[:,dim], 'b-', label='noise')
+                plt.plot(np.arange(x.shape[0]), x[:,dim], 'b-', label='noise')
                 plt.subplot(1, 2, 2)
                 plt.title(f'denoise')
                 plt.plot(np.arange(temp.shape[0]), temp, 'b-', label='denoise')
                 plt.tight_layout()
                 plt.show()
-            x[:,dim] = temp
-        data[i] = x
-    return data
+            data_denoise[i][:,dim] = temp
+    return data_denoise
 
 def calAutoCorrelation(data):
     n = len(data)
     autocorrelation_coeff = np.zeros(n)
-
     autocorrelation_coeff[0]= np.sum(data[:]**2)/n
-    for t in range(1,n-1):
+
+    for t in range(1,n):
         for j in range(1,n-t):
             autocorrelation_coeff[t]= autocorrelation_coeff[t] + data[j]*data[j+t]
         autocorrelation_coeff[t]= autocorrelation_coeff[t] /(n-t)
@@ -250,13 +255,13 @@ def smooth(coef):
     y=np.convolve(w/w.sum(),s,mode='valid')
     return y
 
-def detectGaitCycle(data, plot_peak=False):
+def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
 
     data = data[:,2] # z axis
-    t = 0.4 #0.4 1/2
-    alpha = 0.5 #0.5 1/4
-    beta = 0.7 #0.7 3/4
-    gamma = 0.35 #0.35 1/6
+    t = 0.4 #0.6 #0.4 1/2
+    alpha = 0.5 #0.5 #0.5 1/4
+    beta = 0.7 #1.5 #0.7 3/4
+    gamma = 0.35 #0.3 #0.35 1/6
 
     # all peaks 
     all_peak_pos = []
@@ -272,6 +277,8 @@ def detectGaitCycle(data, plot_peak=False):
     for peak in all_peak_pos:
         if(data[peak] < threshold):
             filter_peaks_pos.append(peak)
+    
+    filter_peaks_pos_copy = filter_peaks_pos.copy()
 
     # compute autcorrelation to estimate len cycle
     auto_corr_coeff = calAutoCorrelation(data)
@@ -281,16 +288,26 @@ def detectGaitCycle(data, plot_peak=False):
         auto_corr_coeff = smooth(auto_corr_coeff)
 
     # approximate the length of a gait cycle by selecting the 2nd peak (positive) in the auto correlation signal
+    peak_auto_corr = []
     gcLen = 0
     flag = 0
+    mean_auto_corr = np.mean(auto_corr_coeff)
     for i in range(1,auto_corr_coeff.shape[0]-1):
-        if(auto_corr_coeff[i] > auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1]):
+        if auto_corr_coeff[i] > auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1] and auto_corr_coeff[i] > mean_auto_corr:
             flag += 1
-            if flag ==1:
-                continue
-            elif flag ==2:
-                gcLen = i-1
+            peak_auto_corr.append(i)
+            if flag == 2:
+                gcLen = i
                 break
+
+    # plot coefficients autocorrelation and 2nd peak used to estimated gait length
+    if plot_auto_corr_coeff:
+        plt.figure(figsize=(12, 3))
+        plt.style.use('seaborn-darkgrid')
+        plt.plot(np.arange(len(auto_corr_coeff)), auto_corr_coeff, 'b-')
+        plt.scatter(peak_auto_corr, auto_corr_coeff[peak_auto_corr], c='red')
+        plt.tight_layout()
+        plt.show()
 
     # find first candidate peak
     i=1
@@ -326,18 +343,27 @@ def detectGaitCycle(data, plot_peak=False):
 
     if filter_peaks_pos[-1]-filter_peaks_pos[-2] < beta*gcLen:
         filter_peaks_pos.remove(filter_peaks_pos[-1])
-
+    
     # final check on len on gait found
-    # if there is a gait grater then gcLen*1.7 must be probabily divided in two gait
+    # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
     med_len = [filter_peaks_pos[i+1] - filter_peaks_pos[i]  for i,_ in enumerate(filter_peaks_pos[:-1])]
-    med_len = np.sum(med_len)/len(med_len)
-
+    med_len = np.sum(med_len)/len(med_len)   
     i = 1
     j = 0
     peak_pos_modified = filter_peaks_pos[:]
-    while i < len(filter_peaks_pos):
+    while i < len(filter_peaks_pos)-1:
         if filter_peaks_pos[i] - filter_peaks_pos[i-1] > 1.5*med_len:
-            peak_pos_modified[i+j:i+j] = [int((filter_peaks_pos[i] - filter_peaks_pos[i-1])/2) + filter_peaks_pos[i-1]]
+            temp = int((filter_peaks_pos[i] - filter_peaks_pos[i-1])/2) + filter_peaks_pos[i-1]
+            most_close = sorted(filter_peaks_pos_copy, key=lambda x:abs(x-temp))
+            if temp in most_close:
+                peak_pos_modified[i+j:i+j] = [temp] 
+            else:           
+                try:
+                    most_close_before = list(filter(lambda x: x <= temp + 20 and x >= temp - 20, most_close))
+                    idx = np.argmin(data[most_close_before])
+                    peak_pos_modified[i+j:i+j] = [most_close_before[idx]]
+                except:
+                    plot_peak = True
             i += 1
             j += 1
             continue
@@ -348,7 +374,6 @@ def detectGaitCycle(data, plot_peak=False):
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(data.shape[0]), data, 'b-')
-        #plt.scatter(filter_peaks_pos, data[filter_peaks_pos], c='red')
         plt.vlines(filter_peaks_pos, ymin=min(data)*0.95, ymax=max(data)*0.95, color='r', ls='--')
         plt.tight_layout()
         plt.show()
@@ -368,7 +393,6 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait
 
     # shuffle data and label
     data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
-    data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
 
     data_for_user = []
     label_for_user = []
@@ -387,53 +411,41 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait
     val_label = []
     test_label = []
 
-    n = int(train_gait / len(np.unique(label_sequences)))
-
     # split train val and test
-    for cycles, label, sequences in zip(data_for_user, label_for_user, sequences_for_user):
+    for cycles, label in zip(data_for_user, label_for_user):
 
-        # same number of cycle from sequence 0 and sequence 1 for every subject
-        for seq in np.unique(sequences):
-            idx = np.where(sequences == seq)
-            temp_cycles = cycles[idx]
-            temp_label = label[idx]
+        # train
+        train_data.append(cycles[:train_gait])
+        train_label.extend(label[:train_gait])
 
-            # train
-            train_data.append(temp_cycles[:n])
-            train_label.extend(temp_label[:n])
+        stop = int((cycles.shape[0]-train_gait)/2)
 
-            # delete used values
-            temp_cycles = np.delete(temp_cycles, np.arange(n), 0)
-            temp_label = temp_label[n:]
+        # val
+        val_data.append(cycles[train_gait:stop+train_gait])
+        val_label.extend(label[train_gait:stop+train_gait])
 
-            stop = int(temp_cycles.shape[0]/2)
+        # test
+        test_data.append(cycles[stop+train_gait:])
+        test_label.extend(label[stop+train_gait:])
 
-            # val
-            val_data.append(temp_cycles[:stop])
-            val_label.extend(temp_label[:stop])
-
-            # test
-            test_data.append(temp_cycles[stop:])
-            test_label.extend(temp_label[stop:])
-
-            if plot:
-                plt.figure(figsize=(12, 3))
-                plt.style.use('seaborn-darkgrid')
-                n = train_data[-1].shape[0]
-                for i in range(n):
-                    plt.subplot(3, n, i+1)
-                    plt.title(f'train')
-                    plt.plot(np.arange(train_data[-1][i].shape[0]), train_data[-1][i,:,2], 'b-', label='noise')
-                for i in range(val_data[-1].shape[0]):
-                    plt.subplot(3, n, i+1+4)
-                    plt.title(f'val')
-                    plt.plot(np.arange(val_data[-1][i].shape[0]), val_data[-1][i,:,2], 'b-', label='noise')
-                for i in range(test_data[-1].shape[0]):
-                    plt.subplot(3, n, i+1+8)
-                    plt.title(f'test')
-                    plt.plot(np.arange(test_data[-1][i].shape[0]), test_data[-1][i,:,2], 'b-', label='noise')
-                plt.tight_layout()
-                plt.show()
+        if plot:
+            plt.figure(figsize=(12, 3))
+            plt.style.use('seaborn-darkgrid')
+            n = train_data[-1].shape[0]
+            for i in range(n):
+                plt.subplot(3, n, i+1)
+                plt.title(f'train')
+                plt.plot(np.arange(train_data[-1][i].shape[0]), train_data[-1][i,:,2], 'b-', label='noise')
+            for i in range(np.min((val_data[-1].shape[0], n))):
+                plt.subplot(3, n, i+1+4)
+                plt.title(f'val')
+                plt.plot(np.arange(val_data[-1][i].shape[0]), val_data[-1][i,:,2], 'b-', label='noise')
+            for i in range(np.min((test_data[-1].shape[0], n))):
+                plt.subplot(3, n, i+1+8)
+                plt.title(f'test')
+                plt.plot(np.arange(test_data[-1][i].shape[0]), test_data[-1][i,:,2], 'b-', label='noise')
+            plt.tight_layout()
+            plt.show()
 
     train_data = np.concatenate(train_data, axis=0)
     val_data = np.concatenate(val_data, axis=0)
@@ -444,10 +456,10 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait
 
     return train_data, val_data, test_data, train_label, val_label, test_label
 
-def normalize_data(train, val, test, axis):
+def normalize_data(train, val, test):
 
-    mean = np.mean(np.reshape(train, [-1, axis]), axis=0)
-    std = np.std(np.reshape(train, [-1, axis]), axis=0)
+    mean = np.mean(np.reshape(train, [-1, train.shape[2]]), axis=0)
+    std = np.std(np.reshape(train, [-1, train.shape[2]]), axis=0)
 
     train = (train - mean)/std
     val = (val - mean)/std

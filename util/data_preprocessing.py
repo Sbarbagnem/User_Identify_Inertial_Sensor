@@ -18,16 +18,17 @@ import pywt
 from sliding_window import sliding_window
 from utils import str2bool, split_balanced_data, denoiseData, detectGaitCycle, segment2GaitCycle
 
-def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, plot_interpolated=False):
+def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, plot_interpolated=False, plot_auto_corr_coeff=False):
 
     # define variables
     data = []
     lu = []
+    seqs = []
     lu_temp = 0
-
     # read files
     print('Read csv file')
     for f in tqdm(os.listdir(path_data)):
+        
         # read only acc data
         df = pd.read_csv(path_data + '/' + f, header=None, skiprows=2, usecols=[3,4,5])
 
@@ -37,9 +38,9 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
 
         if 'seq1' in f:
             lu_temp += 1
-
-    # create list labels seq 0/1 to take signal from both for train set
-    seqs = [0,1] * len(np.unique(lu))
+            seqs.append(1)
+        else:
+            seqs.append(0)
 
     # noise remove with Daubechies wavelet level 2
     print('Denoising data')
@@ -49,7 +50,7 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     print('Find peaks gait cycles')
     peaks = []
     for d in tqdm(data):
-        peaks.append(detectGaitCycle(d, plot_peak))
+        peaks.append(detectGaitCycle(d, plot_peak, plot_auto_corr_coeff))
 
     # divide data in gait cycle based on peak position found 
     print('Split segment in gayt cycles')
@@ -60,7 +61,6 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
         data_gait_cycle.extend(segment2GaitCycle(peak,segment))
         label_user_cycle.extend([user]*(len(peak)-1))
         label_seq_cycle.extend([seq]*(len(peak)-1))
-
 
     # spline interpolation to 120 samples for gait
     print('Interpolate cycle to 120 fixed sample')
@@ -86,7 +86,7 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
 
     # compute magnitude
     print('Compute magnitude')
-    cycles_interpolated = np.concatenate((cycles_interpolated, np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True)), 2) 
+    cycles_interpolated = np.concatenate((cycles_interpolated, np.sqrt(np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True))), 2) 
 
     print(f'Found {cycles_interpolated.shape[0]} gait cycles')
 
@@ -735,25 +735,29 @@ if __name__ == '__main__':
         '-plot_denoise',
         '--plot_denoise',
         type=str2bool,
-        default=False
+        default=False,
+        help='Plot original and denoised signal'
     )
     parser.add_argument(
         '-plot_peak',
         '--plot_peak',
         type=str2bool,
-        default=False
+        default=False,
+        help='Plot detected peak of gait cycles in signal'
     )
     parser.add_argument(
         '-plot_interpolated',
         '--plot_interpolated',
         type=str2bool,
-        default=False
+        default=False, 
+        help='Plot original and interpolated signal to fixed length'
     )
     parser.add_argument(
-        '-plot_signal',
-        '--plot_signal',
+        '-plot_auto_corr_coeff',
+        '--plot_auto_corr_coeff', 
         type=str2bool,
-        default=False
+        default=False, 
+        help='Plot autocorrelation and 2nd peak take for estimated cycle length'
     )
 
     args = parser.parse_args()
@@ -811,5 +815,6 @@ if __name__ == '__main__':
                     path_out = '../data/datasets/OUISIR_processed/', 
                     plot_denoise=args.plot_denoise,
                     plot_peak=args.plot_peak,
-                    plot_interpolated=args.plot_interpolated
+                    plot_interpolated=args.plot_interpolated,
+                    plot_auto_corr_coeff=args.plot_auto_corr_coeff
                 )

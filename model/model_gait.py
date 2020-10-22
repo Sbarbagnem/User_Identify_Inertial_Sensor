@@ -25,13 +25,14 @@ class ModelGait():
         self.data = np.load(self.path_data + 'data.npy')
         self.label = np.load(self.path_data + 'user_label.npy')
         self.sequences = np.load(self.path_data + 'sequences_label.npy')
+        print(f'Found {self.data.shape[0]} cycles for {np.unique(self.label).shape[0]} users')
 
         if filter_num_user != None:
             idx = np.isin(self.label, np.arange(filter_num_user))
             self.data = self.data[idx]
             self.label = self.label[idx]
             self.num_user = np.unique(self.label).shape[0]
-            print(f'found {np.unique(self.label).shape[0]} user')
+            print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
     def split_train_test(self, train_gait=8, val_test=0.5, plot=False):
         self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
@@ -42,7 +43,7 @@ class ModelGait():
 
     def normalize_data(self):
         self.train, self.val, self.test = normalize_data(
-            self.train, self.val, self.test, self.axis)
+            self.train, self.val, self.test)
 
     def create_tf_dataset(self, batch_size=128):
         train_tf = tf.data.Dataset.from_tensor_slices((self.train, self.train_label))
@@ -56,7 +57,7 @@ class ModelGait():
     def build_model(self, stride, fc, flatten, summary=False, name='our'):
         if name == 'our':
             self.model = resnet18(False, 1, self.num_user, stride, fc, flatten)
-        else:
+        elif name == 'paper':
             self.model = ModelPaper(self.num_user)
         self.model.build(input_shape=(None, self.window_sample, self.axis, 1))
         if summary:
