@@ -21,7 +21,9 @@ class ModelGait():
         self.axis = config['ouisir']['AXIS']
         self.best_model = None
 
-    def load_data(self, filter_num_user=None):
+    def load_data(self, filter_num_user=None, gait_2_cycles=False):
+        if gait_2_cycles:
+            self.path_data += 'gait_2_cycles/'
         self.data = np.load(self.path_data + 'data.npy')
         self.label = np.load(self.path_data + 'user_label.npy')
         self.sequences = np.load(self.path_data + 'sequences_label.npy')
@@ -31,6 +33,7 @@ class ModelGait():
             idx = np.isin(self.label, np.arange(filter_num_user))
             self.data = self.data[idx]
             self.label = self.label[idx]
+            self.sequences = self.sequences[idx]
             self.num_user = np.unique(self.label).shape[0]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
