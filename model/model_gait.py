@@ -18,7 +18,6 @@ class ModelGait():
             self.path_data = colab_path + config['ouisir']['PATH_DATA']
         self.num_user = config['ouisir']['NUM_CLASSES_USER']
         self.window_sample = config['ouisir']['WINDOW_SAMPLES']
-        self.axis = config['ouisir']['AXIS']
         self.best_model = None
 
     def load_data(self, filter_num_user=None, gait_2_cycles=False):
@@ -27,6 +26,7 @@ class ModelGait():
         self.data = np.load(self.path_data + 'data.npy')
         self.label = np.load(self.path_data + 'user_label.npy')
         self.sequences = np.load(self.path_data + 'sequences_label.npy')
+        self.axis = self.data.shape[2]
         print(f'Found {self.data.shape[0]} cycles for {np.unique(self.label).shape[0]} users')
 
         if filter_num_user != None:
@@ -37,9 +37,9 @@ class ModelGait():
             self.num_user = np.unique(self.label).shape[0]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
-    def split_train_test(self, train_gait=8, val_test=0.5, plot=False):
+    def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False):
         self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-            self.data, self.label, self.sequences, train_gait, val_test, plot)
+            self.data, self.label, self.sequences, train_gait, val_test, gait_2_cycles, plot)
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
         print(f'{self.test.shape[0]} gait cycles for test')

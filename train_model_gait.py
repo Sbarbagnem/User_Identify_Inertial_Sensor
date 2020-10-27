@@ -91,6 +91,12 @@ if __name__ == '__main__':
         type=str2bool,
         default=False
     )
+    parser.add_argument(
+        '-gait_2_cycles',
+        '--gait_2_cycles',
+        type=str2bool,
+        default=False
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -100,8 +106,8 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(gpu, True)
 
     model = ModelGait(config, args.colab_path)
-    model.load_data(filter_num_user=args.filter_num_user)
-    model.split_train_test(plot=args.plot_split)
+    model.load_data(filter_num_user=args.filter_num_user, gait_2_cycles=args.gait_2_cycles)
+    model.split_train_test(plot=args.plot_split, gait_2_cycles=args.gait_2_cycles)
     model.normalize_data()
     model.create_tf_dataset(batch_size=args.batch_size)
     model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten, summary=args.summary_model, name=args.model)

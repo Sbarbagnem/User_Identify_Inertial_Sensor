@@ -244,7 +244,6 @@ def calAutoCorrelation(data):
         for j in range(1,n-t):
             autocorrelation_coeff[t]= autocorrelation_coeff[t] + data[j]*data[j+t]
         autocorrelation_coeff[t]= autocorrelation_coeff[t] /(n-t)
-    
     autocorrelation_coeff = autocorrelation_coeff/np.max(autocorrelation_coeff)
     return autocorrelation_coeff
 
@@ -255,13 +254,19 @@ def smooth(coef):
     y=np.convolve(w/w.sum(),s,mode='valid')
     return y
 
-def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
+def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_step=False):
 
     data = data[:,2] # z axis
-    t = 0.4 #0.6 #0.4 1/2
-    alpha = 0.5 #0.5 #0.5 1/4
-    beta = 0.7 #1.5 #0.7 3/4
-    gamma = 0.35 #0.3 #0.35 1/6
+    if use_2_step:
+        t = 0.5
+        alpha = 1/4 #1/4 
+        beta = 3/4 #3/4 
+        gamma = 2/6 #2/6 
+    else:
+        t = 0.4
+        alpha = 0.5
+        beta = 0.7
+        gamma = 0.35
 
     # all peaks 
     all_peak_pos = []
@@ -280,6 +285,15 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
     
     filter_peaks_pos_copy = filter_peaks_pos.copy()
 
+    '''
+    plt.figure(figsize=(12, 3))
+    plt.style.use('seaborn-darkgrid')
+    plt.plot(np.arange(len(data)), data, 'b-')
+    plt.scatter(filter_peaks_pos, data[filter_peaks_pos], c='red')
+    plt.tight_layout()
+    plt.show()
+    '''
+
     # compute autcorrelation to estimate len cycle
     auto_corr_coeff = calAutoCorrelation(data)
 
@@ -291,13 +305,19 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
     peak_auto_corr = []
     gcLen = 0
     flag = 0
-    mean_auto_corr = np.mean(auto_corr_coeff)
-    for i in range(1,auto_corr_coeff.shape[0]-1):
-        if auto_corr_coeff[i] > auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1] and auto_corr_coeff[i] > mean_auto_corr:
+    mean_auto_corr = np.mean(auto_corr_coeff[:200])
+    std_auto_corr = np.std(auto_corr_coeff[:200])
+    #print(mean_auto_corr)
+    for i in range(1,len(auto_corr_coeff)-2):
+        if auto_corr_coeff[i] > auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1] and auto_corr_coeff[i] > (mean_auto_corr + std_auto_corr*0.4):
+            #print(i)
             flag += 1
             peak_auto_corr.append(i)
-            if flag == 2:
-                gcLen = i
+            if flag == 3 and use_2_step:
+                gcLen = i - 1
+                break
+            if flag == 2 and not use_2_step:
+                gcLen = i - 1
                 break
 
     # plot coefficients autocorrelation and 2nd peak used to estimated gait length
@@ -305,7 +325,7 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(len(auto_corr_coeff)), auto_corr_coeff, 'b-')
-        plt.scatter(peak_auto_corr, auto_corr_coeff[peak_auto_corr], c='red')
+        plt.scatter([0, peak_auto_corr[-1]], auto_corr_coeff[[0, peak_auto_corr[-1]]], c='red')
         plt.tight_layout()
         plt.show()
 
@@ -346,29 +366,35 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
     
     # final check on len on gait found
     # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
-    med_len = [filter_peaks_pos[i+1] - filter_peaks_pos[i]  for i,_ in enumerate(filter_peaks_pos[:-1])]
-    med_len = np.sum(med_len)/len(med_len)   
-    i = 1
-    j = 0
-    peak_pos_modified = filter_peaks_pos[:]
-    while i < len(filter_peaks_pos)-1:
-        if filter_peaks_pos[i] - filter_peaks_pos[i-1] > 1.5*med_len:
-            temp = int((filter_peaks_pos[i] - filter_peaks_pos[i-1])/2) + filter_peaks_pos[i-1]
-            most_close = sorted(filter_peaks_pos_copy, key=lambda x:abs(x-temp))
-            if temp in most_close:
-                peak_pos_modified[i+j:i+j] = [temp] 
-            else:           
-                try:
-                    most_close_before = list(filter(lambda x: x <= temp + 20 and x >= temp - 20, most_close))
-                    idx = np.argmin(data[most_close_before])
-                    peak_pos_modified[i+j:i+j] = [most_close_before[idx]]
-                except:
-                    plot_peak = True
+    if not use_2_step:
+        med_len = [filter_peaks_pos[i+1] - filter_peaks_pos[i]  for i,_ in enumerate(filter_peaks_pos[:-1])]
+        med_len = np.sum(med_len)/len(med_len)   
+        i = 1
+        j = 0
+        peak_pos_modified = filter_peaks_pos[:]
+        while i < len(filter_peaks_pos):
+            if filter_peaks_pos[i] - filter_peaks_pos[i-1] > 1.5*med_len:
+                temp = int((filter_peaks_pos[i] - filter_peaks_pos[i-1])/2) + filter_peaks_pos[i-1]
+                most_close = sorted(filter_peaks_pos_copy, key=lambda x:abs(x-temp))
+                if temp in most_close:
+                    peak_pos_modified[i+j:i+j] = [temp] 
+                else:           
+                    try:
+                        most_close_before = list(filter(lambda x: x <= temp + 20 and x >= temp - 20, most_close))
+                        idx = np.argmin(data[most_close_before])
+                        peak_pos_modified[i+j:i+j] = [most_close_before[idx]]
+                    except:
+                        plot_peak = True
+                        print('not found peak in the middle of gait')
+                i += 1
+                j += 1
+                continue
             i += 1
-            j += 1
-            continue
-        i += 1
-    filter_peaks_pos = peak_pos_modified
+        filter_peaks_pos = peak_pos_modified
+
+    
+    if len(filter_peaks_pos) < 3:
+        plot_peak = True
 
     if plot_peak:
         plt.figure(figsize=(12, 3))
@@ -389,7 +415,7 @@ def segment2GaitCycle(peaks,segment):
     return cycles
 
 
-def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait=8, val_test=0.5, plot=False):
+def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False):
 
     # shuffle data and label
     data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
@@ -415,6 +441,8 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait
     for cycles, label in zip(data_for_user, label_for_user):
 
         # train
+        if gait_2_cycles:
+            train_gait = int(cycles.shape[0]/2)
         train_data.append(cycles[:train_gait])
         train_label.extend(label[:train_gait])
 

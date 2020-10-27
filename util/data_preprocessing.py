@@ -18,7 +18,7 @@ import pywt
 from sliding_window import sliding_window
 from utils import str2bool, split_balanced_data, denoiseData, detectGaitCycle, segment2GaitCycle
 
-def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, plot_interpolated=False, plot_auto_corr_coeff=False):
+def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, plot_interpolated=False, plot_auto_corr_coeff=False, use_2_step=False):
 
     # define variables
     data = []
@@ -28,7 +28,7 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     # read files
     print('Read csv file')
     for f in tqdm(os.listdir(path_data)):
-        
+
         # read only acc data
         df = pd.read_csv(path_data + '/' + f, header=None, skiprows=2, usecols=[3,4,5])
 
@@ -50,7 +50,7 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     print('Find peaks gait cycles')
     peaks = []
     for d in tqdm(data):
-        peaks.append(detectGaitCycle(d, plot_peak, plot_auto_corr_coeff))
+        peaks.append(detectGaitCycle(d, plot_peak, plot_auto_corr_coeff, use_2_step))
 
     # divide data in gait cycle based on peak position found 
     print('Split segment in gayt cycles')
@@ -58,9 +58,10 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     label_user_cycle = []
     label_seq_cycle = []
     for peak,segment,user, seq in zip(peaks, data, lu, seqs):
-        data_gait_cycle.extend(segment2GaitCycle(peak,segment))
-        label_user_cycle.extend([user]*(len(peak)-1))
-        label_seq_cycle.extend([seq]*(len(peak)-1))
+        cycles = segment2GaitCycle(peak,segment)
+        data_gait_cycle.extend(cycles)
+        label_user_cycle.extend([user]*(len(cycles)))
+        label_seq_cycle.extend([seq]*(len(cycles)))
 
     # spline interpolation to 120 samples for gait
     print('Interpolate cycle to 120 fixed sample')
@@ -88,7 +89,15 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     print('Compute magnitude')
     cycles_interpolated = np.concatenate((cycles_interpolated, np.sqrt(np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True))), 2) 
 
+    count_cycle = np.unique(label_user_cycle, return_counts=True)[1]
+
     print(f'Found {cycles_interpolated.shape[0]} gait cycles')
+    print(f'Min cycles for user: {np.min(count_cycle)}')
+    print(f'Max cycles for user: {np.max(count_cycle)}')
+    print(f'Mean cycles for user: {int(np.mean(count_cycle))}')
+
+    if use_2_step:
+        path_out = path_out + '/gait_2_cycles'
 
     if os.path.exists(path_out):
         shutil.rmtree(path_out)
@@ -759,6 +768,12 @@ if __name__ == '__main__':
         default=False, 
         help='Plot autocorrelation and 2nd peak take for estimated cycle length'
     )
+    parser.add_argument(
+        '-use_2_step',
+        '--use_2_step',
+        type=str2bool,
+        default=False
+    )
 
     args = parser.parse_args()
 
@@ -816,5 +831,6 @@ if __name__ == '__main__':
                     plot_denoise=args.plot_denoise,
                     plot_peak=args.plot_peak,
                     plot_interpolated=args.plot_interpolated,
-                    plot_auto_corr_coeff=args.plot_auto_corr_coeff
+                    plot_auto_corr_coeff=args.plot_auto_corr_coeff,
+                    use_2_step=args.use_2_step
                 )
