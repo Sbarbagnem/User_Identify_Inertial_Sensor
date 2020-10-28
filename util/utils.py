@@ -418,7 +418,7 @@ def segment2GaitCycle(peaks,segment):
 def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False):
 
     # shuffle data and label
-    #data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
+    data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
 
     data_for_user = []
     label_for_user = []
