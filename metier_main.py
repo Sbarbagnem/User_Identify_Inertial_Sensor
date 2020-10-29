@@ -476,7 +476,7 @@ if __name__ == '__main__':
         print('using {} dataset'.format(d))
     
         if d == "unimib":
-            dataset = Dataset(  path='data/datasets/UNIMIBDataset/',
+            dataset = Dataset(  path='data/datasets/UNIMIB_processed/',
                                 name='unimib',
                                 channel=3,
                                 winlen=100,

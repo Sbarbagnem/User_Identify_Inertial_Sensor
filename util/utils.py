@@ -254,19 +254,13 @@ def smooth(coef):
     y=np.convolve(w/w.sum(),s,mode='valid')
     return y
 
-def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_step=False):
+def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
 
     data = data[:,2] # z axis
-    if use_2_step:
-        t = 0.5
-        alpha = 1/4 #1/4 
-        beta = 3/4 #3/4 
-        gamma = 2/6 #2/6 
-    else:
-        t = 0.4
-        alpha = 0.5
-        beta = 0.7
-        gamma = 0.35
+    t = 0.4 #0.4 1/2
+    alpha = 0.5 #0.5 1/4
+    beta = 3/4 #0.7 3/4
+    gamma = 1/6 #0.35 1/6
 
     # all peaks 
     all_peak_pos = []
@@ -285,15 +279,6 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
     
     filter_peaks_pos_copy = filter_peaks_pos.copy()
 
-    '''
-    plt.figure(figsize=(12, 3))
-    plt.style.use('seaborn-darkgrid')
-    plt.plot(np.arange(len(data)), data, 'b-')
-    plt.scatter(filter_peaks_pos, data[filter_peaks_pos], c='red')
-    plt.tight_layout()
-    plt.show()
-    '''
-
     # compute autcorrelation to estimate len cycle
     auto_corr_coeff = calAutoCorrelation(data)
 
@@ -305,18 +290,12 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
     peak_auto_corr = []
     gcLen = 0
     flag = 0
-    mean_auto_corr = np.mean(auto_corr_coeff[:200])
-    std_auto_corr = np.std(auto_corr_coeff[:200])
-    #print(mean_auto_corr)
-    for i in range(1,len(auto_corr_coeff)-2):
-        if auto_corr_coeff[i] > auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1] and auto_corr_coeff[i] > (mean_auto_corr + std_auto_corr*0.4):
-            #print(i)
+    mean_auto_corr = np.mean(auto_corr_coeff)
+    for i in range(1,auto_corr_coeff.shape[0]-1):
+        if auto_corr_coeff[i] > auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1] and auto_corr_coeff[i] > mean_auto_corr:
             flag += 1
             peak_auto_corr.append(i)
-            if flag == 3 and use_2_step:
-                gcLen = i - 1
-                break
-            if flag == 2 and not use_2_step:
+            if flag == 2:
                 gcLen = i - 1
                 break
 
@@ -325,7 +304,7 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(len(auto_corr_coeff)), auto_corr_coeff, 'b-')
-        plt.scatter([0, peak_auto_corr[-1]], auto_corr_coeff[[0, peak_auto_corr[-1]]], c='red')
+        plt.scatter(peak_auto_corr, auto_corr_coeff[peak_auto_corr], c='red')
         plt.tight_layout()
         plt.show()
 
@@ -359,43 +338,38 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
             else:
                 filter_peaks_pos.remove(filter_peaks_pos[i])
                 continue
-        i=i+1
+        else:
+            i=i+1
 
     if filter_peaks_pos[-1]-filter_peaks_pos[-2] < beta*gcLen:
         filter_peaks_pos.remove(filter_peaks_pos[-1])
     
     # final check on len on gait found
     # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
-    if not use_2_step:
-        med_len = [filter_peaks_pos[i+1] - filter_peaks_pos[i]  for i,_ in enumerate(filter_peaks_pos[:-1])]
-        med_len = np.sum(med_len)/len(med_len)   
-        i = 1
-        j = 0
-        peak_pos_modified = filter_peaks_pos[:]
-        while i < len(filter_peaks_pos):
-            if filter_peaks_pos[i] - filter_peaks_pos[i-1] > 1.5*med_len:
-                temp = int((filter_peaks_pos[i] - filter_peaks_pos[i-1])/2) + filter_peaks_pos[i-1]
-                most_close = sorted(filter_peaks_pos_copy, key=lambda x:abs(x-temp))
-                if temp in most_close:
-                    peak_pos_modified[i+j:i+j] = [temp] 
-                else:           
-                    try:
-                        most_close_before = list(filter(lambda x: x <= temp + 20 and x >= temp - 20, most_close))
+    med_len = [filter_peaks_pos[i+1] - filter_peaks_pos[i]  for i,_ in enumerate(filter_peaks_pos[:-1])]
+    med_len = np.sum(med_len)/len(med_len)   
+    i = 1
+    j = 0
+    peak_pos_modified = filter_peaks_pos[:]
+    while i < len(filter_peaks_pos):
+        if filter_peaks_pos[i] - filter_peaks_pos[i-1] > 1.1*gcLen:
+            temp = int((filter_peaks_pos[i] - filter_peaks_pos[i-1])/2) + filter_peaks_pos[i-1]
+            most_close = sorted(filter_peaks_pos_copy, key=lambda x:abs(x-temp))
+            if temp in most_close:
+                peak_pos_modified[i+j:i+j] = [temp] 
+                j += 1
+            else:           
+                try:
+                    most_close_before = list(filter(lambda x: x <= temp + 0.15*gcLen and x >= temp - 0.15*gcLen, most_close))
+                    if most_close_before != []:
                         idx = np.argmin(data[most_close_before])
                         peak_pos_modified[i+j:i+j] = [most_close_before[idx]]
-                    except:
-                        plot_peak = True
-                        print('not found peak in the middle of gait')
-                i += 1
-                j += 1
-                continue
-            i += 1
-        filter_peaks_pos = peak_pos_modified
-
+                        j += 1
+                except:
+                    plot_peak = True
+        i += 1
+    filter_peaks_pos = peak_pos_modified
     
-    if len(filter_peaks_pos) < 3:
-        plot_peak = True
-
     if plot_peak:
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
@@ -412,13 +386,17 @@ def segment2GaitCycle(peaks,segment):
         cycle = segment[peaks[i]:peaks[i+1],:]
         cycle = cycle[np.newaxis,:,:]
         cycles.append(cycle)
+        if cycle.shape[1] == 0:
+            print(peaks)
+            print(segment.shape)
     return cycles
 
 
-def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False):
+def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait=8, val_test=0.5, gait_2_cycles=False, method='cycle_based', plot=False):
 
     # shuffle data and label
-    data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
+    if method == 'cycle_based':
+        data, label_user, label_sequences = skutils.shuffle(data, label_user, label_sequences)
 
     data_for_user = []
     label_for_user = []
@@ -437,43 +415,64 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait
     val_label = []
     test_label = []
 
-    # split train val and test
-    for cycles, label in zip(data_for_user, label_for_user):
+    if method == 'cycle_based':
+        # split train val and test
+        for cycles, label in zip(data_for_user, label_for_user):
 
-        # train
-        if gait_2_cycles:
-            train_gait = int(cycles.shape[0]/2)
-        train_data.append(cycles[:train_gait])
-        train_label.extend(label[:train_gait])
+            # train
+            if gait_2_cycles:
+                train_gait = int(cycles.shape[0]/2)
+            train_data.append(cycles[:train_gait])
+            train_label.extend(label[:train_gait])
 
-        stop = int((cycles.shape[0]-train_gait)/2)
+            stop = int((cycles.shape[0]-train_gait)/2)
 
-        # val
-        val_data.append(cycles[train_gait:stop+train_gait])
-        val_label.extend(label[train_gait:stop+train_gait])
+            # val
+            val_data.append(cycles[train_gait:stop+train_gait])
+            val_label.extend(label[train_gait:stop+train_gait])
 
-        # test
-        test_data.append(cycles[stop+train_gait:])
-        test_label.extend(label[stop+train_gait:])
+            # test
+            test_data.append(cycles[stop+train_gait:])
+            test_label.extend(label[stop+train_gait:])
 
-        if plot:
-            plt.figure(figsize=(12, 3))
-            plt.style.use('seaborn-darkgrid')
-            n = train_data[-1].shape[0]
-            for i in range(n):
-                plt.subplot(3, n, i+1)
-                plt.title(f'train')
-                plt.plot(np.arange(train_data[-1][i].shape[0]), train_data[-1][i,:,2], 'b-', label='noise')
-            for i in range(np.min((val_data[-1].shape[0], n))):
-                plt.subplot(3, n, i+1+4)
-                plt.title(f'val')
-                plt.plot(np.arange(val_data[-1][i].shape[0]), val_data[-1][i,:,2], 'b-', label='noise')
-            for i in range(np.min((test_data[-1].shape[0], n))):
-                plt.subplot(3, n, i+1+8)
-                plt.title(f'test')
-                plt.plot(np.arange(test_data[-1][i].shape[0]), test_data[-1][i,:,2], 'b-', label='noise')
-            plt.tight_layout()
-            plt.show()
+            if plot:
+                plt.figure(figsize=(12, 3))
+                plt.style.use('seaborn-darkgrid')
+                n = train_data[-1].shape[0]
+                for i in range(n):
+                    plt.subplot(3, n, i+1)
+                    plt.title(f'train')
+                    plt.plot(np.arange(train_data[-1][i].shape[0]), train_data[-1][i,:,2], 'b-', label='noise')
+                for i in range(np.min((val_data[-1].shape[0], n))):
+                    plt.subplot(3, n, i+1+4)
+                    plt.title(f'val')
+                    plt.plot(np.arange(val_data[-1][i].shape[0]), val_data[-1][i,:,2], 'b-', label='noise')
+                for i in range(np.min((test_data[-1].shape[0], n))):
+                    plt.subplot(3, n, i+1+8)
+                    plt.title(f'test')
+                    plt.plot(np.arange(test_data[-1][i].shape[0]), test_data[-1][i,:,2], 'b-', label='noise')
+                plt.tight_layout()
+                plt.show()
+
+    elif method == 'window_based':
+        # first sequence for train and seconde sequence for test
+        for cycles, labels, seqs in zip(data_for_user, label_for_user, sequences_for_user):
+
+            # sequence 0
+            idx = np.where(seqs == 0)
+            cycle = cycles[idx]
+            label = labels[idx]
+
+            train_percentage = int(cycle.shape[0]*0.80)
+            train_data.append(cycle[:train_percentage])
+            train_label.extend(label[:train_percentage])
+            val_data.append(cycle[train_percentage:])
+            val_label.extend(label[train_percentage:])
+
+            # sequence 1
+            idx = np.where(seqs == 1)
+            test_data.append(cycles[idx])
+            test_label.extend(labels[idx])
 
     train_data = np.concatenate(train_data, axis=0)
     val_data = np.concatenate(val_data, axis=0)
@@ -498,3 +497,111 @@ def normalize_data(train, val, test):
     test = np.expand_dims(test, 3)
 
     return train, val, test
+
+def find_peaks(peaks, data, gcLen, use_2_step=False):
+
+    if use_2_step:
+        alpha = 1/4 #1/4 
+        beta = 0.7 #3/4 
+        gamma = 2/6 #2/6 
+    else:
+        alpha = 0.5
+        beta = 0.7
+        gamma = 0.35
+
+    plot_peak = False
+    peaks_copy = peaks.copy()
+
+    # find first candidate peak
+    i=1
+    while i < len(peaks)-1:
+        if peaks[i] - peaks[i-1] < gcLen and data[peaks[i]] < data[peaks[i-1]]:
+            peaks.remove(peaks[i-1])
+        else:
+            break
+        i += 1
+
+    # find all candidate peak
+    i = 1
+    while i < len(peaks)-1:
+        if peaks[i]-peaks[i-1] < alpha*gcLen:
+            if data[peaks[i]] <= data[peaks[i-1]]:
+                peaks.remove(peaks[i-1])
+                continue
+            else:
+                peaks.remove(peaks[i])
+                continue
+        
+        elif peaks[i]-peaks[i-1] < beta*gcLen:
+            if peaks[i+1] - peaks[i] < gamma*gcLen:
+                if data[peaks[i+1]] <= data[peaks[i]]:
+                    peaks.remove(peaks[i])
+                    continue
+                else:
+                    peaks.remove(peaks[i+1])
+                    continue
+            else:
+                peaks.remove(peaks[i])
+                continue
+        i=i+1
+
+    if peaks[-1]-peaks[-2] < beta*gcLen:
+        peaks.remove(peaks[-1])
+
+    # final check on len on gait found
+    # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
+    cycles_len = [peaks[i+1] - peaks[i]  for i,_ in enumerate(peaks[:-1])]
+    med_len = np.mean(cycles_len) 
+    i = 1
+    j = 0
+    peak_pos_modified = peaks[:]
+    while i < len(peaks):
+        if peaks[i] - peaks[i-1] > 1.2*gcLen:
+            temp = int((peaks[i] - peaks[i-1])/2) + peaks[i-1]
+            most_close = sorted(peaks_copy, key=lambda x:abs(x-temp))
+            if temp in most_close:
+                peak_pos_modified[i+j:i+j] = [temp] 
+            else:           
+                try:
+                    most_close_before = list(filter(lambda x: x <= temp + 20 and x >= temp - 20, most_close))
+                    idx = np.argmin(data[most_close_before])
+                    peak_pos_modified[i+j:i+j] = [most_close_before[idx]]
+                except:
+                    plot_peak = True
+            i += 1
+            j += 1
+            continue
+        i += 1
+    peaks = peak_pos_modified
+    
+    if len(peaks) < 3 or (len(peaks) > 11 and use_2_step):
+        plot_peak = True
+
+    return peaks, plot_peak
+
+def find_gcLen(data, use_2_step):
+    # compute autcorrelation to estimate len cycle
+    auto_corr_coeff = calAutoCorrelation(data)
+
+    # smooth the auto_correlation_coefficient
+    for i in range(10):
+        auto_corr_coeff = smooth(auto_corr_coeff)
+
+    # approximate the length of a gait cycle by selecting the 2nd peak (positive) in the auto correlation signal
+    peak_auto_corr = []
+    gcLen = 0
+    flag = 0
+    mean_auto_corr = np.mean(auto_corr_coeff[:200])
+    std_auto_corr = np.std(auto_corr_coeff[:200])
+    for i in range(1,len(auto_corr_coeff)-1):
+        if auto_corr_coeff[i] > auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1] and auto_corr_coeff[i] > (mean_auto_corr - std_auto_corr*0.4):
+            flag += 1
+            peak_auto_corr.append(i)
+            if flag == 3 and use_2_step:
+                gcLen = i - 1
+                break
+            if flag == 2 and not use_2_step:
+                gcLen = i - 1
+                break
+
+    return gcLen, auto_corr_coeff, peak_auto_corr
