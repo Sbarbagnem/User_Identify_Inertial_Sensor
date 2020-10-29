@@ -17,16 +17,23 @@ class ModelGait():
         else:
             self.path_data = colab_path + config['ouisir']['PATH_DATA']
         self.num_user = config['ouisir']['NUM_CLASSES_USER']
-        self.window_sample = config['ouisir']['WINDOW_SAMPLES']
         self.best_model = None
 
-    def load_data(self, filter_num_user=None, gait_2_cycles=False):
+    def load_data(self, filter_num_user=None, gait_2_cycles=False, method='cycle_based'):
+
+        if method == 'cycle_based':
+            self.path_data = self.path_data + 'cycle_based/'
+        elif method == 'window_based':
+            self.path_data = self.path_data + 'window_based/'
+
         if gait_2_cycles:
             self.path_data += 'gait_2_cycles/'
+
         self.data = np.load(self.path_data + 'data.npy')
         self.label = np.load(self.path_data + 'user_label.npy')
         self.sequences = np.load(self.path_data + 'sequences_label.npy')
         self.axis = self.data.shape[2]
+        self.window_sample = self.data.shape[1]
         print(f'Found {self.data.shape[0]} cycles for {np.unique(self.label).shape[0]} users')
 
         if filter_num_user != None:
@@ -37,9 +44,9 @@ class ModelGait():
             self.num_user = np.unique(self.label).shape[0]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
-    def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False):
+    def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False, method='cycle_based'):
         self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-            self.data, self.label, self.sequences, train_gait, val_test, gait_2_cycles, plot)
+            self.data, self.label, self.sequences, train_gait, val_test, gait_2_cycles, method, plot)
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
         print(f'{self.test.shape[0]} gait cycles for test')

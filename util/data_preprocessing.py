@@ -14,11 +14,12 @@ from scipy.interpolate import UnivariateSpline, CubicSpline
 from sklearn import utils as skutils
 import matplotlib.pyplot as plt
 import pywt
+from itertools import islice
 
 from sliding_window import sliding_window
 from utils import str2bool, split_balanced_data, denoiseData, detectGaitCycle, segment2GaitCycle
 
-def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, plot_interpolated=False, plot_auto_corr_coeff=False, use_2_step=False):
+def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_peak=False, plot_interpolated=False, plot_auto_corr_coeff=False, use_2_step=False):
 
     # define variables
     data = []
@@ -50,7 +51,7 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     print('Find peaks gait cycles')
     peaks = []
     for d in tqdm(data):
-        peaks.append(detectGaitCycle(d, plot_peak, plot_auto_corr_coeff, use_2_step))
+        peaks.append(detectGaitCycle(d, plot_peak, plot_auto_corr_coeff))#, use_2_step))
 
     # divide data in gait cycle based on peak position found 
     print('Split segment in gayt cycles')
@@ -69,7 +70,10 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     for cycle in data_gait_cycle:
         interpolated = np.zeros((1,120,cycle.shape[2]))
         for dim in np.arange(cycle.shape[2]):
-            interpolated[0,:,dim] = CubicSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim])(np.linspace(0,cycle.shape[1]-1,120))
+            try:
+                interpolated[0,:,dim] = CubicSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim])(np.linspace(0,cycle.shape[1]-1,120))
+            except:
+                print(cycle.shape)
             if plot_interpolated:
                 plt.figure(figsize=(12, 3))
                 plt.style.use('seaborn-darkgrid')
@@ -99,13 +103,61 @@ def ou_isir_process(path_data, path_out, plot_denoise=False, plot_peak=False, pl
     if use_2_step:
         path_out = path_out + '/gait_2_cycles'
 
-    if os.path.exists(path_out):
-        shutil.rmtree(path_out)
-    os.mkdir(path_out)
+    if not os.path.exists(path_out):
+        os.mkdir(path_out)
 
     np.save(path_out + '/data', cycles_interpolated)
     np.save(path_out + '/user_label', label_user_cycle)
     np.save(path_out + '/sequences_label', label_seq_cycle)
+
+def ou_isir_process_window_based(path_data, path_out):
+
+    window_len = 100
+    overlap = int((1 - 0.75)*window_len)
+    axis = 3
+
+    # define variables
+    data = []
+    lu = []
+    seqs = []
+    lu_temp = 0
+    # read files
+    print('Read csv file')
+    for f in tqdm(os.listdir(path_data)):
+
+        # read only acc data
+        df = pd.read_csv(path_data + '/' + f, header=None, skiprows=2, usecols=[3,4,5])
+
+        # stack data and label user
+        data.append(df.values)
+        lu.append(lu_temp)
+
+        if 'seq1' in f:
+            lu_temp += 1
+            seqs.append(1)
+        else:
+            seqs.append(0)   
+
+    data_windows = []
+    label_user = []
+    label_seq = []
+
+    for signal, user, seq in zip(data, lu, seqs):
+        windows = sliding_window(signal, (window_len, axis), (overlap, 1))
+        data_windows.append(windows)
+        label_user.extend([user]*(len(windows)))
+        label_seq.extend([seq]*(len(windows)))
+
+    data_windows = np.concatenate(data_windows, axis=0)
+
+    
+    if not os.path.exists(path_out):
+        os.mkdir(path_out)
+
+    np.save(path_out + '/data', data_windows)
+    np.save(path_out + '/user_label', label_user)
+    np.save(path_out + '/sequences_label', label_seq)    
+
 
 
 def realdisp_process(
@@ -741,6 +793,13 @@ if __name__ == '__main__':
 
     # for ouisir dataset
     parser.add_argument(
+        '-method',
+        '--method',
+        type=str,
+        choices=['cycle_based', 'window_based'],
+        help='type of method for signal segmentation'
+    )
+    parser.add_argument(
         '-plot_denoise',
         '--plot_denoise',
         type=str2bool,
@@ -825,12 +884,18 @@ if __name__ == '__main__':
                     size_overlapping=overlap,
                     win_len=args.win_len)
             elif args.dataset == 'ouisir':
-                ou_isir_process(
-                    path_data = '../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
-                    path_out = '../data/datasets/OUISIR_processed/', 
-                    plot_denoise=args.plot_denoise,
-                    plot_peak=args.plot_peak,
-                    plot_interpolated=args.plot_interpolated,
-                    plot_auto_corr_coeff=args.plot_auto_corr_coeff,
-                    use_2_step=args.use_2_step
-                )
+                if args.method == 'cycle_based':
+                    ou_isir_process_cycle_based(
+                        path_data = '../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
+                        path_out = '../data/datasets/OUISIR_processed/cycle_based/', 
+                        plot_denoise=args.plot_denoise,
+                        plot_peak=args.plot_peak,
+                        plot_interpolated=args.plot_interpolated,
+                        plot_auto_corr_coeff=args.plot_auto_corr_coeff,
+                        use_2_step=args.use_2_step
+                    )
+                elif args.method == 'window_based':
+                    ou_isir_process_window_based(
+                        path_data = '../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
+                        path_out = '../data/datasets/OUISIR_processed/window_based/', 
+                    )
