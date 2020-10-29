@@ -463,7 +463,7 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, train_gait
             cycle = cycles[idx]
             label = labels[idx]
 
-            train_percentage = int(cycle.shape[0]*0.80)
+            train_percentage = int(cycle.shape[0]*0.70)
             train_data.append(cycle[:train_percentage])
             train_label.extend(label[:train_percentage])
             val_data.append(cycle[train_percentage:])
