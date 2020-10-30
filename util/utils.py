@@ -348,15 +348,21 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
                 for i in range(n):
                     plt.subplot(3, n, i+1)
                     plt.title(f'train')
-                    plt.plot(np.arange(train_data[-1][i].shape[0]), train_data[-1][i,:,2], 'b-', label='noise')
+                    plt.plot(np.arange(train_data[-1][i].shape[0]), train_data[-1][i,:,0], 'b-')
+                    plt.plot(np.arange(train_data[-1][i].shape[0]), train_data[-1][i,:,1], 'r-')
+                    plt.plot(np.arange(train_data[-1][i].shape[0]), train_data[-1][i,:,2], 'g-')
                 for i in range(np.min((val_data[-1].shape[0], n))):
-                    plt.subplot(3, n, i+1+4)
+                    plt.subplot(3, n, i+1+n)
                     plt.title(f'val')
-                    plt.plot(np.arange(val_data[-1][i].shape[0]), val_data[-1][i,:,2], 'b-', label='noise')
+                    plt.plot(np.arange(val_data[-1][i].shape[0]), val_data[-1][i,:,0], 'b-')
+                    plt.plot(np.arange(val_data[-1][i].shape[0]), val_data[-1][i,:,1], 'r-')
+                    plt.plot(np.arange(val_data[-1][i].shape[0]), val_data[-1][i,:,2], 'g-')
                 for i in range(np.min((test_data[-1].shape[0], n))):
-                    plt.subplot(3, n, i+1+8)
+                    plt.subplot(3, n, i+1+n*2)
                     plt.title(f'test')
-                    plt.plot(np.arange(test_data[-1][i].shape[0]), test_data[-1][i,:,2], 'b-', label='noise')
+                    plt.plot(np.arange(test_data[-1][i].shape[0]), test_data[-1][i,:,0], 'b-')
+                    plt.plot(np.arange(test_data[-1][i].shape[0]), test_data[-1][i,:,1], 'r-')
+                    plt.plot(np.arange(test_data[-1][i].shape[0]), test_data[-1][i,:,2], 'g-')
                 plt.tight_layout()
                 plt.show()
 
