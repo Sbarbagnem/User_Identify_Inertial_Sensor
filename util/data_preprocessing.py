@@ -70,21 +70,22 @@ def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_pe
     for cycle in data_gait_cycle:
         interpolated = np.zeros((1,120,cycle.shape[2]))
         for dim in np.arange(cycle.shape[2]):
-            try:
-                interpolated[0,:,dim] = CubicSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim])(np.linspace(0,cycle.shape[1]-1,120))
-            except:
-                print(cycle.shape)
-            if plot_interpolated:
-                plt.figure(figsize=(12, 3))
-                plt.style.use('seaborn-darkgrid')
-                plt.subplot(1, 2, 1)
-                plt.title(f'original')
-                plt.plot(np.arange(cycle.shape[1]), cycle[0,:,dim], 'b-', label='noise')
-                plt.subplot(1, 2, 2)
-                plt.title(f'interpolated')
-                plt.plot(np.arange(interpolated.shape[1]), interpolated[0,:,dim], 'b-', label='denoise')
-                plt.tight_layout()
-                plt.show()
+            interpolated[0,:,dim] = CubicSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim])(np.linspace(0,cycle.shape[1]-1,120))
+        if plot_interpolated:
+            plt.figure(figsize=(12, 3))
+            plt.style.use('seaborn-darkgrid')
+            plt.subplot(1, 2, 1)
+            plt.title(f'original')
+            plt.plot(np.arange(cycle.shape[1]), cycle[0,:,0], 'b-', label='noise')
+            plt.plot(np.arange(cycle.shape[1]), cycle[0,:,1], 'r-', label='noise')
+            plt.plot(np.arange(cycle.shape[1]), cycle[0,:,2], 'g-', label='noise')
+            plt.subplot(1, 2, 2)
+            plt.title(f'interpolated')
+            plt.plot(np.arange(interpolated.shape[1]), interpolated[0,:,0], 'b-', label='denoise')
+            plt.plot(np.arange(interpolated.shape[1]), interpolated[0,:,1], 'r-', label='denoise')
+            plt.plot(np.arange(interpolated.shape[1]), interpolated[0,:,2], 'g-', label='denoise')
+            plt.tight_layout()
+            plt.show()
         cycles_interpolated.append(interpolated)
 
     cycles_interpolated = np.concatenate(cycles_interpolated, axis=0)
@@ -121,6 +122,8 @@ def ou_isir_process_window_based(path_data, path_out):
     lu = []
     seqs = []
     lu_temp = 0
+    ID = []
+    id_temp = 0
     # read files
     print('Read csv file')
     for f in tqdm(os.listdir(path_data)):
@@ -142,11 +145,15 @@ def ou_isir_process_window_based(path_data, path_out):
     label_user = []
     label_seq = []
 
+    print('Sliding window')
     for signal, user, seq in zip(data, lu, seqs):
         windows = sliding_window(signal, (window_len, axis), (overlap, 1))
         data_windows.append(windows)
         label_user.extend([user]*(len(windows)))
         label_seq.extend([seq]*(len(windows)))
+        _id = np.arange(id_temp, id_temp + len(windows))
+        ID.extend(_id)
+        id_temp = id_temp + len(windows) + 10
 
     data_windows = np.concatenate(data_windows, axis=0)
 
@@ -157,6 +164,7 @@ def ou_isir_process_window_based(path_data, path_out):
     np.save(path_out + '/data', data_windows)
     np.save(path_out + '/user_label', label_user)
     np.save(path_out + '/sequences_label', label_seq)    
+    np.save(path_out + '/id.npy', ID)
 
 
 

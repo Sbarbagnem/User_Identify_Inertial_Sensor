@@ -3,10 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sn
+import sys
 
 from model.resNet182D.resnet18_2D import resnet18
 from model.model_paper.model import ModelPaper
-from util.utils import split_data_train_val_test_gait, normalize_data
+from util.utils import split_data_train_val_test_gait, normalize_data, delete_overlap
 from util.tf_metrics import custom_metrics
 
 
@@ -23,8 +24,10 @@ class ModelGait():
 
         if method == 'cycle_based':
             self.path_data = self.path_data + 'cycle_based/'
+            self.id = None
         elif method == 'window_based':
             self.path_data = self.path_data + 'window_based/'
+            self.id = np.load(self.path_data + 'id.npy')
 
         if gait_2_cycles:
             self.path_data += 'gait_2_cycles/'
@@ -34,6 +37,7 @@ class ModelGait():
         self.sequences = np.load(self.path_data + 'sequences_label.npy')
         self.axis = self.data.shape[2]
         self.window_sample = self.data.shape[1]
+
         print(f'Found {self.data.shape[0]} cycles for {np.unique(self.label).shape[0]} users')
 
         if filter_num_user != None:
@@ -45,8 +49,19 @@ class ModelGait():
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
     def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False, method='cycle_based'):
-        self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-            self.data, self.label, self.sequences, train_gait, val_test, gait_2_cycles, method, plot)
+
+        if method == 'cycle_based':
+            self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
+                self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot)
+        else:
+            self.train, self.val, self.test, self.train_label, self.val_label, self.test_label, train_id, _, test_id = split_data_train_val_test_gait(
+                self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot)
+            # delete overlap sequence between train and test
+            distances_to_delete = [1]
+            invalid_idx = delete_overlap(train_id, test_id, distances_to_delete)
+            self.train = np.delete(self.train, invalid_idx, axis=0)
+            self.train_label = np.delete(self.train_label, invalid_idx, axis=0)
+
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
         print(f'{self.test.shape[0]} gait cycles for test')
