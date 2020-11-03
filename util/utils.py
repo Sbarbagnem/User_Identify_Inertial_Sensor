@@ -45,7 +45,7 @@ def split_balanced_data(lu, la, folders, di=None, log=True):
     # dict to save indexes' example for every folder
     indexes = {}
     for i in np.arange(folders):
-        indexes[str[i]] = []
+        indexes[str(i)] = []
 
     last_folder = 0
 
@@ -368,15 +368,15 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
 
     elif method == 'window_based':
 
-        # 70 train, 15 val, 15 test
+        # 80% train (80-20) and 20% test
 
         # first sequence for train and seconde sequence for test
         for cycles, labels, ID in zip(data_for_user, label_for_user, id_for_user):
 
             cycles, labels, ID = skutils.shuffle(cycles, labels, ID)
 
-            train_percentage = int(cycles.shape[0]*0.70)
-            val_percentage = int(cycles.shape[0]*0.15) 
+            train_percentage = int(cycles.shape[0]*0.80*0.80)
+            val_percentage = int(cycles.shape[0]*0.80*0.20) 
 
             # train
             train_data.append(cycles[:train_percentage])
