@@ -51,7 +51,7 @@ def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_pe
     print('Find peaks gait cycles')
     peaks = []
     for d in tqdm(data):
-        peaks.append(detectGaitCycle(d, plot_peak, plot_auto_corr_coeff))#, use_2_step))
+        peaks.append(detectGaitCycle(d, plot_peak, plot_auto_corr_coeff, use_2_step))
 
     # divide data in gait cycle based on peak position found 
     print('Split segment in gayt cycles')
@@ -66,11 +66,15 @@ def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_pe
 
     # spline interpolation to 120 samples for gait
     print('Interpolate cycle to 120 fixed sample')
+    to_interp = 120
     cycles_interpolated = []
     for cycle in data_gait_cycle:
-        interpolated = np.zeros((1,120,cycle.shape[2]))
+        interpolated = np.zeros((1,to_interp,cycle.shape[2]))
         for dim in np.arange(cycle.shape[2]):
-            interpolated[0,:,dim] = CubicSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim])(np.linspace(0,cycle.shape[1]-1,120))
+            try:
+                interpolated[0,:,dim] = CubicSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim])(np.linspace(0,cycle.shape[1]-1,to_interp))
+            except:
+                pprint(cycle.shape)
         if plot_interpolated:
             plt.figure(figsize=(12, 3))
             plt.style.use('seaborn-darkgrid')
@@ -94,12 +98,7 @@ def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_pe
     print('Compute magnitude')
     cycles_interpolated = np.concatenate((cycles_interpolated, np.sqrt(np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True))), 2) 
 
-    count_cycle = np.unique(label_user_cycle, return_counts=True)[1]
-
     print(f'Found {cycles_interpolated.shape[0]} gait cycles')
-    print(f'Min cycles for user: {np.min(count_cycle)}')
-    print(f'Max cycles for user: {np.max(count_cycle)}')
-    print(f'Mean cycles for user: {int(np.mean(count_cycle))}')
 
     if use_2_step:
         path_out = path_out + '/gait_2_cycles'
@@ -732,7 +731,13 @@ def plt_act_distribution(dict_indexes, la):
         plt.bar(x=np.arange(len(act_distributions)), height=act_distributions)
     plt.tight_layout()
     plt.show()
-
+    
+def plot_signal(data):
+    plt.figure(figsize=(12, 3))
+    plt.style.use('seaborn-darkgrid')
+    plt.plot(np.arange(data.shape[0]), data, 'b-')
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
