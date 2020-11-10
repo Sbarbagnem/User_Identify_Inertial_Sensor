@@ -57,7 +57,7 @@ class ModelGait():
             self.train, self.val, self.test, self.train_label, self.val_label, self.test_label, train_id, _, test_id = split_data_train_val_test_gait(
                 self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot)
             # delete overlap sequence between train and test
-            distances_to_delete = [1]
+            distances_to_delete = [1,2,3]
             invalid_idx = delete_overlap(train_id, test_id, distances_to_delete)
             self.train = np.delete(self.train, invalid_idx, axis=0)
             self.train_label = np.delete(self.train_label, invalid_idx, axis=0)
