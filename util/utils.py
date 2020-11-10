@@ -5,6 +5,7 @@ import sys
 import pywt
 from pprint import pprint
 from sklearn import utils as skutils
+from math import ceil
 
 
 def plot_performance(ActivityAccuracy, UserAccuracy, fold, path_to_save, save=False):
@@ -218,14 +219,6 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
 
     peaks = find_thresh_peak(data, t)
 
-    '''
-    plt.figure(figsize=(12, 3))
-    plt.style.use('seaborn-darkgrid')
-    plt.plot(np.arange(data.shape[0]), data, 'b-')
-    plt.scatter(peaks, data[peaks], c='red')
-    plt.tight_layout()
-    plt.show()
-    '''
     gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(data, use_2_step)
 
     ############################################
@@ -316,10 +309,12 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
             if gait_2_cycles:
                 # 70 % of cycle for train
                 train_gait = int(cycles.shape[0]*0.7)
+
+            train_gait = int(cycles.shape[0]*0.7)
             train_data.append(cycles[:train_gait])
             train_label.extend(label[:train_gait])
 
-            stop = int((cycles.shape[0]-train_gait)/2)
+            stop = int(cycles.shape[0]*0.2)
 
             # val
             val_data.append(cycles[train_gait:stop+train_gait])
@@ -356,15 +351,15 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
 
     elif method == 'window_based':
 
-        # 80% train (80-20) and 20% test
+        # 70% train, 20% val, 10% test
 
         # first sequence for train and seconde sequence for test
         for cycles, labels, ID in zip(data_for_user, label_for_user, id_for_user):
 
             cycles, labels, ID = skutils.shuffle(cycles, labels, ID)
 
-            train_percentage = int(cycles.shape[0]*0.80*0.80)
-            val_percentage = int(cycles.shape[0]*0.80*0.20) 
+            train_percentage = int(cycles.shape[0]*0.70)
+            val_percentage = int(cycles.shape[0]*0.20) 
 
             # train
             train_data.append(cycles[:train_percentage])
@@ -576,10 +571,11 @@ def find_thresh_peak(data, t):
             all_peak_pos.append(i)
 
     # filter list of peaks based on mean and standard deviation of detected peaks
-    _mean = np.mean(data)
+    _mean = np.mean(data[all_peak_pos])
+    _std = np.std(data[all_peak_pos])
     filter_peaks_pos = []
     for peak in all_peak_pos:
-        if(data[peak] < _mean):
+        if(data[peak] < _mean): #- 0.5*_std):
             filter_peaks_pos.append(peak)
 
     return filter_peaks_pos
@@ -678,5 +674,3 @@ def find_peaks_steps(data, step_equilibrium, step_threshold):
     peaks = sorted(peaks)
 
     return peaks
-
-# 380, 1170
