@@ -307,14 +307,12 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
 
             # train
             if gait_2_cycles:
-                # 70 % of cycle for train
                 train_gait = int(cycles.shape[0]*0.7)
 
-            train_gait = int(cycles.shape[0]*0.7)
             train_data.append(cycles[:train_gait])
             train_label.extend(label[:train_gait])
 
-            stop = int(cycles.shape[0]*0.2)
+            stop = int((cycles.shape[0] - train_gait)/2)
 
             # val
             val_data.append(cycles[train_gait:stop+train_gait])
