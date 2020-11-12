@@ -317,10 +317,20 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
 
             # to take random gait cycle from user
             cycles = skutils.shuffle(cycles)
+            samples = cycles.shape[0]
 
             if gait_2_cycles:
-                train_gait = int(cycles.shape[0]*0.7)
-            stop = int((cycles.shape[0] - train_gait)/2)
+                train_gait = int(samples*0.7)
+            
+            if samples < 10:
+                if samples == 9:
+                    train_gait = 7
+                elif samples== 8:
+                    train_gait = 8
+                elif samples == 7:
+                    train_gait = 5
+
+            stop = int((samples - train_gait)/2)
 
             # train
             train_data.append(cycles[:train_gait])
