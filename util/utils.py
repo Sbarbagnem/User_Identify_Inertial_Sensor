@@ -6,8 +6,7 @@ import pywt
 from pprint import pprint
 from sklearn import utils as skutils
 from sklearn.model_selection import train_test_split
-from math import ceil
-
+import math
 
 def plot_performance(ActivityAccuracy, UserAccuracy, fold, path_to_save, save=False):
 
@@ -345,31 +344,32 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
             test_label.extend(label[stop+train_gait:])
 
     elif method == 'window_based':
-
         # 70% train, 20% val, 10% test
-
         for cycles, labels, ID in zip(data_for_user, label_for_user, id_for_user):
 
-            cycles, labels, ID = skutils.shuffle(cycles, labels, ID)
-            cycle_train, cycle_test, user_train, user_test, id_train, id_test = train_test_split(
-                cycles, labels, ID, test_size=0.1)
-            cycle_train, cycle_val, user_train, user_val, id_train, id_val = train_test_split(
-                cycle_train, user_train, id_train, test_size=0.22)
+            samples = cycles.shape[0]
+
+            # percentage split
+            train_percentage = math.ceil(samples*0.7) if ((samples*0.7) % 1) >= 0.5 else round(samples*0.7)
+            val_percentage = math.ceil(samples*0.2) if ((samples*0.2) % 1) >= 0.5 else round(samples*0.2)
+
+            if train_percentage + val_percentage == samples:
+                val_percentage -= 1
 
             # train
-            train_data.append(cycle_train)
-            train_label.extend(user_train)
-            train_id.extend(id_train)
+            train_data.append(cycles[:train_percentage])
+            train_label.extend(labels[:train_percentage])
+            train_id.extend(ID[:train_percentage])
 
-            # validation
-            val_data.append(cycle_val)
-            val_label.extend(user_val)
-            val_id.extend(id_val)
+            # val
+            val_data.append(cycles[train_percentage:val_percentage+train_percentage])
+            val_label.extend(labels[train_percentage:val_percentage+train_percentage])
+            val_id.extend(ID[train_percentage:val_percentage+train_percentage])
 
             # test
-            test_data.append(cycle_test)
-            test_label.extend(user_test)
-            test_id.extend(id_test)
+            test_data.append(cycles[val_percentage+train_percentage:])
+            test_label.extend(labels[val_percentage+train_percentage:])
+            test_id.extend(ID[val_percentage+train_percentage:])
 
     train_data = np.concatenate(train_data, axis=0)
     val_data = np.concatenate(val_data, axis=0)
@@ -505,9 +505,6 @@ def find_peaks(peaks, data, gcLen, use_2_step=False):
         else:
             i += 1
 
-    if peaks[-1]-peaks[-2] < beta*gcLen:
-        peaks.remove(peaks[-1])
-
     # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
     if not use_2_step:
         i = 1
@@ -530,6 +527,19 @@ def find_peaks(peaks, data, gcLen, use_2_step=False):
 
         peaks = sorted(peak_pos_modified)
 
+    # filter last two peaks
+    filtered = False
+    if peaks[-1]-peaks[-2] < 0.3*gcLen:
+        if peaks[-1] < peaks[-2]:
+            peaks.remove(peaks[-2])
+        else:
+            peaks.remove(peaks[-1])
+        filtered = True
+    elif peaks[-1]-peaks[-2] < 0.5*gcLen and not filtered:
+        peaks.remove(peaks[-1])
+    elif peaks[-1]-peaks[-2] > 1.3*gcLen and not filtered:
+        peaks.remove(peaks[-1])
+
     # check if there a minimum next to detected peaks, take it if it's lower
     if not use_2_step:
         for i, peak in enumerate(peaks):
@@ -538,10 +548,7 @@ def find_peaks(peaks, data, gcLen, use_2_step=False):
             idx = idx[0] + peak-int(0.2*gcLen)
             if len(idx) > 0:
                 peaks[i] = idx[np.argmin(data[idx])]
-
-    if peaks[-1]-peaks[-2] < 0.5*gcLen or peaks[-1]-peaks[-2] > 1.1*gcLen:
-        peaks.remove(peaks[-1])
-
+    
     if len(peaks) <= 4:
         plot_peak = True
 
@@ -582,12 +589,12 @@ def find_thresh_peak(data, t):
     # all peaks
     all_peak_pos = []
     for i in range(1, data.shape[0]-1):
-        if(data[i] < data[i-1] and data[i] < data[i+1]):
+        if(data[i] < data[i-1] and (data[i] < data[i+1] or data[i] == data[i+1])):
             all_peak_pos.append(i)
 
     # filter list of peaks based on mean and standard deviation of detected peaks
-    _mean = np.mean(data[all_peak_pos])
-    _std = np.std(data[all_peak_pos])
+    _mean = np.mean(data)
+    _std = np.mean(data)
     filter_peaks_pos = []
     for peak in all_peak_pos:
         if(data[peak] < _mean - 0.5*_std):

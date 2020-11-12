@@ -7,7 +7,7 @@ import sys
 
 from model.resNet182D.resnet18_2D import resnet18
 from model.model_paper.model import ModelPaper
-from util.utils import split_data_train_val_test_gait, normalize_data, delete_overlap
+from util.utils import split_data_train_val_test_gait, normalize_data, delete_overlap, to_delete
 from util.tf_metrics import custom_metrics
 
 
@@ -57,10 +57,10 @@ class ModelGait():
             self.train, self.val, self.test, self.train_label, self.val_label, self.test_label, train_id, _, test_id = split_data_train_val_test_gait(
                 self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot)
             # delete overlap sequence between train and test
-            distances_to_delete = [1] # for 0.5 overlap
-            invalid_idx = delete_overlap(train_id, test_id, distances_to_delete)
-            self.train = np.delete(self.train, invalid_idx, axis=0)
-            self.train_label = np.delete(self.train_label, invalid_idx, axis=0)
+            #distances_to_delete = [1] # for 0.75 overlap
+            #invalid_idx = delete_overlap(train_id, test_id, distances_to_delete)
+            #self.train = np.delete(self.train, invalid_idx, axis=0)
+            #self.train_label = np.delete(self.train_label, invalid_idx, axis=0)
 
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
@@ -76,8 +76,8 @@ class ModelGait():
         val_tf = tf.data.Dataset.from_tensor_slices((self.val, self.val_label))
         test_tf = tf.data.Dataset.from_tensor_slices((self.test, self.test_label))
         self.train_tf = train_tf.batch(batch_size, drop_remainder=True)
-        self.val_tf = val_tf.batch(1)
-        self.test_tf = test_tf.batch(1)
+        self.val_tf = val_tf.batch(self.val.shape[0])
+        self.test_tf = test_tf.batch(self.test.shape[0])
 
     def build_model(self, stride, fc, flatten, summary=False, name='our'):
         if name == 'our':
