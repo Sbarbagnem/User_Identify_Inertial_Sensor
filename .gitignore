@@ -23,3 +23,5 @@ test_metrics.py
 metrics_original_unimib.pickle
 *.png
 mean_performance
+temp.py
+result_ouisir.txt
