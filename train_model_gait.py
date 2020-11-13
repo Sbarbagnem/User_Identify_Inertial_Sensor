@@ -114,6 +114,12 @@ if __name__ == '__main__':
         '--overlap',
         type=int
     )
+    parser.add_argument(
+        '-split',
+        '--split',
+        type=str,
+        choices=['standard', 'paper']      
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -126,7 +132,7 @@ if __name__ == '__main__':
     model.load_data(filter_num_user=args.filter_num_user, gait_2_cycles=args.gait_2_cycles,
                     method=args.method, window_len=args.window_len, overlap=args.overlap)
     model.split_train_test(
-        plot=args.plot_split, gait_2_cycles=args.gait_2_cycles, method=args.method, overlap=args.overlap)
+        plot=args.plot_split, gait_2_cycles=args.gait_2_cycles, method=args.method, overlap=args.overlap, split=args.split)
     model.normalize_data()
     model.create_tf_dataset(batch_size=args.batch_size)
     model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten,

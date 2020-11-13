@@ -286,7 +286,17 @@ def segment2GaitCycle(peaks, segment):
     return cycles
 
 
-def split_data_train_val_test_gait(data, label_user, label_sequences, id_window, train_gait=8, val_test=0.5, gait_2_cycles=False, method='cycle_based', plot=False, overlap=None):
+def split_data_train_val_test_gait(data, 
+                                   label_user, 
+                                   label_sequences, 
+                                   id_window, 
+                                   train_gait=8, 
+                                   val_test=0.5, 
+                                   gait_2_cycles=False, 
+                                   method='cycle_based', 
+                                   plot=False, 
+                                   overlap=None,
+                                   split='standard'):
 
     data_for_user = []
     label_for_user = []
@@ -319,31 +329,35 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
             if gait_2_cycles:
                 train_gait = int(samples*0.7)
 
-            if samples < 10:
-                if samples == 9:
-                    train_gait = 7
-                elif samples == 8:
-                    train_gait = 8
-                elif samples == 7:
-                    train_gait = 5
+            if split == 'standard':
+                train_gait = math.ceil(
+                    samples*0.7) if ((samples*0.7) % 1) >= 0.5 else round(samples*0.7)
+                val_gait = math.ceil(
+                    samples*0.2) if ((samples*0.2) % 1) >= 0.5 else round(samples*0.2)
+            elif split == 'paper':
+                if samples < 10:
+                    if samples == 9:
+                        train_gait = 7
+                    elif samples == 8:
+                        train_gait = 8
+                    elif samples == 7:
+                        train_gait = 5
 
-            stop = int((samples - train_gait)/2)
-
-            ''' Prova split 70%, 20%, 10%'''
-            train_percentage = math.ceil(samples*0.7) if ((samples*0.7) % 1) >= 0.5 else round(samples*0.7)
-            val_percentage = math.ceil(samples*0.2) if ((samples*0.2) % 1) >= 0.5 else round(samples*0.2)
+                val_gait = int((samples - train_gait)/2)
 
             # train
-            train_data.append(cycles[:train_percentage])
-            train_label.extend(label[:train_percentage])
+            train_data.append(cycles[:train_gait])
+            train_label.extend(label[:train_gait])
 
             # val
-            val_data.append(cycles[train_percentage:val_percentage+train_percentage])
-            val_label.extend(label[train_percentage:val_percentage+train_percentage])
+            val_data.append(
+                cycles[train_gait:val_gait+train_gait])
+            val_label.extend(
+                label[train_gait:val_gait+train_gait])
 
             # test
-            test_data.append(cycles[val_percentage+train_percentage:])
-            test_label.extend(label[val_percentage+train_percentage:])
+            test_data.append(cycles[val_gait+train_gait:])
+            test_label.extend(label[val_gait+train_gait:])
 
     elif method == 'window_based':
         if overlap == None:
@@ -356,26 +370,28 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
             # take 90% of data for train
             train_percentage = int(samples*0.9)
             train = [cycles[:train_percentage],
-                     labels[:train_percentage], 
+                     labels[:train_percentage],
                      ID[:train_percentage]]
 
             # take 10% of data for test
             test_percentage = samples - train_percentage
-            test = [cycles[train_percentage:train_percentage+test_percentage], 
-                    labels[train_percentage:train_percentage+test_percentage], 
+            test = [cycles[train_percentage:train_percentage+test_percentage],
+                    labels[train_percentage:train_percentage+test_percentage],
                     ID[train_percentage:train_percentage+test_percentage]]
 
             # delete overlap between train and test
             if overlap == 50:
                 distances_to_delete = [1]
             elif overlap == 75:
-                distances_to_delete = [1,2,3]
-            overlap_idx = delete_overlap(train[2], test[2], distances_to_delete)
+                distances_to_delete = [1, 2, 3]
+            overlap_idx = delete_overlap(
+                train[2], test[2], distances_to_delete)
             train[0] = np.delete(train[0], overlap_idx, axis=0)
             train[1] = np.delete(train[1], overlap_idx, axis=0)
 
             # split train in train and val (78%, 22%)
-            x_train, x_val, y_train, y_val = train_test_split(train[0], train[1], test_size=0.22)
+            x_train, x_val, y_train, y_val = train_test_split(
+                train[0], train[1], test_size=0.22)
 
             # train
             train_data.append(x_train)
@@ -396,7 +412,7 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
     val_label = np.asarray(val_label)
     test_label = np.asarray(test_label)
 
-    return train_data, val_data, test_data, train_label, val_label, test_label, 
+    return train_data, val_data, test_data, train_label, val_label, test_label,
 
 
 def normalize_data(train, val, test):

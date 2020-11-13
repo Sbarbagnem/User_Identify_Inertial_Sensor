@@ -53,10 +53,10 @@ class ModelGait():
             self.num_user = np.unique(self.label).shape[0]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
-    def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False, method='cycle_based', overlap=None):
+    def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False, method='cycle_based', overlap=None, split=None):
 
         self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-            self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot, overlap)
+            self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot, overlap, split)
 
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
