@@ -330,20 +330,16 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
             stop = int((samples - train_gait)/2)
 
             ''' Prova split 70%, 20%, 10%'''
-            train_percentage = math.ceil(
-                samples*0.7) if ((samples*0.7) % 1) >= 0.5 else round(samples*0.7)
-            val_percentage = math.ceil(
-                samples*0.2) if ((samples*0.2) % 1) >= 0.5 else round(samples*0.2)
+            train_percentage = math.ceil(samples*0.7) if ((samples*0.7) % 1) >= 0.5 else round(samples*0.7)
+            val_percentage = math.ceil(samples*0.2) if ((samples*0.2) % 1) >= 0.5 else round(samples*0.2)
 
             # train
             train_data.append(cycles[:train_percentage])
             train_label.extend(label[:train_percentage])
 
             # val
-            val_data.append(
-                cycles[train_percentage:val_percentage+train_percentage])
-            val_label.extend(
-                label[train_percentage:val_percentage+train_percentage])
+            val_data.append(cycles[train_percentage:val_percentage+train_percentage])
+            val_label.extend(label[train_percentage:val_percentage+train_percentage])
 
             # test
             test_data.append(cycles[val_percentage+train_percentage:])
@@ -360,45 +356,26 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
             # take 90% of data for train
             train_percentage = int(samples*0.9)
             train = [cycles[:train_percentage],
-                     labels[:train_percentage],
+                     labels[:train_percentage], 
                      ID[:train_percentage]]
 
             # take 10% of data for test
             test_percentage = samples - train_percentage
-            test = [cycles[train_percentage:train_percentage+test_percentage],
-                    labels[train_percentage:train_percentage+test_percentage],
+            test = [cycles[train_percentage:train_percentage+test_percentage], 
+                    labels[train_percentage:train_percentage+test_percentage], 
                     ID[train_percentage:train_percentage+test_percentage]]
 
             # delete overlap between train and test
             if overlap == 50:
                 distances_to_delete = [1]
             elif overlap == 75:
-                distances_to_delete = [1, 2, 3]
-            overlap_idx = delete_overlap(
-                train[2], test[2], distances_to_delete)
+                distances_to_delete = [1,2,3]
+            overlap_idx = delete_overlap(train[2], test[2], distances_to_delete)
             train[0] = np.delete(train[0], overlap_idx, axis=0)
             train[1] = np.delete(train[1], overlap_idx, axis=0)
-            train[2] = np.delete(train[2], overlap_idx, axis=0)
 
             # split train in train and val (78%, 22%)
-            #x_train, x_val, y_train, y_val = train_test_split(train[0], train[1], test_size=0.22)
-            samples = train[0].shape[0]
-            train_percentage = math.ceil(
-                samples*0.78) if ((samples*0.78) % 1) >= 0.5 else round(samples*0.78)
-            val_percentage = math.ceil(
-                samples*0.22) if ((samples*0.22) % 1) >= 0.5 else round(samples*0.22)
-
-            x_train = train[0][:train_percentage]
-            y_train = train[1][:train_percentage]
-            id_train = train[2][:train_percentage]
-            x_val, y_val, id_val = [train[0][train_percentage:train_percentage+val_percentage], 
-                                    train[1][train_percentage:train_percentage+val_percentage], 
-                                    train[2][train_percentage:train_percentage+val_percentage]]
-
-            overlap_idx = delete_overlap(
-                id_train, id_val, distances_to_delete)
-            x_train = np.delete(x_train, overlap_idx, axis=0)
-            y_train = np.delete(y_train, overlap_idx, axis=0)
+            x_train, x_val, y_train, y_val = train_test_split(train[0], train[1], test_size=0.22)
 
             # train
             train_data.append(x_train)
@@ -419,7 +396,7 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
     val_label = np.asarray(val_label)
     test_label = np.asarray(test_label)
 
-    return train_data, val_data, test_data, train_label, val_label, test_label,
+    return train_data, val_data, test_data, train_label, val_label, test_label, 
 
 
 def normalize_data(train, val, test):
