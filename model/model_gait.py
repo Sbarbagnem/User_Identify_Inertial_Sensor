@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sn
 import sys
+from pprint import pprint
 
 from model.resNet182D.resnet18_2D import resnet18
 from model.model_paper.model import ModelPaper
@@ -14,19 +15,21 @@ from util.tf_metrics import custom_metrics
 class ModelGait():
     def __init__(self, config, colab_path):
         if colab_path != '':
-            self.path_data = colab_path + ''.join(config['ouisir']['PATH_DATA'].split('.')[1:])
+            self.path_data = colab_path + \
+                ''.join(config['ouisir']['PATH_DATA'].split('.')[1:])
         else:
             self.path_data = colab_path + config['ouisir']['PATH_DATA']
         self.num_user = config['ouisir']['NUM_CLASSES_USER']
         self.best_model = None
 
-    def load_data(self, filter_num_user=None, gait_2_cycles=False, method='cycle_based'):
+    def load_data(self, filter_num_user=None, gait_2_cycles=False, method='cycle_based', window_len=100, overlap=50):
 
         if method == 'cycle_based':
             self.path_data = self.path_data + 'cycle_based/'
             self.id = None
         elif method == 'window_based':
-            self.path_data = self.path_data + 'window_based/'
+            self.path_data = self.path_data + \
+                f'window_based/{window_len}/{overlap}/'
             self.id = np.load(self.path_data + 'id.npy')
 
         if gait_2_cycles:
@@ -37,8 +40,10 @@ class ModelGait():
         self.sequences = np.load(self.path_data + 'sequences_label.npy')
         self.axis = self.data.shape[2]
         self.window_sample = self.data.shape[1]
+        self.overlap = overlap
 
-        print(f'Found {self.data.shape[0]} cycles for {np.unique(self.label).shape[0]} users')
+        print(
+            f'Found {self.data.shape[0]} cycles for {np.unique(self.label).shape[0]} users')
 
         if filter_num_user != None:
             idx = np.isin(self.label, np.arange(filter_num_user))
@@ -48,19 +53,10 @@ class ModelGait():
             self.num_user = np.unique(self.label).shape[0]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
-    def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False, method='cycle_based'):
+    def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False, method='cycle_based', overlap=None):
 
-        if method == 'cycle_based':
-            self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-                self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot)
-        else:
-            self.train, self.val, self.test, self.train_label, self.val_label, self.test_label, train_id, _, test_id = split_data_train_val_test_gait(
-                self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot)
-            # delete overlap sequence between train and test
-            #distances_to_delete = [1] # for 0.75 overlap
-            #invalid_idx = delete_overlap(train_id, test_id, distances_to_delete)
-            #self.train = np.delete(self.train, invalid_idx, axis=0)
-            #self.train_label = np.delete(self.train_label, invalid_idx, axis=0)
+        self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
+            self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot, overlap)
 
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
@@ -71,10 +67,13 @@ class ModelGait():
             self.train, self.val, self.test)
 
     def create_tf_dataset(self, batch_size=128):
-        train_tf = tf.data.Dataset.from_tensor_slices((self.train, self.train_label))
-        train_tf = train_tf.shuffle(buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
+        train_tf = tf.data.Dataset.from_tensor_slices(
+            (self.train, self.train_label))
+        train_tf = train_tf.shuffle(
+            buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
         val_tf = tf.data.Dataset.from_tensor_slices((self.val, self.val_label))
-        test_tf = tf.data.Dataset.from_tensor_slices((self.test, self.test_label))
+        test_tf = tf.data.Dataset.from_tensor_slices(
+            (self.test, self.test_label))
         self.train_tf = train_tf.batch(batch_size, drop_remainder=True)
         self.val_tf = val_tf.batch(self.val.shape[0])
         self.test_tf = test_tf.batch(self.test.shape[0])

@@ -8,6 +8,7 @@ from sklearn import utils as skutils
 from sklearn.model_selection import train_test_split
 import math
 
+
 def plot_performance(ActivityAccuracy, UserAccuracy, fold, path_to_save, save=False):
 
     plt.plot(ActivityAccuracy)
@@ -228,18 +229,18 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
     data = data[:, 2]  # z axis
     t = 0.4
 
-    peaks = find_thresh_peak(data, t)
+    #peaks = find_thresh_peak(data, t)
 
     gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(data, use_2_step)
 
     ############################################
     ### From paper Biometric Walk Recognizer ###
     ############################################
-    '''
+
     step_equilibrium, step_threshold = find_equilibrium_threshold(data, gcLen)
 
     peaks_steps = find_peaks_steps(data, step_equilibrium, step_threshold)
-    
+    '''
     plt.figure(figsize=(12, 3))
     plt.style.use('seaborn-darkgrid')
     plt.plot(np.arange(data.shape[0]), data, 'b-')
@@ -247,9 +248,9 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
     plt.scatter(x=peaks_steps, y=data[peaks_steps], c='r', marker='*')
     plt.tight_layout()
     plt.show()
-    
-    peaks = peaks_steps
     '''
+    peaks = peaks_steps
+
     ############################################
     ################## End #####################
     ############################################
@@ -263,9 +264,9 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
         plt.tight_layout()
         plt.show()
 
-    peaks, to_plot = find_peaks(peaks, data, gcLen, use_2_step)
+    #peaks, to_plot = find_peaks(peaks, data, gcLen, use_2_step)
 
-    if plot_peak or to_plot:
+    if plot_peak:  # or to_plot:
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(data.shape[0]), data, 'b-')
@@ -285,7 +286,7 @@ def segment2GaitCycle(peaks, segment):
     return cycles
 
 
-def split_data_train_val_test_gait(data, label_user, label_sequences, id_window, train_gait=8, val_test=0.5, gait_2_cycles=False, method='cycle_based', plot=False):
+def split_data_train_val_test_gait(data, label_user, label_sequences, id_window, train_gait=8, val_test=0.5, gait_2_cycles=False, method='cycle_based', plot=False, overlap=None):
 
     data_for_user = []
     label_for_user = []
@@ -306,9 +307,6 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
     train_label = []
     val_label = []
     test_label = []
-    train_id = []
-    val_id = []
-    test_id = []
 
     if method == 'cycle_based':
 
@@ -320,11 +318,11 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
 
             if gait_2_cycles:
                 train_gait = int(samples*0.7)
-            
+
             if samples < 10:
                 if samples == 9:
                     train_gait = 7
-                elif samples== 8:
+                elif samples == 8:
                     train_gait = 8
                 elif samples == 7:
                     train_gait = 5
@@ -344,32 +342,48 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
             test_label.extend(label[stop+train_gait:])
 
     elif method == 'window_based':
+        if overlap == None:
+            raise Exception('Overlap must not be empty for window base method')
         # 70% train, 20% val, 10% test
         for cycles, labels, ID in zip(data_for_user, label_for_user, id_for_user):
 
             samples = cycles.shape[0]
 
-            # percentage split
-            train_percentage = math.ceil(samples*0.7) if ((samples*0.7) % 1) >= 0.5 else round(samples*0.7)
-            val_percentage = math.ceil(samples*0.2) if ((samples*0.2) % 1) >= 0.5 else round(samples*0.2)
+            # take 90% of data for train
+            train_percentage = int(samples*0.9)
+            train = [cycles[:train_percentage],
+                     labels[:train_percentage], 
+                     ID[:train_percentage]]
 
-            if train_percentage + val_percentage == samples:
-                val_percentage -= 1
+            # take 10% of data for test
+            test_percentage = samples - train_percentage
+            test = [cycles[train_percentage:train_percentage+test_percentage], 
+                    labels[train_percentage:train_percentage+test_percentage], 
+                    ID[train_percentage:train_percentage+test_percentage]]
+
+            # delete overlap between train and test
+            if overlap == 50:
+                distances_to_delete = [1]
+            elif overlap == 75:
+                distances_to_delete = [1,2,3]
+            overlap_idx = delete_overlap(train[2], test[2], distances_to_delete)
+            train[0] = np.delete(train[0], overlap_idx, axis=0)
+            train[1] = np.delete(train[1], overlap_idx, axis=0)
+
+            # split train in train and val (78%, 22%)
+            x_train, x_val, y_train, y_val = train_test_split(train[0], train[1], test_size=0.22)
 
             # train
-            train_data.append(cycles[:train_percentage])
-            train_label.extend(labels[:train_percentage])
-            train_id.extend(ID[:train_percentage])
+            train_data.append(x_train)
+            train_label.extend(y_train)
 
             # val
-            val_data.append(cycles[train_percentage:val_percentage+train_percentage])
-            val_label.extend(labels[train_percentage:val_percentage+train_percentage])
-            val_id.extend(ID[train_percentage:val_percentage+train_percentage])
+            val_data.append(x_val)
+            val_label.extend(y_val)
 
             # test
-            test_data.append(cycles[val_percentage+train_percentage:])
-            test_label.extend(labels[val_percentage+train_percentage:])
-            test_id.extend(ID[val_percentage+train_percentage:])
+            test_data.append(test[0])
+            test_label.extend(test[1])
 
     train_data = np.concatenate(train_data, axis=0)
     val_data = np.concatenate(val_data, axis=0)
@@ -377,14 +391,8 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
     train_label = np.asarray(train_label)
     val_label = np.asarray(val_label)
     test_label = np.asarray(test_label)
-    train_id = np.asarray(train_id)
-    val_id = np.asarray(val_id)
-    test_id = np.asarray(test_id)
 
-    if method == 'cycle_based':
-        return train_data, val_data, test_data, train_label, val_label, test_label
-    elif method == 'window_based':
-        return train_data, val_data, test_data, train_label, val_label, test_label, train_id, val_id, test_id
+    return train_data, val_data, test_data, train_label, val_label, test_label, 
 
 
 def normalize_data(train, val, test):
@@ -406,6 +414,7 @@ def normalize_data(train, val, test):
 ### From paper Data Augmentation for gait ##
 ############################################
 
+
 def scale(x, out_range=(-1, 1)):
     domain = np.min(x), np.max(x)
     y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
@@ -415,21 +424,21 @@ def scale(x, out_range=(-1, 1)):
 def denoiseData(data, plot=False):
     for i, x in enumerate(data):
         for dim in np.arange(x.shape[1]):
-            # decompostion 
-            d1 = pywt.downcoef('d', x[:,dim], 'db6', level=1)
-            a1 = pywt.downcoef('a', x[:,dim], 'db6', level=1)
-            d2 = pywt.downcoef('d', x[:,dim], 'db6', level=2)
-            a2 = pywt.downcoef('a', x[:,dim], 'db6', level=2)
+            # decompostion
+            d1 = pywt.downcoef('d', x[:, dim], 'db6', level=1)
+            a1 = pywt.downcoef('a', x[:, dim], 'db6', level=1)
+            d2 = pywt.downcoef('d', x[:, dim], 'db6', level=2)
+            a2 = pywt.downcoef('a', x[:, dim], 'db6', level=2)
             # set deatails coef to 0
             d1 = np.zeros_like(d1)
             d2 = np.zeros_like(d2)
             # recostruction
             temp = pywt.upcoef('a', a1, 'db6', level=1, take=x.shape[0]) + \
-                   pywt.upcoef('d', d1, 'db6', level=1, take=x.shape[0]) + \
-                   pywt.upcoef('a', a2, 'db6', level=2, take=x.shape[0]) + \
-                   pywt.upcoef('d', d2, 'db6', level=2, take=x.shape[0]) 
+                pywt.upcoef('d', d1, 'db6', level=1, take=x.shape[0]) + \
+                pywt.upcoef('a', a2, 'db6', level=2, take=x.shape[0]) + \
+                pywt.upcoef('d', d2, 'db6', level=2, take=x.shape[0])
             # rescale in initial range
-            temp = scale(temp, out_range=(min(x[:,dim]), max(x[:,dim])))
+            temp = scale(temp, out_range=(min(x[:, dim]), max(x[:, dim])))
             if plot:
                 plt.figure(figsize=(12, 3))
                 plt.style.use('seaborn-darkgrid')
@@ -548,7 +557,7 @@ def find_peaks(peaks, data, gcLen, use_2_step=False):
             idx = idx[0] + peak-int(0.2*gcLen)
             if len(idx) > 0:
                 peaks[i] = idx[np.argmin(data[idx])]
-    
+
     if len(peaks) <= 4:
         plot_peak = True
 

@@ -6,11 +6,10 @@ import sys
 from tqdm import tqdm
 import pandas as pd
 from pprint import pprint
-
 import numpy as np
 from scipy import stats
 from scipy.io import loadmat
-from scipy.interpolate import UnivariateSpline, CubicSpline
+from scipy.interpolate import CubicSpline
 from sklearn import utils as skutils
 import matplotlib.pyplot as plt
 import pywt
@@ -19,19 +18,29 @@ from itertools import islice
 from sliding_window import sliding_window
 from utils import str2bool, split_balanced_data, denoiseData, detectGaitCycle, segment2GaitCycle
 
-def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_peak=False, plot_interpolated=False, plot_auto_corr_coeff=False, use_2_step=False):
+
+def ou_isir_process_cycle_based(
+        path_data, 
+        path_out, 
+        plot_denoise=False, 
+        plot_peak=False, 
+        plot_interpolated=False, 
+        plot_auto_corr_coeff=False, 
+        use_2_step=False):
 
     # define variables
     data = []
     lu = []
     seqs = []
     lu_temp = 0
+
     # read files
     print('Read csv file')
     for f in tqdm(os.listdir(path_data)):
 
         # read only acc data
-        df = pd.read_csv(path_data + '/' + f, header=None, skiprows=2, usecols=[3,4,5])
+        df = pd.read_csv(path_data + '/' + f, header=None,
+                         skiprows=2, usecols=[3, 4, 5])
 
         # stack data and label user
         data.append(df.values)
@@ -43,23 +52,27 @@ def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_pe
         else:
             seqs.append(0)
 
-    # noise remove with Daubechies wavelet level 2
+    # noise remove with Daubechies (db6) wavelet level 2
     print('Denoising data')
-    data = denoiseData(data, plot_denoise)
+    data_denoise = None
+    #data_denoise = denoiseData(data, plot_denoise)
+    if data_denoise == None:
+        data_denoise = data
 
-    # compute peak gait cycle 
+    # compute peak gait cycle on data denoise
     print('Find peaks gait cycles')
     peaks = []
-    for d in tqdm(data):
-        peaks.append(detectGaitCycle(d, plot_peak, plot_auto_corr_coeff, use_2_step))
+    for d in tqdm(data_denoise):
+        peaks.append(detectGaitCycle(
+            d, plot_peak, plot_auto_corr_coeff, use_2_step))
 
-    # divide data in gait cycle based on peak position found 
+    # divide original data in gait cycle based on peak position found
     print('Split segment in gayt cycles')
     data_gait_cycle = []
     label_user_cycle = []
     label_seq_cycle = []
-    for peak,segment,user, seq in zip(peaks, data, lu, seqs):
-        cycles = segment2GaitCycle(peak,segment)
+    for peak, segment, user, seq in zip(peaks, data, lu, seqs):
+        cycles = segment2GaitCycle(peak, segment)
         data_gait_cycle.extend(cycles)
         label_user_cycle.extend([user]*(len(cycles)))
         label_seq_cycle.extend([seq]*(len(cycles)))
@@ -69,25 +82,29 @@ def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_pe
     to_interp = 120
     cycles_interpolated = []
     for cycle in data_gait_cycle:
-        interpolated = np.zeros((1,to_interp,cycle.shape[2]))
+        interpolated = np.zeros((1, to_interp, cycle.shape[2]))
         for dim in np.arange(cycle.shape[2]):
-            try:
-                interpolated[0,:,dim] = CubicSpline(np.arange(0,cycle.shape[1]), cycle[0,:,dim])(np.linspace(0,cycle.shape[1]-1,to_interp))
-            except:
-                pprint(cycle.shape)
+            interpolated[0, :, dim] = CubicSpline(np.arange(0, cycle.shape[1]), cycle[0, :, dim])(
+                np.linspace(0, cycle.shape[1]-1, to_interp))
         if plot_interpolated:
             plt.figure(figsize=(12, 3))
             plt.style.use('seaborn-darkgrid')
             plt.subplot(1, 2, 1)
             plt.title(f'original')
-            plt.plot(np.arange(cycle.shape[1]), cycle[0,:,0], 'b-', label='noise')
-            plt.plot(np.arange(cycle.shape[1]), cycle[0,:,1], 'r-', label='noise')
-            plt.plot(np.arange(cycle.shape[1]), cycle[0,:,2], 'g-', label='noise')
+            plt.plot(np.arange(cycle.shape[1]),
+                     cycle[0, :, 0], 'b-', label='noise')
+            plt.plot(np.arange(cycle.shape[1]),
+                     cycle[0, :, 1], 'r-', label='noise')
+            plt.plot(np.arange(cycle.shape[1]),
+                     cycle[0, :, 2], 'g-', label='noise')
             plt.subplot(1, 2, 2)
             plt.title(f'interpolated')
-            plt.plot(np.arange(interpolated.shape[1]), interpolated[0,:,0], 'b-', label='denoise')
-            plt.plot(np.arange(interpolated.shape[1]), interpolated[0,:,1], 'r-', label='denoise')
-            plt.plot(np.arange(interpolated.shape[1]), interpolated[0,:,2], 'g-', label='denoise')
+            plt.plot(
+                np.arange(interpolated.shape[1]), interpolated[0, :, 0], 'b-', label='denoise')
+            plt.plot(
+                np.arange(interpolated.shape[1]), interpolated[0, :, 1], 'r-', label='denoise')
+            plt.plot(
+                np.arange(interpolated.shape[1]), interpolated[0, :, 2], 'g-', label='denoise')
             plt.tight_layout()
             plt.show()
         cycles_interpolated.append(interpolated)
@@ -96,7 +113,8 @@ def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_pe
 
     # compute magnitude
     print('Compute magnitude')
-    cycles_interpolated = np.concatenate((cycles_interpolated, np.sqrt(np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True))), 2) 
+    cycles_interpolated = np.concatenate((cycles_interpolated, np.sqrt(
+        np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True))), 2)
 
     print(f'Found {cycles_interpolated.shape[0]} gait cycles')
 
@@ -110,11 +128,13 @@ def ou_isir_process_cycle_based(path_data, path_out, plot_denoise=False, plot_pe
     np.save(path_out + '/user_label', label_user_cycle)
     np.save(path_out + '/sequences_label', label_seq_cycle)
 
-def ou_isir_process_window_based(path_data, path_out):
 
-    window_len = 100
-    overlap = int((1 - 0.75)*window_len)
-    axis = 3
+def ou_isir_process_window_based(
+        path_data, 
+        path_out, 
+        overlap,
+        window_len):
+    stride = int((1 - overlap)*window_len)
 
     # define variables
     data = []
@@ -128,7 +148,8 @@ def ou_isir_process_window_based(path_data, path_out):
     for f in tqdm(os.listdir(path_data)):
 
         # read only acc data
-        df = pd.read_csv(path_data + '/' + f, header=None, skiprows=2, usecols=[3,4,5])
+        df = pd.read_csv(path_data + '/' + f, header=None,
+                         skiprows=2, usecols=[3, 4, 5])
 
         # stack data and label user
         data.append(df.values)
@@ -138,7 +159,7 @@ def ou_isir_process_window_based(path_data, path_out):
             lu_temp += 1
             seqs.append(1)
         else:
-            seqs.append(0)   
+            seqs.append(0)
 
     data_windows = []
     label_user = []
@@ -146,25 +167,28 @@ def ou_isir_process_window_based(path_data, path_out):
 
     print('Sliding window')
     for signal, user, seq in zip(data, lu, seqs):
-        windows = sliding_window(signal, (window_len, axis), (overlap, 1))
+        windows = sliding_window(signal, (window_len, 3), (stride, 1))
         data_windows.append(windows)
         label_user.extend([user]*(len(windows)))
         label_seq.extend([seq]*(len(windows)))
-        _id = np.arange(id_temp, id_temp + len(windows))
-        ID.extend(_id)
+        ID.extend(np.arange(id_temp, id_temp + len(windows))) # to del overlap sequence between train and test
         id_temp = id_temp + len(windows) + 10
 
     data_windows = np.concatenate(data_windows, axis=0)
 
-    
+    print('Compute magnitude')
+    data_windows = np.concatenate((data_windows, np.sqrt(
+        np.sum(np.power(data_windows, 2), 2, keepdims=True))), 2)
+
+    print(f'Found {data_windows.shape[0]} total samples')
+
     if not os.path.exists(path_out):
-        os.mkdir(path_out)
+        os.makedirs(path_out)
 
     np.save(path_out + '/data', data_windows)
     np.save(path_out + '/user_label', label_user)
-    np.save(path_out + '/sequences_label', label_seq)    
+    np.save(path_out + '/sequences_label', label_seq)
     np.save(path_out + '/id.npy', ID)
-
 
 
 def realdisp_process(
@@ -176,10 +200,9 @@ def realdisp_process(
         magnitude=True,
         size_overlapping=0.5,
         win_len=100):
-
     """
     Create 10 folds for dataset REALDISP.
-    
+
     Parameters
     ----------
     path_data : str
@@ -200,7 +223,6 @@ def realdisp_process(
         Length of window used in sliding window.
     """
 
-
     '''
     Data in log file subject{id}_{sensors_displacement}.log
     Structure of log file in dataset (120 columns):
@@ -218,7 +240,8 @@ def realdisp_process(
             ['x', 'y', 'z'], ['1', '2', '3', '4']]
 
     HEADER = ['sec', 'microsec']
-    HEADER.extend(['_'.join([place, sensor, a]) for place in places  for sensor, ax in zip(sensors, axis) for a in ax])
+    HEADER.extend(['_'.join([place, sensor, a])
+                   for place in places for sensor, ax in zip(sensors, axis) for a in ax])
     HEADER.extend(['act'])
 
     print('Processing realdisp dataset')
@@ -243,11 +266,11 @@ def realdisp_process(
 
     number_sensor = len(sensors_type)
 
-    data = [] #list of data window
-    la = [] # list of label activity for every user
-    lu = [] # list of label user for every window
-    di = [] # list of displacement type, to split balanced also based on this
-    id_pos = [] # list of position for every window (LT,RT,....)
+    data = []  # list of data window
+    la = []  # list of label activity for every user
+    lu = []  # list of label user for every window
+    di = []  # list of displacement type, to split balanced also based on this
+    id_pos = []  # list of position for every window (LT,RT,....)
     ID = []
 
     if not os.path.exists(processed_path):
@@ -257,8 +280,10 @@ def realdisp_process(
     total_data = 0
 
     for fl in tqdm(os.listdir(raw_data_path)):
-        if fl.startswith('subject') and any(displace in fl for displace in sensors_displacement): # filter based on displacement choosen
-            log_file = pd.DataFrame(pd.read_table(raw_data_path + fl).values, columns=HEADER)
+        # filter based on displacement choosen
+        if fl.startswith('subject') and any(displace in fl for displace in sensors_displacement):
+            log_file = pd.DataFrame(pd.read_table(
+                raw_data_path + fl).values, columns=HEADER)
             log_file.drop(['sec', 'microsec'], inplace=True, axis=1)
             log_file = log_file.astype({"act": int})
 
@@ -279,7 +304,8 @@ def realdisp_process(
             activities = np.unique(log_file.act)
 
             # filter based on position sensor choosen (BACK, RLA, RUA, ...) and sensor tyep (acc, gyro, ...)
-            mask = [(col.split('_')[0] in positions and col.split('_')[1] in sensors_type) for col in log_file.columns.tolist()[:-1]]
+            mask = [(col.split('_')[0] in positions and col.split('_')[
+                     1] in sensors_type) for col in log_file.columns.tolist()[:-1]]
             mask.append(True)
             col_filter = log_file.columns[mask]
             log_file = log_file[col_filter]
@@ -297,19 +323,22 @@ def realdisp_process(
                     p = positions.index(pos)
 
                     if 'acc' in sensors_type:
-                        acc = temp[[col for col in temp.columns if ('acc' in col and pos in col)]].to_numpy()
+                        acc = temp[[col for col in temp.columns if (
+                            'acc' in col and pos in col)]].to_numpy()
                         if magnitude:
                             acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
-                                np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)   
-                        merge_sensor.append(acc)                        
+                                np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)
+                        merge_sensor.append(acc)
                     if 'gyro' in sensors_type:
-                        gyro = temp[[col for col in temp.columns if ('gyro' in col and pos in col)]].to_numpy()
+                        gyro = temp[[col for col in temp.columns if (
+                            'gyro' in col and pos in col)]].to_numpy()
                         if magnitude:
                             gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
                                 np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
                         merge_sensor.append(gyro)
                     if 'magn' in sensors_type:
-                        magn = temp[[col for col in temp.columns if ('magn' in col and pos in col)]].to_numpy()
+                        magn = temp[[col for col in temp.columns if (
+                            'magn' in col and pos in col)]].to_numpy()
                         if magnitude:
                             magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(
                                 np.sum(np.power(x, 2))), axis=1, arr=magn).reshape(-1, 1)), axis=1)
@@ -326,7 +355,7 @@ def realdisp_process(
                     ID.extend(_id)
                     ID_generater = ID_generater + len(_data_windows) + 10
 
-                    # concat verticaly every window 
+                    # concat verticaly every window
                     data.append(_data_windows)
 
                     # id position
@@ -692,6 +721,7 @@ def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len):
         np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
         np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
 
+
 def plt_user_distribution(dict_indexes, lu):
 
     plt.figure(figsize=(12, 3))
@@ -731,13 +761,15 @@ def plt_act_distribution(dict_indexes, la):
         plt.bar(x=np.arange(len(act_distributions)), height=act_distributions)
     plt.tight_layout()
     plt.show()
-    
+
+
 def plot_signal(data):
     plt.figure(figsize=(12, 3))
     plt.style.use('seaborn-darkgrid')
     plt.plot(np.arange(data.shape[0]), data, 'b-')
     plt.tight_layout()
     plt.show()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -830,14 +862,14 @@ if __name__ == '__main__':
         '-plot_interpolated',
         '--plot_interpolated',
         type=str2bool,
-        default=False, 
+        default=False,
         help='Plot original and interpolated signal to fixed length'
     )
     parser.add_argument(
         '-plot_auto_corr_coeff',
-        '--plot_auto_corr_coeff', 
+        '--plot_auto_corr_coeff',
         type=str2bool,
-        default=False, 
+        default=False,
         help='Plot autocorrelation and 2nd peak take for estimated cycle length'
     )
     parser.add_argument(
@@ -845,6 +877,11 @@ if __name__ == '__main__':
         '--use_2_step',
         type=str2bool,
         default=False
+    )
+    parser.add_argument(
+        '-window_len',
+        '--window_len',
+        type=int
     )
 
     args = parser.parse_args()
@@ -899,8 +936,8 @@ if __name__ == '__main__':
             elif args.dataset == 'ouisir':
                 if args.method == 'cycle_based':
                     ou_isir_process_cycle_based(
-                        path_data = '../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
-                        path_out = '../data/datasets/OUISIR_processed/cycle_based/', 
+                        path_data='../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
+                        path_out='../data/datasets/OUISIR_processed/cycle_based/',
                         plot_denoise=args.plot_denoise,
                         plot_peak=args.plot_peak,
                         plot_interpolated=args.plot_interpolated,
@@ -909,6 +946,8 @@ if __name__ == '__main__':
                     )
                 elif args.method == 'window_based':
                     ou_isir_process_window_based(
-                        path_data = '../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
-                        path_out = '../data/datasets/OUISIR_processed/window_based/', 
+                        path_data='../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
+                        path_out=f'../data/datasets/OUISIR_processed/window_based/{args.window_len}/{int(args.overlap[0]*100)}/',
+                        window_len=args.window_len,
+                        overlap=args.overlap[0]
                     )
