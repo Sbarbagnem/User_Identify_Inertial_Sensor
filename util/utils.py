@@ -329,17 +329,21 @@ def split_data_train_val_test_gait(data, label_user, label_sequences, id_window,
 
             stop = int((samples - train_gait)/2)
 
+            ''' Prova split 70%, 20%, 10%'''
+            train_percentage = math.ceil(samples*0.7) if ((samples*0.7) % 1) >= 0.5 else round(samples*0.7)
+            val_percentage = math.ceil(samples*0.2) if ((samples*0.2) % 1) >= 0.5 else round(samples*0.2)
+
             # train
-            train_data.append(cycles[:train_gait])
-            train_label.extend(label[:train_gait])
+            train_data.append(cycles[:train_percentage])
+            train_label.extend(label[:train_percentage])
 
             # val
-            val_data.append(cycles[train_gait:stop+train_gait])
-            val_label.extend(label[train_gait:stop+train_gait])
+            val_data.append(cycles[train_percentage:val_percentage+train_percentage])
+            val_label.extend(label[train_percentage:val_percentage+train_percentage])
 
             # test
-            test_data.append(cycles[stop+train_gait:])
-            test_label.extend(label[stop+train_gait:])
+            test_data.append(cycles[val_percentage+train_percentage:])
+            test_label.extend(label[val_percentage+train_percentage:])
 
     elif method == 'window_based':
         if overlap == None:
