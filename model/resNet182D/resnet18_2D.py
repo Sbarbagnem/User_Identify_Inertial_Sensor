@@ -55,7 +55,6 @@ class ResNet18SingleBranch(tf.keras.Model):
 
         if self.fc:
             self.fc1 = tf.keras.layers.Dense(int(self.num_user*1.5), activation='relu')
-            self.drpoout = tf.keras.layers.Dropout(0.2)
         # user classification
         self.fc_user = tf.keras.layers.Dense(units=num_user,
                                              activation=tf.keras.activations.softmax,
@@ -80,7 +79,6 @@ class ResNet18SingleBranch(tf.keras.Model):
         #print('shape avg_pool: {}'.format(out_cnn.shape))
         if self.fc:
             out_cnn = self.fc1(out_cnn)
-            out_cnn = self.drpoout(out_cnn)
             #print('shape dense: {}'.format(out_cnn.shape))
 
         if self.multi_task:
