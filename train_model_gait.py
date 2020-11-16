@@ -120,6 +120,11 @@ if __name__ == '__main__':
         type=str,
         choices=['standard', 'paper']      
     )
+    parser.add_argument(
+        '-denoise',
+        '--denoise',
+        type=str2bool
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -130,7 +135,7 @@ if __name__ == '__main__':
 
     model = ModelGait(config, args.colab_path)
     model.load_data(filter_num_user=args.filter_num_user, gait_2_cycles=args.gait_2_cycles,
-                    method=args.method, window_len=args.window_len, overlap=args.overlap)
+                    method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise)
     model.split_train_test(
         plot=args.plot_split, gait_2_cycles=args.gait_2_cycles, method=args.method, overlap=args.overlap, split=args.split)
     model.normalize_data()

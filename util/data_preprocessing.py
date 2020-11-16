@@ -26,7 +26,10 @@ def ou_isir_process_cycle_based(
         plot_peak=False, 
         plot_interpolated=False, 
         plot_auto_corr_coeff=False, 
-        use_2_step=False):
+        use_2_step=False,
+        denoise=False):
+
+    print(path_out)
 
     # define variables
     data = []
@@ -52,11 +55,11 @@ def ou_isir_process_cycle_based(
         else:
             seqs.append(0)
 
-    # noise remove with Daubechies (db6) wavelet level 2
-    print('Denoising data')
-    data_denoise = None
-    #data_denoise = denoiseData(data, plot_denoise)
-    if data_denoise == None:
+    if denoise == True:
+        # noise remove with Daubechies (db6) wavelet level 2
+        print('Denoising data')
+        data_denoise = denoiseData(data, plot_denoise)
+    else:
         data_denoise = data
 
     # compute peak gait cycle on data denoise
@@ -71,17 +74,17 @@ def ou_isir_process_cycle_based(
     data_gait_cycle = []
     label_user_cycle = []
     label_seq_cycle = []
-    for peak, segment, user, seq in zip(peaks, data, lu, seqs):
+    for peak, segment, user, seq in zip(peaks, data_denoise, lu, seqs):
         cycles = segment2GaitCycle(peak, segment)
         data_gait_cycle.extend(cycles)
-        label_user_cycle.extend([user]*(len(cycles)))
-        label_seq_cycle.extend([seq]*(len(cycles)))
+        label_user_cycle.extend([user]*(len(peak)-1))
+        label_seq_cycle.extend([seq]*(len(peak)-1))
 
     # spline interpolation to 120 samples for gait
     print('Interpolate cycle to 120 fixed sample')
     to_interp = 120
     cycles_interpolated = []
-    for cycle in data_gait_cycle:
+    for cycle, user in zip(data_gait_cycle, label_user_cycle):
         interpolated = np.zeros((1, to_interp, cycle.shape[2]))
         for dim in np.arange(cycle.shape[2]):
             interpolated[0, :, dim] = CubicSpline(np.arange(0, cycle.shape[1]), cycle[0, :, dim])(
@@ -90,7 +93,7 @@ def ou_isir_process_cycle_based(
             plt.figure(figsize=(12, 3))
             plt.style.use('seaborn-darkgrid')
             plt.subplot(1, 2, 1)
-            plt.title(f'original')
+            plt.title(f'original user {user}')
             plt.plot(np.arange(cycle.shape[1]),
                      cycle[0, :, 0], 'b-', label='noise')
             plt.plot(np.arange(cycle.shape[1]),
@@ -98,7 +101,7 @@ def ou_isir_process_cycle_based(
             plt.plot(np.arange(cycle.shape[1]),
                      cycle[0, :, 2], 'g-', label='noise')
             plt.subplot(1, 2, 2)
-            plt.title(f'interpolated')
+            plt.title(f'interpolated user {user}')
             plt.plot(
                 np.arange(interpolated.shape[1]), interpolated[0, :, 0], 'b-', label='denoise')
             plt.plot(
@@ -879,6 +882,12 @@ if __name__ == '__main__':
         default=False
     )
     parser.add_argument(
+        '-denoise',
+        '--denoise',
+        type=str2bool,
+        default=False
+    )
+    parser.add_argument(
         '-window_len',
         '--window_len',
         type=int
@@ -937,12 +946,12 @@ if __name__ == '__main__':
                 if args.method == 'cycle_based':
                     ou_isir_process_cycle_based(
                         path_data='../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
-                        path_out='../data/datasets/OUISIR_processed/cycle_based/',
+                        path_out=f'../data/datasets/OUISIR_processed/cycle_based/{"denoise" if args.denoise else "no_denoise"}',
                         plot_denoise=args.plot_denoise,
                         plot_peak=args.plot_peak,
                         plot_interpolated=args.plot_interpolated,
                         plot_auto_corr_coeff=args.plot_auto_corr_coeff,
-                        use_2_step=args.use_2_step
+                        denoise=args.denoise
                     )
                 elif args.method == 'window_based':
                     ou_isir_process_window_based(

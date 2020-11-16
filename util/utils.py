@@ -229,18 +229,18 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
     data = data[:, 2]  # z axis
     t = 0.4
 
-    #peaks = find_thresh_peak(data, t)
+    peaks = find_thresh_peak(data, t)
 
     gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(data, use_2_step)
 
     ############################################
     ### From paper Biometric Walk Recognizer ###
     ############################################
-
+    '''
     step_equilibrium, step_threshold = find_equilibrium_threshold(data, gcLen)
 
     peaks_steps = find_peaks_steps(data, step_equilibrium, step_threshold)
-    '''
+    
     plt.figure(figsize=(12, 3))
     plt.style.use('seaborn-darkgrid')
     plt.plot(np.arange(data.shape[0]), data, 'b-')
@@ -248,9 +248,9 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
     plt.scatter(x=peaks_steps, y=data[peaks_steps], c='r', marker='*')
     plt.tight_layout()
     plt.show()
-    '''
+    
     peaks = peaks_steps
-
+    '''
     ############################################
     ################## End #####################
     ############################################
@@ -264,7 +264,7 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
         plt.tight_layout()
         plt.show()
 
-    #peaks, to_plot = find_peaks(peaks, data, gcLen, use_2_step)
+    peaks, _ = find_peaks(peaks, data, gcLen, use_2_step)
 
     if plot_peak:  # or to_plot:
         plt.figure(figsize=(12, 3))
@@ -622,11 +622,11 @@ def find_thresh_peak(data, t):
             all_peak_pos.append(i)
 
     # filter list of peaks based on mean and standard deviation of detected peaks
-    _mean = np.mean(data)
-    _std = np.mean(data)
+    _mean = np.mean(data[all_peak_pos])
+    _std = np.mean(data[all_peak_pos])
     filter_peaks_pos = []
     for peak in all_peak_pos:
-        if(data[peak] < _mean - 0.5*_std):
+        if(data[peak] < _mean):# - 0.3*_std):
             filter_peaks_pos.append(peak)
 
     return filter_peaks_pos
