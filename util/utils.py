@@ -227,7 +227,7 @@ def smooth(coef):
 def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
 
     data = data[:, 2]  # z axis
-    t = 0.5
+    t = 0.2
 
     peaks = find_thresh_peak(data, t)
 
@@ -320,7 +320,7 @@ def split_data_train_val_test_gait(data,
         for cycles, label in zip(data_for_user, label_for_user):
 
             # to take random gait cycle from user
-            cycles = skutils.shuffle(cycles)
+            cycles = skutils.shuffle(cycles)[:20]
             samples = cycles.shape[0]
 
             if gait_2_cycles:
@@ -486,7 +486,7 @@ def calAutoCorrelation(data):
 
 def find_peaks(peaks, data, gcLen):
 
-    alpha = 0.25  # 0.25
+    alpha = 0.4  # 0.25
     beta = 0.75   # 0.75
     gamma = 1/6  # 0.16
 
@@ -526,7 +526,7 @@ def find_peaks(peaks, data, gcLen):
             i += 1
 
     # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
-    if False:
+    if True:
         i = 1
         j = 0
         peak_pos_modified = peaks[:]
@@ -551,7 +551,6 @@ def find_peaks(peaks, data, gcLen):
         peaks.remove(peaks[-1])
     
     # filter last two peaks
-    '''
     filtered = False
     if peaks[-1]-peaks[-2] < 0.3*gcLen:
         if peaks[-1] < peaks[-2]:
@@ -563,9 +562,9 @@ def find_peaks(peaks, data, gcLen):
         peaks.remove(peaks[-1])
     elif peaks[-1]-peaks[-2] > 1.3*gcLen:
         peaks.remove(peaks[-1])
-    '''
+    
     # check if there a minimum next to detected peaks, take it if it's lower
-    if False:
+    if True:
         for i, peak in enumerate(peaks):
             idx = np.where(data[peak-int(0.2*gcLen):peak +
                                 int(0.2*gcLen)] < data[peak])
@@ -620,7 +619,7 @@ def find_thresh_peak(data, t):
     # filter list of peaks based on mean and standard deviation of detected peaks
     _mean = np.mean(data[all_peak_pos])
     _std = np.std(data[all_peak_pos])
-    threshold = _mean + t*_std
+    threshold = _mean - t*_std
     filter_peaks_pos = []
     for peak in all_peak_pos:
         if(data[peak] < threshold):
