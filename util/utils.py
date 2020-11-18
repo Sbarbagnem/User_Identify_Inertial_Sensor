@@ -224,14 +224,14 @@ def smooth(coef):
     return y
 
 
-def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_step=False):
+def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
 
     data = data[:, 2]  # z axis
-    t = 0.4
+    t = 0.5
 
     peaks = find_thresh_peak(data, t)
 
-    gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(data, use_2_step)
+    gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(data)
 
     ############################################
     ### From paper Biometric Walk Recognizer ###
@@ -264,7 +264,7 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, use_2_ste
         plt.tight_layout()
         plt.show()
 
-    peaks, _ = find_peaks(peaks, data, gcLen, use_2_step)
+    peaks, _ = find_peaks(peaks, data, gcLen)
 
     if plot_peak:  # or to_plot:
         plt.figure(figsize=(12, 3))
@@ -286,28 +286,25 @@ def segment2GaitCycle(peaks, segment):
     return cycles
 
 
-def split_data_train_val_test_gait(data, 
-                                   label_user, 
-                                   label_sequences, 
-                                   id_window, 
-                                   train_gait=8, 
-                                   val_test=0.5, 
-                                   gait_2_cycles=False, 
-                                   method='cycle_based', 
-                                   plot=False, 
+def split_data_train_val_test_gait(data,
+                                   label_user,
+                                   id_window,
+                                   train_gait=8,
+                                   val_test=0.5,
+                                   gait_2_cycles=False,
+                                   method='cycle_based',
+                                   plot=False,
                                    overlap=None,
                                    split='standard'):
 
     data_for_user = []
     label_for_user = []
-    sequences_for_user = []
     id_for_user = []
 
     for user in np.unique(label_user):
         idx_user = np.where(label_user == user)
         data_for_user.append(data[idx_user])
         label_for_user.append(label_user[idx_user])
-        sequences_for_user.append(label_sequences[idx_user])
         if method == 'window_based':
             id_for_user.append(id_window[idx_user])
 
@@ -440,7 +437,6 @@ def scale(x, out_range=(-1, 1)):
     y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
     return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
 
-
 def denoiseData(data, plot=False):
     for i, x in enumerate(data):
         for dim in np.arange(x.shape[1]):
@@ -488,16 +484,11 @@ def calAutoCorrelation(data):
     return autocorrelation_coeff
 
 
-def find_peaks(peaks, data, gcLen, use_2_step=False):
+def find_peaks(peaks, data, gcLen):
 
-    if use_2_step:
-        alpha = 1/4  # 1/4
-        beta = 0.7  # 0.7
-        gamma = 2/6  # 2/6
-    else:
-        alpha = 0.5  # 1/4
-        beta = 3/4
-        gamma = 1/6
+    alpha = 0.25  # 0.25
+    beta = 0.75   # 0.75
+    gamma = 1/6  # 0.16
 
     plot_peak = False
     peaks_copy = peaks.copy()
@@ -505,7 +496,7 @@ def find_peaks(peaks, data, gcLen, use_2_step=False):
     # find first candidate peak
     i = 1
     while i < len(peaks)-1:
-        if peaks[i] - peaks[i-1] < 0.5*gcLen and data[peaks[i]] < data[peaks[i-1]]:
+        if peaks[i] - peaks[i-1] < gcLen and data[peaks[i]] < data[peaks[i-1]]:
             peaks.remove(peaks[i-1])
         else:
             break
@@ -535,7 +526,7 @@ def find_peaks(peaks, data, gcLen, use_2_step=False):
             i += 1
 
     # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
-    if not use_2_step:
+    if False:
         i = 1
         j = 0
         peak_pos_modified = peaks[:]
@@ -555,8 +546,12 @@ def find_peaks(peaks, data, gcLen, use_2_step=False):
             i += 1
 
         peaks = sorted(peak_pos_modified)
-
+    
+    if peaks[-1]-peaks[-2] < beta*gcLen:
+        peaks.remove(peaks[-1])
+    
     # filter last two peaks
+    '''
     filtered = False
     if peaks[-1]-peaks[-2] < 0.3*gcLen:
         if peaks[-1] < peaks[-2]:
@@ -566,11 +561,11 @@ def find_peaks(peaks, data, gcLen, use_2_step=False):
         filtered = True
     elif peaks[-1]-peaks[-2] < 0.5*gcLen and not filtered:
         peaks.remove(peaks[-1])
-    elif peaks[-1]-peaks[-2] > 1.3*gcLen and not filtered:
+    elif peaks[-1]-peaks[-2] > 1.3*gcLen:
         peaks.remove(peaks[-1])
-
+    '''
     # check if there a minimum next to detected peaks, take it if it's lower
-    if not use_2_step:
+    if False:
         for i, peak in enumerate(peaks):
             idx = np.where(data[peak-int(0.2*gcLen):peak +
                                 int(0.2*gcLen)] < data[peak])
@@ -584,29 +579,28 @@ def find_peaks(peaks, data, gcLen, use_2_step=False):
     return peaks, plot_peak
 
 
-def find_gcLen(data, use_2_step):
+def find_gcLen(data):
 
     # compute autcorrelation to estimate len cycle
     auto_corr_coeff = calAutoCorrelation(data)
 
     # smooth the auto_correlation_coefficient
-    for i in range(10):
+    for i in range(7):
         auto_corr_coeff = smooth(auto_corr_coeff)
 
     # approximate the length of a gait cycle by selecting the 2nd peak (positive) in the auto correlation signal
     peak_auto_corr = []
     gcLen = 0
     flag = 0
-    mean_auto_corr = np.mean(auto_corr_coeff[:200])
-    std_auto_corr = np.std(auto_corr_coeff[:200])
+    #mean_auto_corr = np.mean(auto_corr_coeff)
+    #std_auto_corr = np.std(auto_corr_coeff)
     for i in range(1, 200):
-        if auto_corr_coeff[i] > auto_corr_coeff[i-1] and auto_corr_coeff[i] > auto_corr_coeff[i+1] and auto_corr_coeff[i] > (mean_auto_corr + std_auto_corr*0.4):
+        if auto_corr_coeff[i] > auto_corr_coeff[i-1] and \
+           auto_corr_coeff[i] > auto_corr_coeff[i+1]: #and \
+           #auto_corr_coeff[i] > (mean_auto_corr + std_auto_corr*0.4):
             flag += 1
             peak_auto_corr.append(i)
-            if flag == 3 and use_2_step:
-                gcLen = i - 1
-                break
-            if flag == 2 and not use_2_step:
+            if flag == 2:
                 gcLen = i - 1
                 break
 
@@ -615,19 +609,32 @@ def find_gcLen(data, use_2_step):
 
 def find_thresh_peak(data, t):
 
+    plot = False
+
     # all peaks
     all_peak_pos = []
     for i in range(1, data.shape[0]-1):
-        if(data[i] < data[i-1] and (data[i] < data[i+1] or data[i] == data[i+1])):
+        if(data[i] < data[i-1] and data[i] < data[i+1]):
             all_peak_pos.append(i)
 
     # filter list of peaks based on mean and standard deviation of detected peaks
     _mean = np.mean(data[all_peak_pos])
-    _std = np.mean(data[all_peak_pos])
+    _std = np.std(data[all_peak_pos])
+    threshold = _mean + t*_std
     filter_peaks_pos = []
     for peak in all_peak_pos:
-        if(data[peak] < _mean):# - 0.3*_std):
+        if(data[peak] < threshold):
             filter_peaks_pos.append(peak)
+
+        
+    if plot:
+        plt.figure(figsize=(12, 3))
+        plt.style.use('seaborn-darkgrid')
+        plt.plot(np.arange(len(data)), data, 'b-')
+        plt.scatter(all_peak_pos, data[all_peak_pos], c='red')
+        plt.scatter(filter_peaks_pos, data[filter_peaks_pos], c='black')
+        plt.tight_layout()
+        plt.show()
 
     return filter_peaks_pos
 

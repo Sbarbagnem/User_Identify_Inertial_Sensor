@@ -40,7 +40,6 @@ class ModelGait():
 
         self.data = np.load(self.path_data + 'data.npy')
         self.label = np.load(self.path_data + 'user_label.npy')
-        self.sequences = np.load(self.path_data + 'sequences_label.npy')
         self.axis = self.data.shape[2]
         self.window_sample = self.data.shape[1]
         self.overlap = overlap
@@ -52,14 +51,13 @@ class ModelGait():
             idx = np.isin(self.label, np.arange(filter_num_user))
             self.data = self.data[idx]
             self.label = self.label[idx]
-            self.sequences = self.sequences[idx]
             self.num_user = np.unique(self.label).shape[0]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
     def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False, method='cycle_based', overlap=None, split=None):
 
         self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-            self.data, self.label, self.sequences, self.id, train_gait, val_test, gait_2_cycles, method, plot, overlap, split)
+            self.data, self.label, self.id, train_gait, val_test, gait_2_cycles, method, plot, overlap, split)
 
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
