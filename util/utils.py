@@ -226,34 +226,26 @@ def smooth(coef):
 
 def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
 
-    data = data[:, 2]  # z axis
+    magnitude = np.sqrt(np.sum(np.power(data,2), 1))
+    selected_data = data[:,2]
+
+    # plot data
+    if False:
+        plt.figure(figsize=(12, 3))
+        plt.style.use('seaborn-darkgrid')
+        plt.plot(np.arange(data.shape[0]), data[:,0], 'b-')
+        plt.plot(np.arange(data.shape[0]), data[:,1], 'r-')
+        plt.plot(np.arange(data.shape[0]), data[:,2], 'y-')
+        plt.plot(np.arange(data.shape[0]), magnitude, 'g-')
+        plt.tight_layout()
+        plt.show()
+
     t = 0.2
 
-    peaks = find_thresh_peak(data, t)
+    peaks = find_thresh_peak(selected_data, t)
 
-    gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(data)
-
-    ############################################
-    ### From paper Biometric Walk Recognizer ###
-    ############################################
-    '''
-    step_equilibrium, step_threshold = find_equilibrium_threshold(data, gcLen)
-
-    peaks_steps = find_peaks_steps(data, step_equilibrium, step_threshold)
-    
-    plt.figure(figsize=(12, 3))
-    plt.style.use('seaborn-darkgrid')
-    plt.plot(np.arange(data.shape[0]), data, 'b-')
-    plt.hlines([step_equilibrium, step_threshold], xmin=0, xmax=data.shape[0], color=['b', 'r'], ls='--')
-    plt.scatter(x=peaks_steps, y=data[peaks_steps], c='r', marker='*')
-    plt.tight_layout()
-    plt.show()
-    
-    peaks = peaks_steps
-    '''
-    ############################################
-    ################## End #####################
-    ############################################
+    gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(selected_data)
+    gcLen = 100
 
     # plot coefficients autocorrelation and 2nd peak used to estimated gait length
     if plot_auto_corr_coeff:
@@ -264,14 +256,16 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
         plt.tight_layout()
         plt.show()
 
-    peaks, _ = find_peaks(peaks, data, gcLen)
+    peaks, _ = find_peaks(peaks, selected_data, gcLen)
 
-    if plot_peak:  # or to_plot:
+    if plot_peak: 
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
-        plt.plot(np.arange(data.shape[0]), data, 'b-')
-        plt.vlines(peaks, ymin=min(data)*0.95,
-                   ymax=max(data)*0.95, color='r', ls='--')
+        #plt.plot(np.arange(data.shape[0]), data[:,0], 'b-')
+        #plt.plot(np.arange(data.shape[0]), data[:,1], 'r-')
+        plt.plot(np.arange(data.shape[0]), data[:,2], 'b-')
+        plt.vlines(peaks, ymin=min(min(data[:,0]), min(data[:,1]), min(data[:,2]))*0.95,
+                   ymax=max(max(data[:,0]), max(data[:,1]), max(data[:,2]))*0.95, color='black', ls='--')
         plt.tight_layout()
         plt.show()
 
@@ -281,7 +275,7 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
 def segment2GaitCycle(peaks, segment):
     cycles = []
     for i in range(0, len(peaks)-1):
-        cycle = segment[peaks[i]:peaks[i+1], :]
+        cycle = segment[peaks[i]:peaks[i+1]+1]
         cycles.append(cycle[np.newaxis, :, :])
     return cycles
 
@@ -327,18 +321,15 @@ def split_data_train_val_test_gait(data,
                 train_gait = int(samples*0.7)
 
             if split == 'standard':
-                train_gait = math.ceil(
-                    samples*0.7) if ((samples*0.7) % 1) >= 0.5 else round(samples*0.7)
-                val_gait = math.ceil(
-                    samples*0.2) if ((samples*0.2) % 1) >= 0.5 else round(samples*0.2)
+                train_gait = int(samples*0.7)
+                val_gait = int(samples*0.2)
+                if samples < 10:
+                    train_gait = samples - 2    
+                    val_gait = int((samples - train_gait)/2)           
+
             elif split == 'paper':
                 if samples < 10:
-                    if samples == 9:
-                        train_gait = 7
-                    elif samples == 8:
-                        train_gait = 8
-                    elif samples == 7:
-                        train_gait = 5
+                    train_gait = samples - 2
 
                 val_gait = int((samples - train_gait)/2)
 
@@ -486,7 +477,7 @@ def calAutoCorrelation(data):
 
 def find_peaks(peaks, data, gcLen):
 
-    alpha = 0.4  # 0.25
+    alpha = 0.25  # 0.25
     beta = 0.75   # 0.75
     gamma = 1/6  # 0.16
 
@@ -496,7 +487,7 @@ def find_peaks(peaks, data, gcLen):
     # find first candidate peak
     i = 1
     while i < len(peaks)-1:
-        if peaks[i] - peaks[i-1] < gcLen and data[peaks[i]] < data[peaks[i-1]]:
+        if peaks[i] - peaks[i-1] < 0.5*gcLen and data[peaks[i]] < data[peaks[i-1]]:
             peaks.remove(peaks[i-1])
         else:
             break
@@ -526,7 +517,7 @@ def find_peaks(peaks, data, gcLen):
             i += 1
 
     # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
-    if True:
+    if False:
         i = 1
         j = 0
         peak_pos_modified = peaks[:]
@@ -551,6 +542,7 @@ def find_peaks(peaks, data, gcLen):
         peaks.remove(peaks[-1])
     
     # filter last two peaks
+    '''
     filtered = False
     if peaks[-1]-peaks[-2] < 0.3*gcLen:
         if peaks[-1] < peaks[-2]:
@@ -562,6 +554,7 @@ def find_peaks(peaks, data, gcLen):
         peaks.remove(peaks[-1])
     elif peaks[-1]-peaks[-2] > 1.3*gcLen:
         peaks.remove(peaks[-1])
+    '''
     
     # check if there a minimum next to detected peaks, take it if it's lower
     if True:
@@ -619,7 +612,8 @@ def find_thresh_peak(data, t):
     # filter list of peaks based on mean and standard deviation of detected peaks
     _mean = np.mean(data[all_peak_pos])
     _std = np.std(data[all_peak_pos])
-    threshold = _mean - t*_std
+    #threshold = _mean - t*_std
+    threshold = _mean
     filter_peaks_pos = []
     for peak in all_peak_pos:
         if(data[peak] < threshold):
@@ -636,107 +630,3 @@ def find_thresh_peak(data, t):
         plt.show()
 
     return filter_peaks_pos
-
-############################################
-### From paper Biometric Walk Recognizer ###
-############################################
-
-
-def find_equilibrium_threshold(data, gcLen):
-
-    # step equilibrium
-    temp_data = np.around(data[np.where(data < np.mean(data))], decimals=2)
-    value, counts = np.unique(temp_data, return_counts=True)
-    step_equilibrium = value[np.argmax(counts)]
-
-    # step threshold
-    maxima = []
-    for i in range(1, data.shape[0]-1):
-        if data[i] > data[i-1] and data[i] > data[i+1]:
-            maxima.append(data[i])
-    k = int((data.shape[0] / 50)*1.5)
-    step_threshold = np.around(sorted(maxima, reverse=True)[k], decimals=2)
-    step_threshold = 0.9 * step_threshold
-
-    if step_threshold < step_equilibrium:
-        return step_threshold, step_equilibrium
-
-    return step_equilibrium, step_threshold
-
-
-def find_peaks_steps(data, step_equilibrium, step_threshold):
-
-    peaks_steps = []
-
-    maxima = []
-    for i in range(1, data.shape[0]-1):
-        if data[i] > data[i-1] and data[i] > data[i+1]:
-            maxima.append(i)
-
-    start = 0
-    while True:
-        # find first peak greater than step threshold
-        if start == 0:
-            idx_step = min(
-                list(set(np.where(data[start:] > 0.9*step_threshold)[0]) & set(maxima)))
-            peaks_steps.append(idx_step)
-            start = idx_step
-        # find first value lower than step equilibrium
-        idx = np.where(data[start:] < 0.9*step_equilibrium)[0]
-        if idx.shape[0] == 0:
-            break
-        else:
-            start = idx[0] + start
-        # find next maximum greater than stap threshold
-        idx = np.where(data[start:] > step_threshold)[0]
-        if idx.shape[0] == 0:
-            break
-        try:
-            idx_step = min(list(set(idx+start) & set(maxima)))
-        except:
-            break
-        peaks_steps.append(idx_step)
-        start = idx_step
-
-    _mean = int(np.sum([peaks_steps[i] - peaks_steps[i-1]
-                        for i in range(1, len(peaks_steps))]) / (len(peaks_steps)-1))
-
-    # refine peaks based on value in neighboor
-    for i in range(0, len(peaks_steps)):
-        idx_r = np.where(
-            data[peaks_steps[i]:peaks_steps[i]+int(0.3*_mean)] > data[peaks_steps[i]])[0]
-        if idx_r.shape[0] > 0:
-            max_neigh = np.argmax(
-                data[peaks_steps[i]:peaks_steps[i]+int(0.3*_mean)])
-            peaks_steps[i] = max_neigh + peaks_steps[i]
-
-    # filter based on average len
-    j = 0
-    peaks = peaks_steps.copy()
-    for i in range(1, len(peaks_steps)):
-        if peaks_steps[i] - peaks_steps[i-1] < 0.7*_mean:
-            if data[peaks_steps[i]] > data[peaks_steps[i-1]]:
-                try:
-                    peaks.remove(peaks_steps[i-1])
-                except:
-                    pass
-            else:
-                try:
-                    peaks.remove(peaks_steps[i])
-                except:
-                    pass
-        elif peaks_steps[i] - peaks_steps[i-1] > 1.7*_mean:
-            temp = int(
-                (peaks_steps[i] - peaks_steps[i-1])/2) + peaks_steps[i-1]
-            most_close = sorted(
-                np.arange(peaks_steps[i-1], peaks_steps[i]), key=lambda x: abs(x-temp))
-            most_close_before = list(
-                filter(lambda x: x <= temp + 0.20*_mean and x >= temp - 0.20*_mean, most_close))
-            if most_close_before != []:
-                idx = np.argmax(data[most_close_before])
-                peaks[i+j:i+j] = [most_close_before[idx]]
-                j += 1
-
-    peaks = sorted(peaks)
-
-    return peaks
