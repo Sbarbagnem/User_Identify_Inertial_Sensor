@@ -8,6 +8,9 @@ from sklearn import utils as skutils
 from sklearn.model_selection import train_test_split
 import math
 
+from scipy.signal import find_peaks as find_peaks_scipy
+from sklearn.preprocessing import scale as scale_sklearn
+
 
 def plot_performance(ActivityAccuracy, UserAccuracy, fold, path_to_save, save=False):
 
@@ -224,10 +227,10 @@ def smooth(coef):
     return y
 
 
-def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
+def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, gcLen=None):
 
-    magnitude = np.sqrt(np.sum(np.power(data,2), 1))
-    selected_data = data[:,2]
+    selected_data = data[:,2] # z axis
+    autocorr = False if gcLen != None else True
 
     # plot data
     if False:
@@ -236,40 +239,55 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False):
         plt.plot(np.arange(data.shape[0]), data[:,0], 'b-')
         plt.plot(np.arange(data.shape[0]), data[:,1], 'r-')
         plt.plot(np.arange(data.shape[0]), data[:,2], 'y-')
-        plt.plot(np.arange(data.shape[0]), magnitude, 'g-')
         plt.tight_layout()
         plt.show()
 
-    t = 0.2
+    t = 0.4
 
     peaks = find_thresh_peak(selected_data, t)
 
-    gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(selected_data)
-    gcLen = 100
+    # compute gcLen based on autocorrelation of signal if not given by default
+    if autocorr:
+        gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(selected_data)
+        if plot_auto_corr_coeff:
+            plt.figure(figsize=(12, 3))
+            plt.style.use('seaborn-darkgrid')
+            plt.plot(np.arange(len(auto_corr_coeff)), auto_corr_coeff, 'b-')
+            plt.scatter(peak_auto_corr, auto_corr_coeff[peak_auto_corr], c='red')
+            plt.tight_layout()
+            plt.show()
 
-    # plot coefficients autocorrelation and 2nd peak used to estimated gait length
-    if plot_auto_corr_coeff:
+    peaks, to_plot = find_peaks(peaks, selected_data, gcLen, autocorr)
+
+    selected_data = scale_sklearn(selected_data, axis=0, with_mean=True, with_std=True)
+    peaks_scipy, _ = find_peaks_scipy(np.negative(selected_data), height=np.mean(np.negative(selected_data)) + 0.5*np.std(np.negative(selected_data)), distance=gcLen*0.7)
+
+    if plot_peak:# or to_plot: 
         plt.figure(figsize=(12, 3))
+
+        plt.subplot(3,1,1)
         plt.style.use('seaborn-darkgrid')
-        plt.plot(np.arange(len(auto_corr_coeff)), auto_corr_coeff, 'b-')
-        plt.scatter(peak_auto_corr, auto_corr_coeff[peak_auto_corr], c='red')
+        plt.plot(np.arange(data.shape[0]), data[:,0], 'g-', label='x')
+        plt.plot(np.arange(data.shape[0]), data[:,1], 'r-', label='y')
+        plt.plot(np.arange(data.shape[0]), data[:,2], 'b-', label='z')
+        plt.legend(loc='upper right')
+
+        plt.subplot(3,1,2)
+        plt.style.use('seaborn-darkgrid')
+        plt.plot(np.arange(data.shape[0]), data[:,2], 'b-', label='z')
+        plt.vlines(peaks, ymin=min(data[:,2]), ymax=max(data[:,2]), color='black', ls='dotted')
+        plt.legend(loc='upper right')
+
+        plt.subplot(3,1,3)
+        plt.style.use('seaborn-darkgrid')
+        plt.plot(np.arange(selected_data.shape[0]), selected_data, 'b-', label='z')
+        plt.vlines(peaks_scipy, ymin=min(selected_data), ymax=max(selected_data), color='red', ls='--')
+        plt.legend(loc='upper right')
+
         plt.tight_layout()
         plt.show()
 
-    peaks, _ = find_peaks(peaks, selected_data, gcLen)
-
-    if plot_peak: 
-        plt.figure(figsize=(12, 3))
-        plt.style.use('seaborn-darkgrid')
-        #plt.plot(np.arange(data.shape[0]), data[:,0], 'b-')
-        #plt.plot(np.arange(data.shape[0]), data[:,1], 'r-')
-        plt.plot(np.arange(data.shape[0]), data[:,2], 'b-')
-        plt.vlines(peaks, ymin=min(min(data[:,0]), min(data[:,1]), min(data[:,2]))*0.95,
-                   ymax=max(max(data[:,0]), max(data[:,1]), max(data[:,2]))*0.95, color='black', ls='--')
-        plt.tight_layout()
-        plt.show()
-
-    return peaks
+    return peaks_scipy
 
 
 def segment2GaitCycle(peaks, segment):
@@ -317,15 +335,19 @@ def split_data_train_val_test_gait(data,
             cycles = skutils.shuffle(cycles)
             samples = cycles.shape[0]
 
+            if samples <= 4:
+                print(f'There only {samples} cycles for user {label[0]}')
+
             if gait_2_cycles:
                 train_gait = int(samples*0.7)
 
             if split == 'standard':
                 train_gait = int(samples*0.7)
                 val_gait = int(samples*0.2)
-                if samples < 10:
+                if samples < 10 and samples >= 4:
                     train_gait = samples - 2    
-                    val_gait = int((samples - train_gait)/2)           
+                    val_gait = int((samples - train_gait)/2)        
+                   
 
             elif split == 'paper':
                 if samples < 10:
@@ -475,11 +497,11 @@ def calAutoCorrelation(data):
     return autocorrelation_coeff
 
 
-def find_peaks(peaks, data, gcLen):
+def find_peaks(peaks, data, gcLen, autocorr):
 
     alpha = 0.25  # 0.25
     beta = 0.75   # 0.75
-    gamma = 1/6  # 0.16
+    gamma = 0.2  # 0.16
 
     plot_peak = False
     peaks_copy = peaks.copy()
@@ -487,7 +509,7 @@ def find_peaks(peaks, data, gcLen):
     # find first candidate peak
     i = 1
     while i < len(peaks)-1:
-        if peaks[i] - peaks[i-1] < 0.5*gcLen and data[peaks[i]] < data[peaks[i-1]]:
+        if peaks[i] - peaks[i-1] < 0.2*gcLen and data[peaks[i]] < data[peaks[i-1]]:
             peaks.remove(peaks[i-1])
         else:
             break
@@ -517,12 +539,12 @@ def find_peaks(peaks, data, gcLen):
             i += 1
 
     # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
-    if False:
+    if autocorr:
         i = 1
         j = 0
         peak_pos_modified = peaks[:]
         while i < len(peaks):
-            if peaks[i] - peaks[i-1] > 1.1*gcLen:
+            if peaks[i] - peaks[i-1] > 1.2*gcLen:
                 temp = int((peaks[i] - peaks[i-1])/2) + peaks[i-1]
                 most_close = sorted(peaks_copy, key=lambda x: abs(x-temp))
                 try:
@@ -538,37 +560,31 @@ def find_peaks(peaks, data, gcLen):
 
         peaks = sorted(peak_pos_modified)
     
-    if peaks[-1]-peaks[-2] < beta*gcLen:
+    if peaks[-1]-peaks[-2] < 0.5*gcLen:
         peaks.remove(peaks[-1])
-    
+        
+    # check if there a minimum next to detected peaks, take it if it's lower
+    thresh = 0.4 if autocorr else 0.2
+    for i, peak in enumerate(peaks):
+        idx = np.where(data[peak-int(thresh*gcLen):peak +
+                            int(thresh*gcLen)] < data[peak])
+        idx = idx[0] + peak-int(thresh*gcLen)
+        if len(idx) > 0:
+            peaks[i] = idx[np.argmin(data[idx])]
+
     # filter last two peaks
-    '''
-    filtered = False
     if peaks[-1]-peaks[-2] < 0.3*gcLen:
         if peaks[-1] < peaks[-2]:
             peaks.remove(peaks[-2])
         else:
             peaks.remove(peaks[-1])
-        filtered = True
-    elif peaks[-1]-peaks[-2] < 0.5*gcLen and not filtered:
+    elif peaks[-1]-peaks[-2] > 1.5*gcLen:
         peaks.remove(peaks[-1])
-    elif peaks[-1]-peaks[-2] > 1.3*gcLen:
-        peaks.remove(peaks[-1])
-    '''
-    
-    # check if there a minimum next to detected peaks, take it if it's lower
-    if True:
-        for i, peak in enumerate(peaks):
-            idx = np.where(data[peak-int(0.2*gcLen):peak +
-                                int(0.2*gcLen)] < data[peak])
-            idx = idx[0] + peak-int(0.2*gcLen)
-            if len(idx) > 0:
-                peaks[i] = idx[np.argmin(data[idx])]
 
-    if len(peaks) <= 4:
+    if len(peaks) <= 4 or len(peaks)>30:
         plot_peak = True
 
-    return peaks, plot_peak
+    return sorted(peaks), plot_peak
 
 
 def find_gcLen(data):
@@ -606,14 +622,14 @@ def find_thresh_peak(data, t):
     # all peaks
     all_peak_pos = []
     for i in range(1, data.shape[0]-1):
-        if(data[i] < data[i-1] and data[i] < data[i+1]):
+        if(data[i] <= data[i-1] and data[i] <= data[i+1]):
             all_peak_pos.append(i)
 
     # filter list of peaks based on mean and standard deviation of detected peaks
     _mean = np.mean(data[all_peak_pos])
     _std = np.std(data[all_peak_pos])
-    #threshold = _mean - t*_std
-    threshold = _mean
+    threshold = _mean - t*_std
+    #threshold = _mean
     filter_peaks_pos = []
     for peak in all_peak_pos:
         if(data[peak] < threshold):
