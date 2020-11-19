@@ -125,6 +125,12 @@ if __name__ == '__main__':
         '--denoise',
         type=str2bool
     )
+    parser.add_argument(
+        '-autocorr',
+        '--autocorr',
+        type=str2bool,
+        default=False
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -135,7 +141,7 @@ if __name__ == '__main__':
 
     model = ModelGait(config, args.colab_path)
     model.load_data(filter_num_user=args.filter_num_user, gait_2_cycles=args.gait_2_cycles,
-                    method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise)
+                    method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise, autocorr=args.autocorr)
     model.split_train_test(
         plot=args.plot_split, gait_2_cycles=args.gait_2_cycles, method=args.method, overlap=args.overlap, split=args.split)
     model.normalize_data()

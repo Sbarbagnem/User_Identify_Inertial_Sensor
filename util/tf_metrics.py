@@ -28,11 +28,7 @@ def custom_metrics(confusion_matrix):
         tp = confusion_matrix[user,user]
         precision = tp / np.sum(confusion_matrix[:,user])
         recall = tp / np.sum(confusion_matrix[user,:])
-        try:
-            f1 = 2 * precision * recall / (precision + recall)
-        except:
-            print(f'precision {precision}')
-            print(f'recall {recall}')
+        f1 = 2 * precision * recall / (precision + recall)
         metrics['precision'].append(precision)
         metrics['recall'].append(recall)
         metrics['f1'].append(f1)

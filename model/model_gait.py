@@ -22,7 +22,7 @@ class ModelGait():
         self.num_user = config['ouisir']['NUM_CLASSES_USER']
         self.best_model = None
 
-    def load_data(self, denoise, filter_num_user=None, gait_2_cycles=False, method='cycle_based', window_len=100, overlap=50):
+    def load_data(self, denoise, filter_num_user=None, gait_2_cycles=False, method='cycle_based', window_len=100, overlap=50, autocorr=False):
 
         if method == 'cycle_based':
             if denoise:
@@ -30,6 +30,10 @@ class ModelGait():
             else:
                 self.path_data = self.path_data + 'cycle_based/no_denoise/'
             self.id = None
+            if autocorr:
+                self.path_data = self.path_data + 'autocorr/'
+            else:
+                self.path_data = self.path_data + 'no_autocorr/'
         elif method == 'window_based':
             self.path_data = self.path_data + \
                 f'window_based/{window_len}/{overlap}/'

@@ -203,14 +203,14 @@ class Model():
         ValData = tf.data.Dataset.from_tensor_slices(self.val)
         ValLA = tf.data.Dataset.from_tensor_slices(self.val_act)
         ValLU = tf.data.Dataset.from_tensor_slices(self.val_user)
-        test_data = tf.data.Dataset.zip((ValData, ValLA, ValLU))
-        self.val_data = test_data.batch(1)
+        val_data = tf.data.Dataset.zip((ValData, ValLA, ValLU))
+        self.val_data = val_data.batch(len(ValData))
 
         TestData = tf.data.Dataset.from_tensor_slices(self.test)
         TestLA = tf.data.Dataset.from_tensor_slices(self.test_act)
         TestLU = tf.data.Dataset.from_tensor_slices(self.test_user)
         test_data = tf.data.Dataset.zip((TestData, TestLA, TestLU))
-        self.test_data = test_data.batch(1)
+        self.test_data = test_data.batch(len(TestData))
 
     def create_tensorflow_dataset(self):
 
