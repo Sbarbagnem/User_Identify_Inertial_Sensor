@@ -72,13 +72,24 @@ class ModelGait():
             self.train, self.val, self.test)
 
     def create_tf_dataset(self, batch_size=128):
-        train_tf = tf.data.Dataset.from_tensor_slices(
-            (self.train, self.train_label))
+        # train
+        train = tf.data.Dataset.from_tensor_slices(self.train)
+        train_label = tf.data.Dataset.from_tensor_slices(self.train_label)
+        train_tf = tf.data.Dataset.zip((train, train_label))
+
+        # val
+        val = tf.data.Dataset.from_tensor_slices(self.val)
+        val_label = tf.data.Dataset.from_tensor_slices(self.val_label)
+        val_tf = tf.data.Dataset.zip((val,val_label))
+
+        # test
+        test = tf.data.Dataset.from_tensor_slices(self.test)
+        test_label = tf.data.Dataset.from_tensor_slices(self.test_label)
+        test_tf = tf.data.Dataset.zip((test,test_label))
+
+        # set reshuffle and batch size
         train_tf = train_tf.shuffle(
             buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
-        val_tf = tf.data.Dataset.from_tensor_slices((self.val, self.val_label))
-        test_tf = tf.data.Dataset.from_tensor_slices(
-            (self.test, self.test_label))
         self.train_tf = train_tf.batch(batch_size, drop_remainder=True)
         self.val_tf = val_tf.batch(self.val.shape[0])
         self.test_tf = test_tf.batch(self.test.shape[0])
