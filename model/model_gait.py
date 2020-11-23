@@ -73,25 +73,16 @@ class ModelGait():
 
     def create_tf_dataset(self, batch_size=128):
         # train
-        train = tf.data.Dataset.from_tensor_slices(self.train)
-        train_label = tf.data.Dataset.from_tensor_slices(self.train_label)
-        train_tf = tf.data.Dataset.zip((train, train_label))
+        train_tf = tf.data.Dataset.from_tensor_slices((self.train, self.train_label))
+        train_tf = train_tf.shuffle(buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
+        self.train_tf = train_tf.batch(batch_size, drop_remainder=True)
 
         # val
-        val = tf.data.Dataset.from_tensor_slices(self.val)
-        val_label = tf.data.Dataset.from_tensor_slices(self.val_label)
-        val_tf = tf.data.Dataset.zip((val,val_label))
+        val_tf = tf.data.Dataset.from_tensor_slices((self.val, self.val_label))
+        self.val_tf = val_tf.batch(self.val.shape[0])
 
         # test
-        test = tf.data.Dataset.from_tensor_slices(self.test)
-        test_label = tf.data.Dataset.from_tensor_slices(self.test_label)
-        test_tf = tf.data.Dataset.zip((test,test_label))
-
-        # set reshuffle and batch size
-        train_tf = train_tf.shuffle(
-            buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
-        self.train_tf = train_tf.batch(batch_size, drop_remainder=True)
-        self.val_tf = val_tf.batch(self.val.shape[0])
+        test_tf = tf.data.Dataset.from_tensor_slices((self.test, self.test_label))
         self.test_tf = test_tf.batch(self.test.shape[0])
 
     def build_model(self, stride, fc, flatten, summary=False, name='our'):
@@ -146,7 +137,7 @@ class ModelGait():
         cm = tf.math.confusion_matrix(label_user, tf.math.argmax(
             predictions_user, axis=1), num_classes=num_user)
 
-        return cm,
+        return cm
 
     def train_model(
             self,
