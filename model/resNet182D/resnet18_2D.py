@@ -7,7 +7,7 @@ import sys
 
 
 class ResNet18SingleBranch(tf.keras.Model):
-    def __init__(self, multi_task, num_act, num_user, stride=1, fc=False, flatten=False):
+    def __init__(self, multi_task, num_act, num_user, stride=1, fc=False, flatten=False, feature_generator=False):
         super(ResNet18SingleBranch, self).__init__()
 
         self.multi_task = multi_task
@@ -16,6 +16,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         self.num_user = num_user
         self.fc = fc
         self.flatten = flatten
+        self.feature_generator = feature_generator
 
         # features about single axis sensor (kernel len from metier paper)
 
@@ -23,7 +24,8 @@ class ResNet18SingleBranch(tf.keras.Model):
                                             kernel_size=(5,1),
                                             strides=(1,1),
                                             padding="valid",
-                                            kernel_regularizer=tf.keras.regularizers.l2)
+                                            kernel_regularizer=tf.keras.regularizers.l2,
+                                            )
         self.bn1 = tf.keras.layers.BatchNormalization()
         
         self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(3,1),
@@ -47,18 +49,19 @@ class ResNet18SingleBranch(tf.keras.Model):
         else:
             self.flatten = tf.keras.layers.GlobalAveragePooling2D()
 
-        if multi_task:
-            # activity classification
-            self.fc_activity = tf.keras.layers.Dense(units=num_act,
-                                                     activation=tf.keras.activations.softmax,
-                                                     name='fc_act')
-
         if self.fc:
             self.fc1 = tf.keras.layers.Dense(int(self.num_user*1.5), activation='relu')
-        # user classification
-        self.fc_user = tf.keras.layers.Dense(units=num_user,
-                                             activation=tf.keras.activations.softmax,
-                                             name='fc_user')
+
+        if not self.feature_generator:
+            if multi_task:
+                # activity classification
+                self.fc_activity = tf.keras.layers.Dense(units=num_act,
+                                                        activation=tf.keras.activations.softmax,
+                                                        name='fc_act')
+            # user classification
+            self.fc_user = tf.keras.layers.Dense(units=num_user,
+                                                activation=tf.keras.activations.softmax,
+                                                name='fc_user')
 
     def call(self, inputs, training=None):
 
@@ -80,14 +83,16 @@ class ResNet18SingleBranch(tf.keras.Model):
         if self.fc:
             out_cnn = self.fc1(out_cnn)
             #print('shape dense: {}'.format(out_cnn.shape))
-
-        if self.multi_task:
-            output_activity = self.fc_activity(out_cnn)
-            output_user = self.fc_user(out_cnn)
-            return output_activity, output_user
+        if not self.feature_generator:
+            if self.multi_task:
+                output_activity = self.fc_activity(out_cnn)
+                output_user = self.fc_user(out_cnn)
+                return output_activity, output_user
+            else:
+                output_user = self.fc_user(out_cnn)
+                return output_user
         else:
-            output_user = self.fc_user(out_cnn)
-            return output_user
+            return out_cnn
 
 
 class BasicBlock(tf.keras.layers.Layer):
@@ -98,13 +103,15 @@ class BasicBlock(tf.keras.layers.Layer):
                                             kernel_size=kernel,
                                             strides=stride,
                                             padding='same',
-                                            kernel_regularizer=tf.keras.regularizers.l2)
+                                            kernel_regularizer=tf.keras.regularizers.l2,
+                                            )
         self.bn1 = tf.keras.layers.BatchNormalization()
         self.conv2 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=1,
                                             padding="same",
-                                            kernel_regularizer=tf.keras.regularizers.l2)
+                                            kernel_regularizer=tf.keras.regularizers.l2,
+                                            )
         self.bn2 = tf.keras.layers.BatchNormalization()
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
         if stride != 1 or kernel[0]!=1:
@@ -142,5 +149,5 @@ def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1):
     return res_block
 
 
-def resnet18(multi_task, num_act, num_user, stride=1, fc=False, flatten=False):
-    return ResNet18SingleBranch(multi_task=multi_task, num_act=num_act, num_user=num_user, stride=stride, fc=fc, flatten=flatten)
+def resnet18(multi_task, num_act, num_user, stride=1, fc=False, flatten=False, feature_generator=False):
+    return ResNet18SingleBranch(multi_task=multi_task, num_act=num_act, num_user=num_user, stride=stride, fc=fc, flatten=flatten, feature_generator=feature_generator)
