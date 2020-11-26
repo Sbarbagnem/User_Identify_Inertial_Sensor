@@ -17,7 +17,6 @@ from scipy.spatial.distance import cosine
 
 from model.resNet182D.resnet18_2D import resnet18 as resnet2D
 from util.tf_metrics import custom_metrics
-from util.data_augmentation import random_transformation
 from util.utils import mapping_act_label, plot_pred_based_act, delete_overlap, normalize_data, mapping_act_label
 from util.eer import calculate_eer
 
