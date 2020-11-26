@@ -20,21 +20,18 @@ from utils import str2bool, split_balanced_data, denoiseData, detectGaitCycle, s
 
 
 def ou_isir_process_cycle_based(
-        path_data, 
-        path_out, 
-        plot_denoise=False, 
-        plot_peak=False, 
-        plot_interpolated=False, 
-        plot_auto_corr_coeff=False, 
-        use_2_step=False,
-        denoise=False):
-
-    print(path_out)
+        path_data,
+        path_out,
+        plot_denoise=False,
+        plot_peak=False,
+        plot_interpolated=False,
+        plot_auto_corr_coeff=False,
+        denoise=False,
+        gcLen=None):
 
     # define variables
     data = []
     lu = []
-    seqs = []
     lu_temp = 0
 
     # read files
@@ -51,9 +48,6 @@ def ou_isir_process_cycle_based(
 
         if 'seq1' in f:
             lu_temp += 1
-            seqs.append(1)
-        else:
-            seqs.append(0)
 
     if denoise == True:
         # noise remove with Daubechies (db6) wavelet level 2
@@ -67,18 +61,17 @@ def ou_isir_process_cycle_based(
     peaks = []
     for d in tqdm(data_denoise):
         peaks.append(detectGaitCycle(
-            d, plot_peak, plot_auto_corr_coeff, use_2_step))
+            d, plot_peak, plot_auto_corr_coeff, gcLen))
 
     # divide original data in gait cycle based on peak position found
     print('Split segment in gayt cycles')
     data_gait_cycle = []
     label_user_cycle = []
-    label_seq_cycle = []
-    for peak, segment, user, seq in zip(peaks, data_denoise, lu, seqs):
+    for peak, segment, user in zip(peaks, data_denoise, lu):
+        #peak = list(dict.fromkeys(peak))
         cycles = segment2GaitCycle(peak, segment)
         data_gait_cycle.extend(cycles)
-        label_user_cycle.extend([user]*(len(peak)-1))
-        label_seq_cycle.extend([seq]*(len(peak)-1))
+        label_user_cycle.extend([user for _ in range(len(peak)-1)])
 
     # spline interpolation to 120 samples for gait
     print('Interpolate cycle to 120 fixed sample')
@@ -87,8 +80,11 @@ def ou_isir_process_cycle_based(
     for cycle, user in zip(data_gait_cycle, label_user_cycle):
         interpolated = np.zeros((1, to_interp, cycle.shape[2]))
         for dim in np.arange(cycle.shape[2]):
-            interpolated[0, :, dim] = CubicSpline(np.arange(0, cycle.shape[1]), cycle[0, :, dim])(
-                np.linspace(0, cycle.shape[1]-1, to_interp))
+            try:
+                interpolated[0, :, dim] = CubicSpline(np.arange(0, cycle.shape[1]), cycle[0, :, dim])(
+                    np.linspace(0, cycle.shape[1]-1, to_interp))
+            except:
+                print(cycle.shape)
         if plot_interpolated:
             plt.figure(figsize=(12, 3))
             plt.style.use('seaborn-darkgrid')
@@ -120,21 +116,21 @@ def ou_isir_process_cycle_based(
         np.sum(np.power(cycles_interpolated, 2), 2, keepdims=True))), 2)
 
     print(f'Found {cycles_interpolated.shape[0]} gait cycles')
-
-    if use_2_step:
-        path_out = path_out + '/gait_2_cycles'
+    print(
+        f'Min number of cycle for user is: {min(np.unique(label_user_cycle, return_counts=True)[1])}')
+    print(
+        f'Max number of cycle for user is: {max(np.unique(label_user_cycle, return_counts=True)[1])}')
 
     if not os.path.exists(path_out):
-        os.mkdir(path_out)
+        os.makedirs(path_out)
 
     np.save(path_out + '/data', cycles_interpolated)
     np.save(path_out + '/user_label', label_user_cycle)
-    np.save(path_out + '/sequences_label', label_seq_cycle)
 
 
 def ou_isir_process_window_based(
-        path_data, 
-        path_out, 
+        path_data,
+        path_out,
         overlap,
         window_len):
     stride = int((1 - overlap)*window_len)
@@ -142,7 +138,6 @@ def ou_isir_process_window_based(
     # define variables
     data = []
     lu = []
-    seqs = []
     lu_temp = 0
     ID = []
     id_temp = 0
@@ -160,21 +155,17 @@ def ou_isir_process_window_based(
 
         if 'seq1' in f:
             lu_temp += 1
-            seqs.append(1)
-        else:
-            seqs.append(0)
 
     data_windows = []
     label_user = []
-    label_seq = []
 
     print('Sliding window')
-    for signal, user, seq in zip(data, lu, seqs):
+    for signal, user in zip(data, lu):
         windows = sliding_window(signal, (window_len, 3), (stride, 1))
         data_windows.append(windows)
         label_user.extend([user]*(len(windows)))
-        label_seq.extend([seq]*(len(windows)))
-        ID.extend(np.arange(id_temp, id_temp + len(windows))) # to del overlap sequence between train and test
+        # to del overlap sequence between train and test
+        ID.extend(np.arange(id_temp, id_temp + len(windows)))
         id_temp = id_temp + len(windows) + 10
 
     data_windows = np.concatenate(data_windows, axis=0)
@@ -190,7 +181,6 @@ def ou_isir_process_window_based(
 
     np.save(path_out + '/data', data_windows)
     np.save(path_out + '/user_label', label_user)
-    np.save(path_out + '/sequences_label', label_seq)
     np.save(path_out + '/id.npy', ID)
 
 
@@ -434,24 +424,33 @@ def sbhar_process(
         magnitude,
         size_overlapping,
         win_len,
-        six_adl=False):
+        six_adl=False,
+        authentication=False):
     print('Processing sbhar dataset')
 
     raw_data_path = path_data + 'RawData/'
-    if magnitude:
-        if six_adl:
-            processed_path = path_out + \
-                'OuterPartition_magnitude_sbhar_six_adl_{}'.format(
-                    str(size_overlapping * 10))
+
+    if not authentication:
+        if magnitude:
+            if six_adl:
+                processed_path = path_out + \
+                    'OuterPartition_magnitude_sbhar_six_adl_{}'.format(
+                        str(size_overlapping * 10))
+            else:
+                processed_path = path_out + \
+                    'OuterPartition_magnitude_{}'.format(
+                        str(size_overlapping * 10))
         else:
             processed_path = path_out + \
-                'OuterPartition_magnitude_{}'.format(
-                    str(size_overlapping * 10))
+                'OuterPartition_{}'.format(str(size_overlapping * 10))
+        if win_len != 100:
+            processed_path = processed_path + f'_wl_{win_len}'
     else:
-        processed_path = path_out + \
-            'OuterPartition_{}'.format(str(size_overlapping * 10))
-    if win_len != 100:
-        processed_path = processed_path + f'_wl_{win_len}'
+        if six_adl:
+            processed_path = "../data/authentication/SBHAR"
+        else:
+            sys.exit('Only six adl for sbhar dataset')
+
     #win_len = 100
     if magnitude:
         channel = 4
@@ -464,9 +463,12 @@ def sbhar_process(
     la = []
     lu = []
     ID = []
+    sessions = []  # sessions for authentication experiment
 
+    '''
     if not os.path.exists(path_out):
         os.mkdir(path_out)
+    '''
 
     # read labels.txt with inf about data (id_exp, id_usr, id_activity,
     # start_sample, stop_sample)
@@ -479,10 +481,11 @@ def sbhar_process(
         # for activity
         for id_act in np.unique(user_info[:, 2]):
             activity_info = user_info[np.where(user_info[:, 2] == int(id_act))]
-            acc = np.empty([0, 3], dtype=np.float)
-            gyro = np.empty([0, 3], dtype=np.float)
 
-            for tid in np.unique(activity_info[:, 0]):
+            # for sessions
+            for i, tid in enumerate(np.unique(activity_info[:, 0])):
+                acc = np.empty([0, 3], dtype=np.float)
+                gyro = np.empty([0, 3], dtype=np.float)
                 data_info = activity_info[np.where(
                     activity_info[:, 0] == int(tid))]
 
@@ -507,56 +510,51 @@ def sbhar_process(
 
                 # concat data
                 for start, stop in zip(data_info[:, -2], data_info[:, -1]):
-                    #print(start, " ", stop)
                     acc = np.concatenate(
                         (acc, file_acc[int(start):int(stop), :]), axis=0)
                     gyro = np.concatenate(
                         (gyro, file_gyro[int(start):int(stop), :]), axis=0)
 
-            if magnitude:
-                acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
-                    np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)
-                gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
-                    np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
+                if magnitude:
+                    acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
+                        np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)
+                    gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
+                        np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
 
-            # sliding window
-            try:
-                _data_windows_acc = sliding_window(
-                    acc, (win_len, channel), (int(win_len * (1 - size_overlapping)), 1))
-            except BaseException:
-                print("Not enough data for sliding window")
-            invalid_idx = np.where(np.any(np.isnan(np.reshape(
-                _data_windows_acc, [-1, win_len * channel])), axis=1))[0]
-            _data_windows_acc = np.delete(
-                _data_windows_acc, invalid_idx, axis=0)
+                # sliding window
+                try:
+                    _data_windows_acc = sliding_window(
+                        acc, (win_len, channel), (int(win_len * (1 - size_overlapping)), 1))
+                    _data_windows_gyro = sliding_window(
+                        gyro, (win_len, channel), (int(win_len * (1 - size_overlapping)), 1))
+                except BaseException:
+                    print("Not enough data for sliding window")
+                    print(id_user, id_act)
+                try:
+                    acc_gyro = np.concatenate(
+                        (_data_windows_acc, _data_windows_gyro), axis=2)
+                except BaseException:
+                    print("There is only one sliding window")
+                    acc_gyro = np.concatenate(
+                        (_data_windows_acc, _data_windows_gyro), axis=1)
+                    acc_gyro = acc_gyro.reshape(
+                        (1, acc_gyro.shape[0], acc_gyro.shape[1]))
 
-            _data_windows_gyro = sliding_window(
-                gyro, (win_len, channel), (int(win_len * (1 - size_overlapping)), 1))
-            invalid_idx = np.where(np.any(np.isnan(np.reshape(
-                _data_windows_gyro, [-1, win_len * channel])), axis=1))[0]
-            _data_windows_gyro = np.delete(
-                _data_windows_gyro, invalid_idx, axis=0)
+                _id = np.arange(ID_generater, ID_generater +
+                                len(acc_gyro))  # id for every window
+                # concat verticaly every window
+                data.append(acc_gyro)
+                ID.extend(_id)
+                ID_generater = ID_generater + len(acc_gyro) + 10
 
-            try:
-                acc_gyro = np.concatenate(
-                    (_data_windows_acc, _data_windows_gyro), axis=2)
-            except BaseException:
-                print("There is only one sliding window")
-                acc_gyro = np.concatenate(
-                    (_data_windows_acc, _data_windows_gyro), axis=1)
-                acc_gyro = acc_gyro.reshape(
-                    (1, acc_gyro.shape[0], acc_gyro.shape[1]))
+                # label activity for every window
+                _la = [int(id_act) - 1] * (len(ID) - len(la))
+                la.extend(_la)
 
-            _id = np.arange(ID_generater, ID_generater +
-                            len(acc_gyro))  # id for every window
-            # concat verticaly every window
-            data.append(acc_gyro)
-            ID.extend(_id)
-            ID_generater = ID_generater + len(acc_gyro) + 10
-
-            # label activity for every window
-            _la = [int(id_act) - 1] * (len(ID) - len(la))
-            la.extend(_la)
+                # trials for authentication test
+                if authentication:
+                    session = [i] * len(_id)
+                    sessions.extend(session)
 
         # update gloabl variabel lu
         _lu = [int(id_user) - 1] * (len(ID) - len(lu))
@@ -568,6 +566,8 @@ def sbhar_process(
     la_array = np.zeros([len(lu)], dtype=np.int32)
     lu_array = np.zeros([len(lu)], dtype=np.int32)
     ID_array = np.zeros([len(lu)], dtype=np.int32)
+    if authentication:
+        sessions_array = np.zeros([len(lu)], dtype=np.int32)
 
     idx = 0
     for i, el in enumerate(data):
@@ -575,6 +575,8 @@ def sbhar_process(
         ID_array[idx:idx + n] = ID[idx:idx + n]
         lu_array[idx:idx + n] = lu[idx:idx + n]
         la_array[idx:idx + n] = la[idx:idx + n]
+        if authentication:
+            sessions_array[idx:idx + n] = sessions[idx:idx + n]
         data_array[idx:idx + n, :, :] = el
         idx += n
 
@@ -586,37 +588,45 @@ def sbhar_process(
         la_array = np.delete(la_array, idx_to_del, axis=0)
         lu_array = np.delete(lu_array, idx_to_del, axis=0)
         ID_array = np.delete(ID_array, idx_to_del, axis=0)
+        if authentication:
+            sessions_array = np.delete(sessions_array, idx_to_del, axis=0)
 
     if not os.path.exists(processed_path + '/'):
         os.mkdir(processed_path + '/')
 
-    data_array, lu_array, la_array, ID_array = skutils.shuffle(
-        data_array, lu_array, la_array, ID_array)
-    data_array, lu_array, la_array, ID_array = skutils.shuffle(
-        data_array, lu_array, la_array, ID_array)
+    if not authentication:
+        data_array, lu_array, la_array, ID_array, sessions_array = skutils.shuffle(
+            data_array, lu_array, la_array, ID_array, sessions_array)
+        indexes = split_balanced_data(lu_array, la_array, folders=10)
 
-    indexes = split_balanced_data(lu_array, la_array, folders=10)
+        #plt_user_distribution(indexes, lu_array)
 
-    #plt_user_distribution(indexes, lu_array)
+        #plt_act_distribution(indexes, la_array)
 
-    #plt_act_distribution(indexes, la_array)
+        # partition
+        for i in range(10):
 
-    # partition
-    for i in range(10):
+            # clear dir
+            if os.path.exists(processed_path + '/fold{}'.format(i)):
+                shutil.rmtree(processed_path + '/fold{}'.format(i))
+            os.mkdir(processed_path + '/fold{}'.format(i))
 
-        # clear dir
-        if os.path.exists(processed_path + '/fold{}'.format(i)):
-            shutil.rmtree(processed_path + '/fold{}'.format(i))
-        os.mkdir(processed_path + '/fold{}'.format(i))
+            idx = indexes[str(i)]
+            np.save(processed_path + '/fold{}/data'.format(i), data_array[idx])
+            np.save(processed_path +
+                    '/fold{}/user_label'.format(i), lu_array[idx])
+            np.save(processed_path +
+                    '/fold{}/act_label'.format(i), la_array[idx])
+            np.save(processed_path + '/fold{}/id'.format(i), ID_array[idx])
+    else:
+        np.save(processed_path + '/data', data_array)
+        np.save(processed_path + '/user_label', lu_array)
+        np.save(processed_path + '/act_label', la_array)
+        np.save(processed_path + '/id', ID_array)
+        np.save(processed_path + '/sessions', sessions_array)
 
-        idx = indexes[str(i)]
-        np.save(processed_path + '/fold{}/data'.format(i), data_array[idx])
-        np.save(processed_path + '/fold{}/user_label'.format(i), lu_array[idx])
-        np.save(processed_path + '/fold{}/act_label'.format(i), la_array[idx])
-        np.save(processed_path + '/fold{}/id'.format(i), ID_array[idx])
 
-
-def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len):
+def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len, authentication=False):
     print('Processing unimib dataset')
 
     raw_data_path = path_data + 'data/'
@@ -630,6 +640,9 @@ def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len):
     if win_len != 100:
         processed_path = processed_path + f'_wl_{win_len}'
 
+    if authentication:
+        processed_path = "../data/authentication/SHAR"
+
     # win_len = 100 # 50 Hz * 2 seconds
     if magnitude:
         channel = 4
@@ -641,6 +654,10 @@ def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len):
     la = np.empty([0], dtype=np.int32)
     lu = np.empty([0], dtype=np.int32)
     ID = np.empty([0], dtype=np.int32)
+    gender_map = {'M': 0, 'F': 1}
+    # for split equal gender authentication test
+    gender = np.empty([0], dtype=np.int32)
+    sessions = np.empty([0], dtype=np.int32)
 
     signal = loadmat(raw_data_path + 'full_data.mat')['full_data']
 
@@ -653,18 +670,11 @@ def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len):
         'Jumping',
         'GoingDownS',
         'LyingDownFS',
-        'SittingDown',
-        'FallingForw',
-        'FallingRight',
-        'FallingBack',
-        'HittingObstacle',
-        'FallingWithPS',
-        'FallingBackSC',
-        'Syncope',
-        'FallingLeft']
+        'SittingDown']
 
     # id subject
     for sid in range(30):
+        gender_user = gender_map[signal[sid, 1][0].strip()]
         # id activity
         for aid in range(9):
             act = activity_table[aid]
@@ -689,40 +699,53 @@ def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len):
                 ID = np.concatenate((ID, _id), axis=0)
                 ID_generater = ID_generater + len(_data_windows) + 10
 
+                # trials for authentication test
+                session = np.repeat(tid, len(_data_windows))
+                sessions = np.concatenate((sessions, session), axis=0)
+
             # label activity for every window
             _la = np.full(len(data) - len(la), aid, dtype=np.int32)
             la = np.concatenate((la, _la), axis=0)
 
         # label user for every window
         _lu = np.full(len(data) - len(lu), sid, dtype=np.int32)
+        _gender = np.full(len(data) - len(gender), gender_user, dtype=np.int32)
         lu = np.concatenate((lu, _lu), axis=0)
+        gender = np.concatenate((gender, _gender), axis=0)
 
     if not os.path.exists(processed_path + '/'):
         os.makedirs(processed_path + '/')
 
-    data, lu, la, ID = skutils.shuffle(data, lu, la, ID)
-    data, lu, la, ID = skutils.shuffle(data, lu, la, ID)
-
     # split balanced data, return array (10, indexes_folder)
-    indexes = split_balanced_data(lu, la, folders=10)
+    if not authentication:
+        data, lu, la, ID = skutils.shuffle(
+            data, lu, la, ID)
+        indexes = split_balanced_data(lu, la, folders=10)
 
-    #plt_user_distribution(indexes, lu)
-    #plt_act_distribution(indexes, la)
+        #plt_user_distribution(indexes, lu)
+        #plt_act_distribution(indexes, la)
 
-    # create dir partition
-    for i in range(10):
+        # create dir partition
+        for i in range(10):
 
-        # clear dir
-        if os.path.exists(processed_path + '/fold{}'.format(i)):
-            shutil.rmtree(processed_path + '/fold{}'.format(i))
-        os.mkdir(processed_path + '/fold{}'.format(i))
+            # clear dir
+            if os.path.exists(processed_path + '/fold{}'.format(i)):
+                shutil.rmtree(processed_path + '/fold{}'.format(i))
+            os.mkdir(processed_path + '/fold{}'.format(i))
 
-        #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
-        idx = indexes[str(i)]
-        np.save(processed_path + '/fold{}/data'.format(i), data[idx])
-        np.save(processed_path + '/fold{}/user_label'.format(i), lu[idx])
-        np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
-        np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
+            #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
+            idx = indexes[str(i)]
+            np.save(processed_path + '/fold{}/data'.format(i), data[idx])
+            np.save(processed_path + '/fold{}/user_label'.format(i), lu[idx])
+            np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
+            np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
+    else:
+        np.save(processed_path + '/data', data)
+        np.save(processed_path + '/user_label', lu)
+        np.save(processed_path + '/act_label', la)
+        np.save(processed_path + '/id', ID)
+        np.save(processed_path + '/gender', gender)
+        np.save(processed_path + '/sessions', sessions)
 
 
 def plt_user_distribution(dict_indexes, lu):
@@ -809,6 +832,12 @@ if __name__ == '__main__':
         default=[True],
         nargs='+',
         help='bool use or not magnitude')
+    parser.add_argument(
+        '-authentication',
+        '--authentication',
+        type=str2bool,
+        help='read data for authentication, it doesn\'t split data in 10 fold'
+    )
 
     # for realdisp dataset
     parser.add_argument(
@@ -819,15 +848,6 @@ if __name__ == '__main__':
         default=[],
         choices=['LC', 'RC', 'LT', 'RT', 'LLA', 'RLA', 'LUA', 'RUA', 'BACK'],
         help='choose sensor\'s place to used',
-        required=False)
-    parser.add_argument(
-        '-sensors',
-        '--sensors',
-        choices=['acc', 'gyro', 'magn'],
-        default=['acc', 'gyro', 'magn'],
-        nargs='+',
-        type=str,
-        help='which sensor using',
         required=False)
     parser.add_argument(
         '-sensor_displacement',
@@ -876,12 +896,6 @@ if __name__ == '__main__':
         help='Plot autocorrelation and 2nd peak take for estimated cycle length'
     )
     parser.add_argument(
-        '-use_2_step',
-        '--use_2_step',
-        type=str2bool,
-        default=False
-    )
-    parser.add_argument(
         '-denoise',
         '--denoise',
         type=str2bool,
@@ -890,6 +904,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '-window_len',
         '--window_len',
+        type=int
+    )
+    parser.add_argument(
+        '-gcLen',
+        '--gcLen',
         type=int
     )
 
@@ -901,37 +920,31 @@ if __name__ == '__main__':
     for magnitude in [*args.magnitude]:
         for overlap in [*args.overlap]:
             if args.dataset == 'unimib':
-                if args.sensors != ['acc']:
-                    parser.error(
-                        'Please in unimib dataset there is only accelerometer data')
                 unimib_process(
                     path_data="../data/datasets/unimib_dataset/",
                     path_out="../data/datasets/UNIMIB_processed/",
                     magnitude=magnitude,
                     size_overlapping=overlap,
-                    win_len=args.win_len)
+                    win_len=args.win_len,
+                    authentication=args.authentication)
             elif args.dataset == 'sbhar':
-                if args.sensors == ['acc', 'magn']:
-                    parser.error(
-                        'Please in sbahr dataset there is only accelerometer and gyriscope data')
                 sbhar_process(
-                    path_data="../data/datasets/RawData/",
+                    path_data="../data/datasets/SBHAR/",
                     path_out="../data/datasets/SBHAR_processed/",
                     magnitude=magnitude,
                     size_overlapping=overlap,
                     win_len=args.win_len,
-                    six_adl=False)
+                    six_adl=False,
+                    authentication=args.authentication)
             elif args.dataset == 'sbhar_six_adl':
-                if args.sensors == ['acc', 'magn']:
-                    parser.error(
-                        'Please in sbahr dataset there is only accelerometer and gyriscope data')
                 sbhar_process(
-                    path_data="../data/datasets/",
+                    path_data="../data/datasets/SBHAR/",
                     path_out="../data/datasets/SBHAR_processed/",
                     magnitude=magnitude,
                     size_overlapping=overlap,
                     win_len=args.win_len,
-                    six_adl=True)
+                    six_adl=True,
+                    authentication=args.authentication)
             elif args.dataset == 'realdisp':
                 realdisp_process(
                     path_data="../data/datasets/REALDISP/",
@@ -944,14 +957,19 @@ if __name__ == '__main__':
                     win_len=args.win_len)
             elif args.dataset == 'ouisir':
                 if args.method == 'cycle_based':
+                    denoise = "denoise" if args.denoise else "no_denoise"
+                    autocorr = 'autocorr' if args.gcLen == None else "no_autocorr"
+                    path_out = '../data/datasets/OUISIR_processed/cycle_based/{}/{}'.format(
+                        denoise, autocorr)
                     ou_isir_process_cycle_based(
                         path_data='../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
-                        path_out=f'../data/datasets/OUISIR_processed/cycle_based/{"denoise" if args.denoise else "no_denoise"}',
+                        path_out=path_out,
                         plot_denoise=args.plot_denoise,
                         plot_peak=args.plot_peak,
                         plot_interpolated=args.plot_interpolated,
                         plot_auto_corr_coeff=args.plot_auto_corr_coeff,
-                        denoise=args.denoise
+                        denoise=args.denoise,
+                        gcLen=args.gcLen
                     )
                 elif args.method == 'window_based':
                     ou_isir_process_window_based(

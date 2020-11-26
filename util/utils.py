@@ -144,7 +144,7 @@ def to_delete(overlapping):
 
 
 def mapping_act_label(dataset_name):
-    if 'unimib' in dataset_name:
+    if 'unimib' in dataset_name or 'shar' in dataset_name:
         return ['StandingUpFS', 'StandingUpFL', 'Walking', 'Running', 'GoingUpS',
                 'Jumping', 'GoingDownS', 'LyingDownFS', 'SittingDown']
     if 'sbhar' in dataset_name:
@@ -232,16 +232,6 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, gcLen=Non
     selected_data = data[:,2] # z axis
     autocorr = False if gcLen != None else True
 
-    # plot data
-    if False:
-        plt.figure(figsize=(12, 3))
-        plt.style.use('seaborn-darkgrid')
-        plt.plot(np.arange(data.shape[0]), data[:,0], 'b-')
-        plt.plot(np.arange(data.shape[0]), data[:,1], 'r-')
-        plt.plot(np.arange(data.shape[0]), data[:,2], 'y-')
-        plt.tight_layout()
-        plt.show()
-
     t = 0.4
 
     peaks = find_thresh_peak(selected_data, t)
@@ -259,36 +249,36 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, gcLen=Non
 
     peaks, to_plot = find_peaks(peaks, selected_data, gcLen, autocorr)
 
-    selected_data = scale_sklearn(selected_data, axis=0, with_mean=True, with_std=True)
-    peaks_scipy, _ = find_peaks_scipy(np.negative(selected_data), height=np.mean(np.negative(selected_data)) + 0.5*np.std(np.negative(selected_data)), distance=gcLen*0.7)
+    #selected_data_scale = scale_sklearn(selected_data, axis=0, with_mean=True, with_std=True)
+    #peaks_scipy, _ = find_peaks_scipy(np.negative(selected_data_scale), height=np.mean(np.negative(selected_data)) + 0.5*np.std(np.negative(selected_data)), distance=gcLen*0.7)
 
     if plot_peak:# or to_plot: 
         plt.figure(figsize=(12, 3))
 
-        plt.subplot(3,1,1)
+        plt.subplot(2,1,1)
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(data.shape[0]), data[:,0], 'g-', label='x')
         plt.plot(np.arange(data.shape[0]), data[:,1], 'r-', label='y')
         plt.plot(np.arange(data.shape[0]), data[:,2], 'b-', label='z')
         plt.legend(loc='upper right')
 
-        plt.subplot(3,1,2)
-        plt.style.use('seaborn-darkgrid')
-        plt.plot(np.arange(data.shape[0]), data[:,2], 'b-', label='z')
-        plt.vlines(peaks, ymin=min(data[:,2]), ymax=max(data[:,2]), color='black', ls='dotted')
-        plt.legend(loc='upper right')
-
-        plt.subplot(3,1,3)
+        plt.subplot(2,1,2)
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(selected_data.shape[0]), selected_data, 'b-', label='z')
-        plt.vlines(peaks_scipy, ymin=min(selected_data), ymax=max(selected_data), color='red', ls='--')
+        plt.vlines(peaks, ymin=min(selected_data), ymax=max(selected_data), color='black', ls='dotted')
         plt.legend(loc='upper right')
+
+        #plt.subplot(3,1,3)
+        #plt.style.use('seaborn-darkgrid')
+        #plt.plot(np.arange(selected_data_scale.shape[0]), selected_data_scale, 'b-', label='z')
+        #plt.vlines(peaks_scipy, ymin=min(selected_data_scale), ymax=max(selected_data_scale), color='red', ls='--')
+        #plt.legend(loc='upper right')
 
         plt.tight_layout()
         plt.show()
 
-    return peaks_scipy
-
+    #return peaks_scipy
+    return peaks
 
 def segment2GaitCycle(peaks, segment):
     cycles = []
@@ -313,7 +303,7 @@ def split_data_train_val_test_gait(data,
     label_for_user = []
     id_for_user = []
 
-    for user in np.unique(label_user):
+    for user in np.unique(label_user)[:5]:
         idx_user = np.where(label_user == user)
         data_for_user.append(data[idx_user])
         label_for_user.append(label_user[idx_user])
@@ -422,22 +412,23 @@ def split_data_train_val_test_gait(data,
     val_label = np.asarray(val_label)
     test_label = np.asarray(test_label)
 
-    return train_data, val_data, test_data, train_label, val_label, test_label,
+    return train_data, val_data, test_data, train_label, val_label, test_label
 
-
-def normalize_data(train, val, test):
+def normalize_data(train, val, test=None):
 
     mean = np.mean(np.reshape(train, [-1, train.shape[2]]), axis=0)
     std = np.std(np.reshape(train, [-1, train.shape[2]]), axis=0)
 
     train = (train - mean)/std
     val = (val - mean)/std
-    test = (test - mean)/std
 
     train = np.expand_dims(train, 3)
     val = np.expand_dims(val,  3)
-    test = np.expand_dims(test, 3)
 
+    if test is not None:
+        test = (test - mean)/std
+        test = np.expand_dims(test, 3)
+        
     return train, val, test
 
 ############################################
@@ -445,7 +436,7 @@ def normalize_data(train, val, test):
 ############################################
 
 
-def scale(x, out_range=(-1, 1)):
+def scale(x, out_range):
     domain = np.min(x), np.max(x)
     y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
     return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2

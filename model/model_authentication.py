@@ -18,25 +18,32 @@ from scipy.spatial.distance import cosine
 from model.resNet182D.resnet18_2D import resnet18 as resnet2D
 from util.tf_metrics import custom_metrics
 from util.data_augmentation import random_transformation
-from util.utils import mapping_act_label, plot_pred_based_act, delete_overlap, normalize_data
+from util.utils import mapping_act_label, plot_pred_based_act, delete_overlap, normalize_data, mapping_act_label
 from util.eer import calculate_eer
 
 
 class ModelAuthentication():
-    def __init__(self, path_data, name_dataset, name_model):
-        self.path_data = path_data
+    def __init__(self, path_data, name_dataset, name_model, colab_path=''):
+        if colab_path == '':
+            self.path_save_model = f'./saved_model/{name_dataset}/'
+            self.path_data = path_data
+        else:
+            self.path_save_model = f'{colba_path}saved_model/{name_dataset}'
+            self.path_data = colab_path + path_data
         self.batch_size = 128
         self.init_lr = 0.001
         self.epochs = 100
-        self.path_save_model = f'./saved_model/{name_dataset}/'
-        if not os.path.exists(self.path_save_model):
-            os.makedirs(self.path_save_model)
         self.name_model = name_model
         self.best_model = None
+        self.name_dataset = name_dataset
+
+        if not os.path.exists(self.path_save_model):
+            os.makedirs(self.path_save_model)
 
     def load_data(self):
         data_dict = dict.fromkeys(
             ['data', 'user_label', 'act_label', 'id', 'gender', 'sessions'])
+        print(self.path_data)
         for key in list(data_dict.keys()):
             if Path(f'{self.path_data}{key}.npy').is_file():
                 data_dict[key] = np.load(f'{self.path_data}{key}.npy')
@@ -316,13 +323,11 @@ class ModelAuthentication():
         path_probe_gallery = self.path_data + 'gallery_probe/'
 
         # remove overlap between sequences ?
-        '''
         self.auth['data'] = self.auth['data'][::2, :]
         self.auth['user_label'] = self.auth['user_label'][::2]
         self.auth['act_label'] = self.auth['act_label'][::2]
         if 'sessions' in list(self.auth.keys()):
             self.auth['sessions'] = self.auth['sessions'][::2]
-        '''
 
         # case1: probe-gallery for every session
         if split_probe_gallery == 'intra_session':
@@ -427,7 +432,7 @@ class ModelAuthentication():
         path_probe_gallery = os.path.join(
             self.path_data, f'gallery_probe/{split_gallery_probe}/')
         path_distance_txt = os.path.join(
-            self.path_data, f'eer/{split_gallery_probe}/')
+            self.path_data, f'distance/{split_gallery_probe}/')
         if not os.path.exists(path_distance_txt):
             os.makedirs(path_distance_txt)
 
@@ -466,14 +471,12 @@ class ModelAuthentication():
 
     def compute_distance(self, gallery, user_gallery, act_gallery, probe, user_probe, act_probe, preprocess, action_dependent, path_to_save):
 
-        print(f'Shape gallery before processing {gallery.shape}')
-
         # preprocess features
         if preprocess:
+            print(f'Shape gallery before processing {gallery.shape}')
             gallery, user_gallery, act_gallery, probe, user_probe, act_probe = self.process_feature(
                 gallery, user_gallery, act_gallery, probe, user_probe, act_probe)
-
-        print(f'Shape gallery before processing {gallery.shape}')
+            print(f'Shape gallery before processing {gallery.shape}')
 
         # compute distances and evaluate eer based on action
         if action_dependent:
@@ -492,12 +495,12 @@ class ModelAuthentication():
                 print(f'Probe shape: {probe_filtered.shape}')
                 for seq1, user1 in zip(gallery_filtered, user_gallery_filtered):
                     for seq2, user2 in zip(probe_filtered, user_probe_filtered):
-                        dist = np.linalg.norm(seq1-seq2)
+                        dist = np.linalg.norm(seq1 - seq2)
                         same = 1 if user1 == user2 else 0
-                        distances.append([dist, same])
+                        distances.append([dist, same, user1])
                 distances = np.array(distances)
                 np.savetxt(
-                    path_to_save + f'action_dependent/distance_act_{act}.txt', distances)
+                    path_to_save + f'action_dependent/distance_act_{act}.txt', distances, delimiter='\t', fmt="%.3f %d %d")
         # compute distances and evaluate eer without filter for action
         else:
             if not os.path.exists(os.path.join(path_to_save, 'action_independent/')):
@@ -506,16 +509,16 @@ class ModelAuthentication():
             distances = []
             for seq1, user1 in zip(gallery, user_gallery):
                 for seq2, user2 in zip(probe, user_probe):
-                    dist = np.linalg.norm(seq1-seq2)
+                    dist = cosine(seq1,seq2)
                     same = 1 if user1 == user2 else 0
-                    distances.append([dist, same])
+                    distances.append([dist, same, user1])
             distances = np.array(distances)
             np.savetxt(
-                path_to_save + 'action_independent/distance.txt', distances)
+                path_to_save + 'action_independent/distance.txt', distances, delimiter='\t', fmt="%.3f %d %d")
 
     def compute_eer(self, split_gallery_probe, action_dependent=True):
         path_distance_txt = os.path.join(
-            self.path_data, f'eer/{split_gallery_probe}/')
+            self.path_data, f'distance/{split_gallery_probe}/')
 
         if split_gallery_probe == 'intra_session':
             for dir_session in os.listdir(path_distance_txt):
@@ -525,49 +528,42 @@ class ModelAuthentication():
             eer, thresh = self.eer(path_distance_txt, action_dependent)
 
     def eer(self, path_score_txt, action_dependent):
+        path_save_eer = path_score_txt.split('distance')[0] + 'eer' + path_score_txt.split('distance')[1]
+        if action_dependent:
+            path_save_eer = path_save_eer + 'action_dependent/'
+        else:
+            path_save_eer = path_save_eer + 'action_independent/'
+        if not os.path.exists(path_save_eer):
+            os.makedirs(path_save_eer)
+
         # load txt based on action dependent or independent
         if action_dependent:
             # read score for every act
+            eers = []
             for act in np.unique(self.data_dict['act_label']):
                 score_txt = np.loadtxt(
                     path_score_txt + f'action_dependent/distance_act_{act}.txt')
-                score = [float(x) for x in score_txt[:, 0]]
-                label = [float(x) for x in score_txt[:, 1]]
-                eer, threshold = calculate_eer(label, score, pos=1)
-                print('Act {} EER: {:.3f}'.format(act, eer*100))
+                score = score_txt[:, 0]
+                label = score_txt[:, 1]
+                eer, threshold = calculate_eer(label, score, pos=0)
+                eers.append([act, eer*100])
+                print('Act {} EER: {:.3f} Trhesh: {:.3f}'.format(act, eer*100, threshold))
+            # save result
+            with open(f"{path_save_eer}eer.txt", "w") as f:
+                for el in eers:
+                    f.write('{} EER: {:.3f}%\n'.format(mapping_act_label(self.name_dataset.lower())[el[0]], el[1]))
         else:
             score_txt = np.loadtxt(
                 path_score_txt + 'action_independent/distance.txt')
-            score = [float(x) for x in score_txt[:, 0]]
-            label = [float(x) for x in score_txt[:, 1]]
-            eer, threshold = calculate_eer(label, score, pos=1)
+            score = score_txt[:, 0]
+            label = score_txt[:, 1]
+            eer, threshold = calculate_eer(label, score, pos=0)
             print('EER: {:.3f}'.format(eer*100))
+            # save result
+            with open(f"{path_save_eer}eer.txt", "w") as f:
+                f.write('EER: {:.3f}%'.format(eer*100))
         
         return eer, threshold
-
-    def mean_gallery(self, gallery, user_gallery, act_gallery):
-        """
-        Compute mean of features vector for every user-activitity
-        """
-
-        gallery_reduced = []
-        user_gallery_reduced = []
-        act_gallery_reduced = []
-
-        for user in np.unique(user_gallery):
-            for act in np.unique(act_gallery):
-                idx = np.where((user_gallery == user) & (act_gallery == act))
-                gallery_temp = gallery[idx]
-                _mean = np.mean(gallery_temp, axis=0)
-                gallery_reduced.append(np.expand_dims(_mean, 0))
-                user_gallery_reduced.append(user)
-                act_gallery_reduced.append(act)
-
-        gallery_reduced = np.concatenate(gallery_reduced, axis=0)
-        user_gallery_reduced = np.asarray(user_gallery_reduced)
-        act_gallery_reduced = np.asarray(act_gallery_reduced)
-
-        return gallery_reduced, user_gallery_reduced, act_gallery_reduced
 
     def balance_gallery_probe(self, data, users, activities):
 
@@ -604,15 +600,15 @@ class ModelAuthentication():
     def process_feature(self, gallery, user_gallery, act_gallery, probe, user_probe, act_probe):
 
         # mean 0 variance 1
-        standardScaler = StandardScaler()
-        standardScaler.fit(gallery)
-        gallery = standardScaler.transform(gallery)
-        probe = standardScaler.transform(probe)
+        _mean = np.mean(gallery, axis=0)
+        _std = np.std(gallery, axis=0)
+        gallery = (gallery - _mean) / _std 
+        probe = (probe - _mean) / _std
 
         '''
         # PCA for dimension reduction ?
-        pca = PCA()
-        #pca = KernelPCA(kernel='rbf', gamma=0.0001)
+        #pca = PCA()
+        pca = KernelPCA(kernel='rbf', gamma=0.0001)
         pca.fit(gallery)
         gallery_pca = pca.transform(gallery)
         probe_pca = pca.transform(probe)
@@ -631,13 +627,7 @@ class ModelAuthentication():
 
         gallery = gallery_pca[:, :20]
         probe = probe_pca[:, :20]
-        
-        # for every user mean of all vector in gallery ?
-        
-        gallery, user_gallery, act_gallery = self.mean_gallery(
-            gallery, user_gallery, act_gallery)
         '''
-
         return gallery, user_gallery, act_gallery, probe, user_probe, act_probe
 
     def split_train_val_classifier(self, data, users, activities, id_window, train_size=0.8):

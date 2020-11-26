@@ -67,6 +67,11 @@ parser.add_argument(
     type=str,
     choices=['random', 'intra_session', 'extra_session']
 )
+parser.add_argument(
+    '-colab_path',
+    '--colab_path',
+    type=str,
+)
 
 args = parser.parse_args()
 
@@ -86,8 +91,9 @@ compute_eer = args.compute_eer
 action_dependent = args.action_dependent
 split_gallery_probe = args.split_gallery_probe
 preprocess_features = args.preprocess_features
+colab_path = args.colab_path
 
-model = ModelAuthentication(path_data,name_dataset, name_model)
+model = ModelAuthentication(path_data,name_dataset, name_model, colab_path)
 model.load_data()
 model.split_user()
 if train_classifier:
