@@ -192,7 +192,8 @@ def realdisp_process(
         sensors_displacement=['ideal', 'self'],
         magnitude=True,
         size_overlapping=0.5,
-        win_len=100):
+        win_len=100,
+        authentication=False):
     """
     Create 10 folds for dataset REALDISP.
 
@@ -251,6 +252,9 @@ def realdisp_process(
 
     if win_len != 100:
         processed_path = processed_path + f'_wl_{win_len}'
+    if authentication:
+        processed_path = f"../data/authentication/REALDISP_{positions[0]}"
+
     channel = 3
     ID_generater = 1
 
@@ -387,36 +391,39 @@ def realdisp_process(
         idx += n
 
     # shuffle
-    data, la, lu, di, id_pos, ID = skutils.shuffle(
-        data_array, la_array, lu_array, di_array, id_pos_array, ID_array)
-    data, la, lu, di, id_pos, ID = skutils.shuffle(
-        data, la, lu, di, id_pos, ID)
+    if not authentication:
+        data, la, lu, di, id_pos, ID = skutils.shuffle(
+            data, la, lu, di, id_pos, ID)
 
-    print(f'shape data {data.shape}')
+        print(f'shape data {data.shape}')
 
-    indexes = split_balanced_data(lu, la, folders=10, di=di)
+        indexes = split_balanced_data(lu, la, folders=10, di=di)
 
-    #plt_user_distribution(indexes, lu)
+        #plt_user_distribution(indexes, lu)
 
-    #plt_act_distribution(indexes, la)
+        #plt_act_distribution(indexes, la)
 
-    # partition
-    for i in range(10):
+        # partition
+        for i in range(10):
 
-        # clear dir
-        if os.path.exists(processed_path + '/fold{}'.format(i)):
-            shutil.rmtree(processed_path + '/fold{}'.format(i))
-        os.mkdir(processed_path + '/fold{}'.format(i))
+            # clear dir
+            if os.path.exists(processed_path + '/fold{}'.format(i)):
+                shutil.rmtree(processed_path + '/fold{}'.format(i))
+            os.mkdir(processed_path + '/fold{}'.format(i))
 
-        #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
-        idx = indexes[str(i)]
-        np.save(processed_path + '/fold{}/data'.format(i), data[idx])
-        np.save(processed_path + '/fold{}/user_label'.format(i), lu[idx])
-        np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
-        np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
-        np.save(processed_path + '/fold{}/di'.format(i), di[idx])
-        np.save(processed_path + '/fold{}/pos'.format(i), id_pos[idx])
-
+            #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
+            idx = indexes[str(i)]
+            np.save(processed_path + '/fold{}/data'.format(i), data[idx])
+            np.save(processed_path + '/fold{}/user_label'.format(i), lu[idx])
+            np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
+            np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
+            np.save(processed_path + '/fold{}/di'.format(i), di[idx])
+            np.save(processed_path + '/fold{}/pos'.format(i), id_pos[idx])
+    else:
+        np.save(processed_path + '/data', data_array)
+        np.save(processed_path + '/user_label', lu_array)
+        np.save(processed_path + '/act_label', la_array)
+        np.save(processed_path + '/id', ID_array)    
 
 def sbhar_process(
         path_data,
@@ -949,12 +956,12 @@ if __name__ == '__main__':
                 realdisp_process(
                     path_data="../data/datasets/REALDISP/",
                     path_out=f"../data/datasets/REALDISP_processed_{'_'.join(args.sensor_place)}/",
-                    sensors_type=args.sensors,
                     positions=args.sensor_place,
                     sensors_displacement=args.sensor_displacement,
                     magnitude=magnitude,
                     size_overlapping=overlap,
-                    win_len=args.win_len)
+                    win_len=args.win_len,
+                    authentication=args.authentication)
             elif args.dataset == 'ouisir':
                 if args.method == 'cycle_based':
                     denoise = "denoise" if args.denoise else "no_denoise"

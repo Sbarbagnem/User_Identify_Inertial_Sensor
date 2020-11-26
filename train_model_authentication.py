@@ -71,6 +71,7 @@ parser.add_argument(
     '-colab_path',
     '--colab_path',
     type=str,
+    default=''
 )
 
 args = parser.parse_args()
@@ -96,6 +97,7 @@ colab_path = args.colab_path
 model = ModelAuthentication(path_data,name_dataset, name_model, colab_path)
 model.load_data()
 model.split_user()
+sys.exit()
 if train_classifier:
     model.create_dataset_classifier()
     model.build_model()

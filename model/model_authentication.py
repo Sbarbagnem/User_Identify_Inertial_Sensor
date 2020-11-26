@@ -42,13 +42,16 @@ class ModelAuthentication():
     def load_data(self):
         data_dict = dict.fromkeys(
             ['data', 'user_label', 'act_label', 'id', 'gender', 'sessions'])
-        print(self.path_data)
         for key in list(data_dict.keys()):
             if Path(f'{self.path_data}{key}.npy').is_file():
                 data_dict[key] = np.load(f'{self.path_data}{key}.npy')
 
         # remove key with None value
         self.data_dict = {k: v for k, v in data_dict.items() if v is not None}
+        if 'gender' not in self.data_dict.keys():
+            print('There aren\'t gender information for this dataset')
+        if 'sessions' not in self.data_dict.keys():
+            print('There aren\'t sessions information for this dataset')
         self.win_len = self.data_dict['data'].shape[1]
         self.axis = self.data_dict['data'].shape[2]
 
