@@ -27,7 +27,7 @@ class ModelAuthentication():
             self.path_save_model = f'./saved_model/{name_dataset}/'
             self.path_data = path_data
         else:
-            self.path_save_model = f'{colba_path}saved_model/{name_dataset}'
+            self.path_save_model = f'{colab_path}saved_model/{name_dataset}'
             self.path_data = colab_path + path_data
         self.batch_size = 128
         self.init_lr = 0.001
