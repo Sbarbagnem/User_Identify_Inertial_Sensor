@@ -508,7 +508,7 @@ class ModelAuthentication():
             distances = []
             for seq1, user1 in zip(gallery, user_gallery):
                 for seq2, user2 in zip(probe, user_probe):
-                    dist = cosine(seq1,seq2)
+                    dist = np.linalg.norm(seq1 - seq2)
                     same = 1 if user1 == user2 else 0
                     distances.append([dist, same, user1])
             distances = np.array(distances)
