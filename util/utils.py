@@ -303,7 +303,7 @@ def split_data_train_val_test_gait(data,
     label_for_user = []
     id_for_user = []
 
-    for user in np.unique(label_user)[:5]:
+    for user in np.unique(label_user):
         idx_user = np.where(label_user == user)
         data_for_user.append(data[idx_user])
         label_for_user.append(label_user[idx_user])

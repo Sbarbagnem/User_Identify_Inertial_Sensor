@@ -36,6 +36,9 @@ class ModelAuthentication():
         self.best_model = None
         self.name_dataset = name_dataset
 
+        if name_dataset.lower() == 'ouisir':
+            self.batch_size = 64
+
         if not os.path.exists(self.path_save_model):
             os.makedirs(self.path_save_model)
 
@@ -120,7 +123,7 @@ class ModelAuthentication():
 
         print('{} users for train feature extraction'.format(
             len(np.unique(self.classifier['user_label']))))
-        print('{} users for auth feature extraction'.format(
+        print('{} users for authentication evaluation'.format(
             len(np.unique(self.auth['user_label']))))
         print('{} window for train classifier'.format(
             self.classifier['data'].shape))
@@ -169,8 +172,12 @@ class ModelAuthentication():
         pass
 
     def build_model(self, stride=1, fc=False):
-        self.feature_extractor = resnet2D(
-            multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=stride, fc=fc, flatten=False)
+        if self.name_dataset.lower != 'ouisir':
+            self.feature_extractor = resnet2D(
+                multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=stride, fc=fc, flatten=False)
+        else:
+            self.feature_extractor = resnet2D(
+                multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=2, fc=fc, flatten=False)
         self.feature_extractor.build(
             input_shape=(None, self.win_len, self.axis, 1))
         self.feature_extractor.summary()
@@ -311,8 +318,12 @@ class ModelAuthentication():
 
     def load_model(self):
         print('Load model')
-        self.feature_extractor = resnet2D(
-            False, 0, self.num_user_classifier, feature_generator=True)
+        if self.name_dataset.lower() != 'ouisir':
+            self.feature_extractor = resnet2D(
+                False, 0, self.num_user_classifier, feature_generator=True)
+        else:
+             self.feature_extractor = resnet2D(
+                False, 0, self.num_user_classifier, stride=2, feature_generator=True)           
         self.feature_extractor.build((None, self.win_len, self.axis, 1))
         self.feature_extractor.load_weights(
             self.path_save_model + self.name_model + '.h5', by_name=True)
