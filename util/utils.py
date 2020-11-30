@@ -231,7 +231,6 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, gcLen=Non
 
     selected_data = data[:,2] # z axis
     autocorr = False if gcLen != None else True
-
     t = 0.4
 
     peaks = find_thresh_peak(selected_data, t)
@@ -249,42 +248,42 @@ def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, gcLen=Non
 
     peaks, to_plot = find_peaks(peaks, selected_data, gcLen, autocorr)
 
-    #selected_data_scale = scale_sklearn(selected_data, axis=0, with_mean=True, with_std=True)
-    #peaks_scipy, _ = find_peaks_scipy(np.negative(selected_data_scale), height=np.mean(np.negative(selected_data)) + 0.5*np.std(np.negative(selected_data)), distance=gcLen*0.7)
+    selected_data_scale = scale_sklearn(selected_data, axis=0, with_mean=True, with_std=True)
+    peaks_scipy, _ = find_peaks_scipy(np.negative(selected_data_scale), height=np.mean(np.negative(selected_data)) + 0.5*np.std(np.negative(selected_data)), distance=gcLen*0.7)
 
-    if plot_peak:# or to_plot: 
+    if plot_peak or to_plot: 
         plt.figure(figsize=(12, 3))
 
-        plt.subplot(2,1,1)
+        plt.subplot(3,1,1)
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(data.shape[0]), data[:,0], 'g-', label='x')
         plt.plot(np.arange(data.shape[0]), data[:,1], 'r-', label='y')
         plt.plot(np.arange(data.shape[0]), data[:,2], 'b-', label='z')
         plt.legend(loc='upper right')
 
-        plt.subplot(2,1,2)
+        plt.subplot(3,1,2)
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(selected_data.shape[0]), selected_data, 'b-', label='z')
         plt.vlines(peaks, ymin=min(selected_data), ymax=max(selected_data), color='black', ls='dotted')
         plt.legend(loc='upper right')
 
-        #plt.subplot(3,1,3)
-        #plt.style.use('seaborn-darkgrid')
-        #plt.plot(np.arange(selected_data_scale.shape[0]), selected_data_scale, 'b-', label='z')
-        #plt.vlines(peaks_scipy, ymin=min(selected_data_scale), ymax=max(selected_data_scale), color='red', ls='--')
-        #plt.legend(loc='upper right')
+        plt.subplot(3,1,3)
+        plt.style.use('seaborn-darkgrid')
+        plt.plot(np.arange(selected_data_scale.shape[0]), selected_data_scale, 'b-', label='z')
+        plt.vlines(peaks_scipy, ymin=min(selected_data_scale), ymax=max(selected_data_scale), color='red', ls='--')
+        plt.legend(loc='upper right')
 
         plt.tight_layout()
         plt.show()
 
-    #return peaks_scipy
-    return peaks
+    return peaks_scipy
+    #return peaks
 
 def segment2GaitCycle(peaks, segment):
     cycles = []
     for i in range(0, len(peaks)-1):
-        cycle = segment[peaks[i]:peaks[i+1]+1]
-        cycles.append(cycle[np.newaxis, :, :])
+        cycle = segment[peaks[i]:peaks[i+1],:]
+        cycles.append(cycle)
     return cycles
 
 
@@ -304,11 +303,10 @@ def split_data_train_val_test_gait(data,
     id_for_user = []
 
     for user in np.unique(label_user):
-        idx_user = np.where(label_user == user)
-        data_for_user.append(data[idx_user])
-        label_for_user.append(label_user[idx_user])
+        data_for_user.append(data[np.where(label_user == user)])
+        label_for_user.append(label_user[np.where(label_user == user)])
         if method == 'window_based':
-            id_for_user.append(id_window[idx_user])
+            id_for_user.append(id_window[np.where(label_user == user)])
 
     train_data = []
     val_data = []
@@ -320,9 +318,9 @@ def split_data_train_val_test_gait(data,
     if method == 'cycle_based':
 
         for cycles, label in zip(data_for_user, label_for_user):
-
+            
             # to take random gait cycle from user
-            cycles = skutils.shuffle(cycles)
+            #cycles = skutils.shuffle(cycles)
             samples = cycles.shape[0]
 
             if samples <= 4:
@@ -365,6 +363,7 @@ def split_data_train_val_test_gait(data,
         # 70% train, 20% val, 10% test
         for cycles, labels, ID in zip(data_for_user, label_for_user, id_for_user):
 
+            cycles = skutils.shuffle(cycles)
             samples = cycles.shape[0]
 
             # take 90% of data for train
@@ -555,6 +554,7 @@ def find_peaks(peaks, data, gcLen, autocorr):
         peaks.remove(peaks[-1])
         
     # check if there a minimum next to detected peaks, take it if it's lower
+    '''
     thresh = 0.4 if autocorr else 0.2
     for i, peak in enumerate(peaks):
         idx = np.where(data[peak-int(thresh*gcLen):peak +
@@ -562,6 +562,7 @@ def find_peaks(peaks, data, gcLen, autocorr):
         idx = idx[0] + peak-int(thresh*gcLen)
         if len(idx) > 0:
             peaks[i] = idx[np.argmin(data[idx])]
+    '''
 
     # filter last two peaks
     if peaks[-1]-peaks[-2] < 0.3*gcLen:
@@ -572,7 +573,7 @@ def find_peaks(peaks, data, gcLen, autocorr):
     elif peaks[-1]-peaks[-2] > 1.5*gcLen:
         peaks.remove(peaks[-1])
 
-    if len(peaks) <= 4 or len(peaks)>30:
+    if len(peaks) <= 2 or len(peaks)>30:
         plot_peak = True
 
     return sorted(peaks), plot_peak

@@ -48,7 +48,7 @@ def ou_isir_process_cycle_based(
 
         if 'seq1' in f:
             lu_temp += 1
-
+    
     if denoise == True:
         # noise remove with Daubechies (db6) wavelet level 2
         print('Denoising data')
@@ -68,47 +68,47 @@ def ou_isir_process_cycle_based(
     data_gait_cycle = []
     label_user_cycle = []
     for peak, segment, user in zip(peaks, data_denoise, lu):
-        #peak = list(dict.fromkeys(peak))
         cycles = segment2GaitCycle(peak, segment)
         data_gait_cycle.extend(cycles)
-        label_user_cycle.extend([user for _ in range(len(peak)-1)])
+        label_user_cycle.extend([user]*(len(peak)-1))
 
     # spline interpolation to 120 samples for gait
     print('Interpolate cycle to 120 fixed sample')
     to_interp = 120
     cycles_interpolated = []
     for cycle, user in zip(data_gait_cycle, label_user_cycle):
-        interpolated = np.zeros((1, to_interp, cycle.shape[2]))
-        for dim in np.arange(cycle.shape[2]):
+        interpolated = np.zeros((to_interp, cycle.shape[1]))
+        for dim in np.arange(cycle.shape[1]):
             try:
-                interpolated[0, :, dim] = CubicSpline(np.arange(0, cycle.shape[1]), cycle[0, :, dim])(
-                    np.linspace(0, cycle.shape[1]-1, to_interp))
+                interpolated[:, dim] = CubicSpline(np.arange(0, cycle.shape[0]), cycle[:, dim])(
+                    np.linspace(0, cycle.shape[0]-1, to_interp))
             except:
-                print(cycle.shape)
+                print(f'User {user}')
+                sys.exit()
         if plot_interpolated:
             plt.figure(figsize=(12, 3))
             plt.style.use('seaborn-darkgrid')
             plt.subplot(1, 2, 1)
             plt.title(f'original user {user}')
             plt.plot(np.arange(cycle.shape[1]),
-                     cycle[0, :, 0], 'b-', label='noise')
+                     cycle[:, 0], 'b-', label='noise')
             plt.plot(np.arange(cycle.shape[1]),
-                     cycle[0, :, 1], 'r-', label='noise')
+                     cycle[:, 1], 'r-', label='noise')
             plt.plot(np.arange(cycle.shape[1]),
-                     cycle[0, :, 2], 'g-', label='noise')
+                     cycle[:, 2], 'g-', label='noise')
             plt.subplot(1, 2, 2)
             plt.title(f'interpolated user {user}')
             plt.plot(
-                np.arange(interpolated.shape[1]), interpolated[0, :, 0], 'b-', label='denoise')
+                np.arange(interpolated.shape[1]), interpolated[:, 0], 'b-', label='denoise')
             plt.plot(
-                np.arange(interpolated.shape[1]), interpolated[0, :, 1], 'r-', label='denoise')
+                np.arange(interpolated.shape[1]), interpolated[:, 1], 'r-', label='denoise')
             plt.plot(
-                np.arange(interpolated.shape[1]), interpolated[0, :, 2], 'g-', label='denoise')
+                np.arange(interpolated.shape[1]), interpolated[:, 2], 'g-', label='denoise')
             plt.tight_layout()
             plt.show()
         cycles_interpolated.append(interpolated)
 
-    cycles_interpolated = np.concatenate(cycles_interpolated, axis=0)
+    cycles_interpolated = np.asarray(cycles_interpolated)
 
     # compute magnitude
     print('Compute magnitude')

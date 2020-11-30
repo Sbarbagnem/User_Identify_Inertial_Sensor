@@ -25,12 +25,14 @@ class ResNet18SingleBranch(tf.keras.Model):
                                             strides=(1,1),
                                             padding="valid",
                                             kernel_regularizer=tf.keras.regularizers.l2,
+                                            name='conv2d_input'
                                             )
-        self.bn1 = tf.keras.layers.BatchNormalization()
+        self.bn1 = tf.keras.layers.BatchNormalization(name='bn_1')
         
         self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(3,1),
                                                strides=(2,1),
-                                               padding="valid")
+                                               padding="valid",
+                                               name='max_pool_1')
         
         # features about interaction between sensor
 
@@ -47,7 +49,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         if flatten:
             self.flatten = tf.keras.layers.Flatten()
         else:
-            self.flatten = tf.keras.layers.GlobalAveragePooling2D()
+            self.flatten = tf.keras.layers.GlobalAveragePooling2D(name='global_average_pooling')
 
         if self.fc:
             self.fc1 = tf.keras.layers.Dense(int(self.num_user*1.5), activation='relu')
@@ -94,6 +96,10 @@ class ResNet18SingleBranch(tf.keras.Model):
         else:
             return out_cnn
 
+    def build_graph(self, raw_shape):
+        x = tf.keras.layers.Input(shape=raw_shape)
+        return tf.keras.Model(inputs=[x], outputs=self.call(x))
+
 
 class BasicBlock(tf.keras.layers.Layer):
 
@@ -104,22 +110,25 @@ class BasicBlock(tf.keras.layers.Layer):
                                             strides=stride,
                                             padding='same',
                                             kernel_regularizer=tf.keras.regularizers.l2,
+                                            name='conv1'
                                             )
-        self.bn1 = tf.keras.layers.BatchNormalization()
+        self.bn1 = tf.keras.layers.BatchNormalization(name='bn1')
         self.conv2 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=1,
                                             padding="same",
                                             kernel_regularizer=tf.keras.regularizers.l2,
+                                            name='conv2'
                                             )
-        self.bn2 = tf.keras.layers.BatchNormalization()
+        self.bn2 = tf.keras.layers.BatchNormalization(name='bn2')
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
         if stride != 1 or kernel[0]!=1:
             self.downsample = tf.keras.Sequential()
             self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
                                                        kernel_size=(1, 1),
-                                                       strides=stride))
-            self.downsample.add(tf.keras.layers.BatchNormalization())
+                                                       strides=stride,
+                                                       name='conv_equal'))
+            self.downsample.add(tf.keras.layers.BatchNormalization(name='bn_equal'))
         # all'interno del blocco le dimensioni del residuo in input sono le stesse
         else:
             self.downsample = lambda x: x

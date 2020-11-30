@@ -131,6 +131,11 @@ if __name__ == '__main__':
         type=str2bool,
         default=False
     )
+    parser.add_argument(
+        '-augment_data',
+        '--augment_data',
+        type=str2bool
+    )
     args = parser.parse_args()
 
     # GPU settings
@@ -144,7 +149,10 @@ if __name__ == '__main__':
                     method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise, autocorr=args.autocorr)
     model.split_train_test(
         plot=args.plot_split, gait_2_cycles=args.gait_2_cycles, method=args.method, overlap=args.overlap, split=args.split)
+    model.augment_train_data()
     model.normalize_data()
+    if args.augment_data:
+        model.augment_train_data()
     model.create_tf_dataset(batch_size=args.batch_size)
     model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten,
                       summary=args.summary_model, name=args.model)
