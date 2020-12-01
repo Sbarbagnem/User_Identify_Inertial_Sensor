@@ -415,7 +415,6 @@ class ModelAuthentication():
                 print(f'Session {session}')
                 print(f'Gallery shape: {gallery.shape}')
                 print(f'Probe shape: {probe.shape}')
-                sys.exit()
                 # save gallery and probe in every session respectively
                 self.generate_save_feaures(
                     gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe, path_session)
