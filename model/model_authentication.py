@@ -140,7 +140,7 @@ class ModelAuthentication():
         '''
         # split data balance based on user and act
         data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
-            data, label_user, label_activities, id_window, train_size=0.8)
+            self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], train_size=0.8)
 
         print(
             f'Train window before delete overlap sequence: {data_train.shape[0]}')
