@@ -142,8 +142,7 @@ class ModelAuthentication():
             data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
                 self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], self.classifier['sessions'], train_size=0.8)            
 
-        print(
-            f'Train window before delete overlap sequence: {data_train.shape[0]}')
+        print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
         # delete overlap sequence
         if self.name_dataset.lower() == 'ouisir':
@@ -154,8 +153,8 @@ class ModelAuthentication():
         data_train = np.delete(data_train, invalid_idx, axis=0)
         label_user_train = np.delete(label_user_train, invalid_idx, axis=0)
 
-        print(
-            f'Train window after delete overlap sequence: {data_train.shape[0]}')
+        print(f'Train window after delete overlap sequence: {data_train.shape[0]}')
+        print(f'Validation set: {data_val.shape[0]}')
 
         self.train = data_train
         self.train_user = label_user_train
@@ -163,7 +162,7 @@ class ModelAuthentication():
         self.val_user = label_user_val
     
     def normalize_data(self):
-        self.train, self.val, _ = normalize_data(self.train, self.val)
+        self.train, self.val, _, self.mean, self.std = normalize_data(self.train, self.val, return_mean_std=True)
 
     def augment_train_data(self):
         if self.name_dataset.lower() == 'ouisir':
@@ -340,11 +339,17 @@ class ModelAuthentication():
         self.feature_extractor = best_seen['model']
 
     def save_model(self):
+
         print('Save model')
         self.feature_extractor.save_weights(
             self.path_save_model + self.name_model + '.h5')
 
+        print('Mean and std')
+        np.save(self.path_save_model + 'mean.npy', self.mean)
+        np.save(self.path_save_model + 'std.npy', self.std)
+
     def load_model(self):
+
         print('Load model')
         if self.name_dataset.lower() != 'ouisir':
             self.feature_extractor = resnet2D(
@@ -356,6 +361,10 @@ class ModelAuthentication():
         self.feature_extractor.load_weights(
             self.path_save_model + self.name_model + '.h5', by_name=True)
 
+        print('Load mean and std')
+        self.mean = np.load(self.path_save_model + 'mean.npy')
+        self.std = np.load(self.path_save_model + 'std.npy')
+
     def generate_features(self, split_probe_gallery=''):
 
         if not os.path.exists(self.path_data + 'gallery_probe/'):
@@ -363,19 +372,18 @@ class ModelAuthentication():
 
         path_probe_gallery = self.path_data + 'gallery_probe/'
 
-        # remove overlap between sequences ?
-        if self.name_dataset.lower() != 'ouisir':
-            self.auth['data'] = self.auth['data'][::2, :]
-            self.auth['user_label'] = self.auth['user_label'][::2]
-            self.auth['act_label'] = self.auth['act_label'][::2]
-            if 'sessions' in list(self.auth.keys()):
-                self.auth['sessions'] = self.auth['sessions'][::2]
+        # sort data based on id window (time sorted)
+        idx_sorted = np.argsort(self.auth['id'])
+        self.auth['data'] = self.auth['data'][idx_sorted]
+        self.auth['user_label'] = self.auth['user_label'][idx_sorted]
+        self.auth['act_label'] = self.auth['act_label'][idx_sorted]
+        self.auth['sessions'] = self.auth['sessions'][idx_sorted]
+        self.auth['id'] = self.auth['id'][idx_sorted]
+
+        if self.name_dataset.lower() == 'ouisir':
+            overlap = 75
         else:
-            self.auth['data'] = self.auth['data'][::3, :]
-            self.auth['user_label'] = self.auth['user_label'][::3]
-            self.auth['act_label'] = self.auth['act_label'][::3]
-            if 'sessions' in list(self.auth.keys()):
-                self.auth['sessions'] = self.auth['sessions'][::3]           
+            overlap = 50
 
         # case1: probe-gallery for every session
         if split_probe_gallery == 'intra_session':
@@ -399,13 +407,15 @@ class ModelAuthentication():
                 data = self.auth['data'][idx_session]
                 user_label = self.auth['user_label'][idx_session]
                 act_label = self.auth['act_label'][idx_session]
+                ID = self.auth['id'][idx_session]
                 # divide in two balanced subset (user-act)
                 gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe = self.balance_gallery_probe(
-                    data, user_label, act_label
+                    data, user_label, act_label, ID, overlap
                 )
                 print(f'Session {session}')
                 print(f'Gallery shape: {gallery.shape}')
                 print(f'Probe shape: {probe.shape}')
+                sys.exit()
                 # save gallery and probe in every session respectively
                 self.generate_save_feaures(
                     gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe, path_session)
@@ -433,7 +443,7 @@ class ModelAuthentication():
                 if not os.path.exists(path_probe_gallery + 'probe/'):
                     os.makedirs(path_probe_gallery + 'probe/')
                 gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe = self.balance_gallery_probe(
-                    self.auth['data'], self.auth['user_label'], self.auth['act_label'])
+                    self.auth['data'], self.auth['user_label'], self.auth['act_label'], self.auth['id'], overlap)
 
             print(f'Gallery shape: {gallery.shape}')
             print(f'Probe shape: {probe.shape}')
@@ -441,6 +451,10 @@ class ModelAuthentication():
                                        probe, user_label_probe, act_label_probe, path_probe_gallery)
 
     def generate_save_feaures(self, gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe, path_to_save):
+
+        # add normalization gallery and probe
+        gallery = (gallery - self.mean)/self.std
+        probe = (probe - self.mean)/self.std
 
         # extracts features
         print('Generate features')
@@ -459,6 +473,10 @@ class ModelAuthentication():
 
         gallery_feature = np.concatenate(gallery_feature, axis=0)
         probe_feature = np.concatenate(probe_feature, axis=0)
+
+        # l2 normalization on features
+        gallery_feature = self.normalize_feature_vector(gallery_feature)
+        probe_feature = self.normalize_feature_vector(probe_feature)
 
         print(f'Shape gallery feature{gallery_feature.shape}')
         print(f'Shape probe feature{probe_feature.shape}')
@@ -484,15 +502,6 @@ class ModelAuthentication():
             (features.shape[0], 1)), features.shape[1], axis=1)
 
         return features_normalized
-
-    def distance_to_prob(self, distances):
-        """
-        Transform distances into probabilities
-        """
-
-        probs = 1 - (distances/np.max(distances))
-
-        return probs
 
     def compute_distance_gallery_probe(self, split_gallery_probe, action_dependent=True, preprocess=False):
 
@@ -546,7 +555,7 @@ class ModelAuthentication():
                 gallery, user_gallery, act_gallery, probe, user_probe, act_probe)
             print(f'Shape gallery before processing {gallery.shape}')
 
-        # compute distances and evaluate eer based on action
+        # compute distances 
         if action_dependent:
             if not os.path.exists(os.path.join(path_to_save, 'action_dependent/')):
                 os.makedirs(os.path.join(
@@ -591,10 +600,10 @@ class ModelAuthentication():
         if split_gallery_probe == 'intra_session':
             for dir_session in os.listdir(path_distance_txt):
                 print(f'Session {dir_session.split("_")[1]}')
-                eer, thresh = self.eer(
+                _, _ = self.eer(
                     path_distance_txt + f'{dir_session}/', action_dependent)
         else:
-            eer, thresh = self.eer(path_distance_txt, action_dependent)
+            _, _ = self.eer(path_distance_txt, action_dependent)
 
     def eer(self, path_score_txt, action_dependent):
         path_save_eer = path_score_txt.split(
@@ -637,7 +646,12 @@ class ModelAuthentication():
 
         return eer, threshold
 
-    def balance_gallery_probe(self, data, users, activities):
+    def balance_gallery_probe(self, data, users, activities, id_window, overlap):
+
+        if overlap ==  75:
+            to_del = [1,2,3]
+        if overlap == 50:
+            to_del = [1]
 
         gallery = []
         probe = []
@@ -648,16 +662,31 @@ class ModelAuthentication():
 
         for user in np.unique(users):
             for act in np.unique(activities):
+
+                # filter for user and activity
                 idx = np.where((users == user) & (activities == act))
-                data_temp = np.array_split(data[idx], 2)
-                gallery.append(data_temp[0])
-                probe.append(data_temp[1])
+                samples = len(idx[0])
+                data_temp = data[idx]
+                id_temp = id_window[idx]
+
+                # split 50% gallery and 50% probe
+                gallery_temp = data_temp[:int(samples/2)]
+                gallery_id = id_temp[:int(samples/2)]
+                probe_temp = data_temp[int(samples/2):]
+                probe_id = id_temp[int(samples/2):]
+
+                # delete possible overlap between gallery and probe (delete from probe)
+                invalid_idx = delete_overlap(probe_id, gallery_id, to_del)
+                probe_temp = np.delete(probe_temp, invalid_idx, axis=0)             
+
+                gallery.append(gallery_temp)
+                probe.append(probe_temp)
                 users_gallery.extend(
-                    [user for _ in range(data_temp[0].shape[0])])
+                    [user for _ in range(gallery_temp.shape[0])])
                 users_probe.extend(
-                    [user for _ in range(data_temp[1].shape[0])])
-                act_gallery.extend([act for _ in range(data_temp[0].shape[0])])
-                act_probe.extend([act for _ in range(data_temp[1].shape[0])])
+                    [user for _ in range(probe_temp.shape[0])])
+                act_gallery.extend([act for _ in range(gallery_temp.shape[0])])
+                act_probe.extend([act for _ in range(probe_temp.shape[0])])
 
         gallery = np.expand_dims(np.concatenate(gallery, axis=0), 3)
         probe = np.expand_dims(np.concatenate(probe, axis=0), 3)

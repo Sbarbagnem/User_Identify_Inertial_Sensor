@@ -106,18 +106,25 @@ def split_balanced_data(lu, la, folders, di=None, log=True):
     return indexes
 
 
-def delete_overlap(train_id, val_id, distances_to_delete):
-    overlap_ID = np.empty([0], dtype=np.int32)
+def normalize_data(train, val, test=None, return_mean_std=False):
 
-    for distance in distances_to_delete:
-        overlap_ID = np.concatenate(
-            (overlap_ID, val_id+distance, val_id-distance))
+    mean = np.mean(np.reshape(train, [-1, train.shape[2]]), axis=0)
+    std = np.std(np.reshape(train, [-1, train.shape[2]]), axis=0)
 
-    overlap_ID = np.unique(overlap_ID)
-    invalid_idx = np.array([i for i in np.arange(
-        len(train_id)) if train_id[i] in overlap_ID])
+    train = (train - mean)/std
+    val = (val - mean)/std
 
-    return invalid_idx
+    train = np.expand_dims(train, 3)
+    val = np.expand_dims(val,  3)
+
+    if test is not None:
+        test = (test - mean)/std
+        test = np.expand_dims(test, 3)
+        
+    if return_mean_std:
+        return train, val, test, mean, std
+    else:
+        return train, val, test
 
 
 def to_delete(overlapping):
