@@ -135,8 +135,12 @@ class ModelAuthentication():
         """
         
         # split data balance based on user and act
-        data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
-            self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], train_size=0.8)
+        if 'sessions' not in self.classifier.keys():
+            data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], None, train_size=0.8)
+        else:
+            data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], self.classifier['sessions'], train_size=0.8)            
 
         print(
             f'Train window before delete overlap sequence: {data_train.shape[0]}')
@@ -697,7 +701,7 @@ class ModelAuthentication():
 
         return gallery, user_gallery, act_gallery, probe, user_probe, act_probe
 
-    def split_train_val_classifier(self, data, users, activities, id_window, train_size=0.8):
+    def split_train_val_classifier(self, data, users, activities, id_window, sessions, train_size=0.8):
 
         data_train = []
         data_val = []
@@ -708,17 +712,31 @@ class ModelAuthentication():
 
         for user in np.unique(users):
             for act in np.unique(activities):
-                idx = np.where((users == user) & (activities == act))
-                data_temp = data[idx]
-                user_temp = np.array(users)[idx]
-                id_temp = np.array(id_window)[idx]
-                train = int(len(data_temp)*train_size)
-                data_train.append(data_temp[:train])
-                data_val.append(data_temp[train:])
-                label_user_train.append(user_temp[:train])
-                label_user_val.append(user_temp[train:])
-                id_window_train.append(id_temp[:train])
-                id_window_val.append(id_temp[train:])
+                if sessions is None:
+                    idx = np.where((users == user) & (activities == act))
+                    data_temp = data[idx]
+                    user_temp = np.array(users)[idx]
+                    id_temp = np.array(id_window)[idx]
+                    train = int(len(data_temp)*train_size)
+                    data_train.append(data_temp[:train])
+                    data_val.append(data_temp[train:])
+                    label_user_train.append(user_temp[:train])
+                    label_user_val.append(user_temp[train:])
+                    id_window_train.append(id_temp[:train])
+                    id_window_val.append(id_temp[train:])
+                else:
+                    for session in np.unique(sessions):
+                        idx = np.where((users == user) & (activities == act) & (sessions == session))
+                        data_temp = data[idx]
+                        user_temp = np.array(users)[idx]
+                        id_temp = np.array(id_window)[idx]
+                        train = int(len(data_temp)*train_size)
+                        data_train.append(data_temp[:train])
+                        data_val.append(data_temp[train:])
+                        label_user_train.append(user_temp[:train])
+                        label_user_val.append(user_temp[train:])
+                        id_window_train.append(id_temp[:train])
+                        id_window_val.append(id_temp[train:])
 
         data_train = np.concatenate(data_train, axis=0)
         data_val = np.concatenate(data_val, axis=0)
