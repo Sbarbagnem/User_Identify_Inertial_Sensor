@@ -73,6 +73,11 @@ parser.add_argument(
     type=str,
     default=''
 )
+parser.add_argument(
+    '-augment_data',
+    '--augment_data',
+    type=str2bool
+)
 
 args = parser.parse_args()
 
@@ -93,14 +98,20 @@ action_dependent = args.action_dependent
 split_gallery_probe = args.split_gallery_probe
 preprocess_features = args.preprocess_features
 colab_path = args.colab_path
+augment_data = args.augment_data
 
 model = ModelAuthentication(path_data,name_dataset, name_model, colab_path)
 model.load_data()
 model.split_user()
 if train_classifier:
+    model.split_train_test_classifier()
+    if augment_data:
+        model.augment_train_data()
+    model.normalize_data()
     model.create_dataset_classifier()
     model.build_model()
     model.loss_opt_metric()
+    sys.exit()
     model.train_model(log=True)
     model.save_model()
 else:

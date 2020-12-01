@@ -130,7 +130,7 @@ class ModelAuthentication():
         print('{} window for evaluate authentication'.format(
             self.auth['data'].shape))
 
-    def create_dataset_classifier(self):
+    def split_train_test_classifier(self):
         """
         From numpy to tensorflow data to train. Divide data for train classifier in 80-20
         """
@@ -153,26 +153,49 @@ class ModelAuthentication():
         print(
             f'Train window after delete overlap sequence: {data_train.shape[0]}')
 
-        # normalize data
-        data_train, data_val, _ = normalize_data(data_train, data_val)
+        self.train = data_train
+        self.train_user = label_user_train
+        self.val = data_val
+        self.val_user = label_user_val
+    
+    def normalize_data(self):
+        self.train, self.val, _ = normalize_data(self.train, self.val)
 
+    def augment_train_data(self):
+        if self.name_dataset.lower() == 'ouisir':
+            print('Add gaussian noise')
+            data_noisy = np.empty_like(self.train)
+            label_noisy = self.train_user
+            for i,cycle in enumerate(data_noisy):
+                data_noisy[i,:,[0,1,2]] = (cycle[:,[0,1,2]] + np.random.normal(loc=0., scale=0.01, size=cycle[:,[0,1,2]].shape)).T
+                data_noisy[i,:,3] = np.sqrt(np.sum(np.power(data_noisy[i,:,[0,1,2]], 2), 0, keepdims=True)).T[:,0]
+
+            # scaling by a random value in range 0.7 and 1.1
+            print('Scaling data by random value in range 0.7 - 1.1')
+            data_scaling = np.empty_like(self.train)
+            label_scaling = self.train_user
+            for i,cycle in enumerate(data_scaling):
+                data_scaling[i,:,[0,1,2]] = (cycle[:,[0,1,2]] * ((0.4) * np.random.uniform(0, 1) + 0.7)).T
+                data_scaling[i,:,3] = np.sqrt(np.sum(np.power(data_scaling[i,:,[0,1,2]], 2), 0, keepdims=True)).T[:,0]       
+
+            self.train = np.concatenate((self.train, data_noisy, data_scaling), axis=0)
+            self.train_user = np.concatenate((self.train_user, label_noisy, label_scaling))
+            print(f'Shape train after augment: {self.train.shape[0]}')
+    
+    def create_dataset_classifier(self):
         # train
         train_tf = tf.data.Dataset.from_tensor_slices(
-            (data_train, label_user_train))
+            (self.train, self.train_user))
         train_tf = train_tf.shuffle(
-            buffer_size=data_train.shape[0], reshuffle_each_iteration=True)
+            buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
         self.train_tf = train_tf.batch(self.batch_size, drop_remainder=True)
 
         # val
-        val_tf = tf.data.Dataset.from_tensor_slices((data_val, label_user_val))
-        self.val_tf = val_tf.batch(data_val.shape[0])
-
-    def augment_data(self):
-        # TODO:
-        pass
+        val_tf = tf.data.Dataset.from_tensor_slices((self.val, self.val_user))
+        self.val_tf = val_tf.batch(self.val.shape[0])
 
     def build_model(self, stride=1, fc=False):
-        if self.name_dataset.lower != 'ouisir':
+        if self.name_dataset.lower() != 'ouisir':
             self.feature_extractor = resnet2D(
                 multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=stride, fc=fc, flatten=False)
         else:
@@ -180,7 +203,8 @@ class ModelAuthentication():
                 multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=2, fc=fc, flatten=False)
         self.feature_extractor.build(
             input_shape=(None, self.win_len, self.axis, 1))
-        self.feature_extractor.summary()
+        self.feature_extractor.build_graph(
+            (self.win_len, self.axis, 1)).summary()
 
     def loss_opt_metric(self):
         """
@@ -243,7 +267,7 @@ class ModelAuthentication():
         best_seen = {
             'epoch': 0,
             'loss': 10,
-            'model': None,
+            #'model': None,
             'time_not_improved': 0
         }
 
@@ -294,8 +318,12 @@ class ModelAuthentication():
             if self.metric_loss.result().numpy() < best_seen['loss']:
                 best_seen['loss'] = self.metric_loss.result().numpy()
                 best_seen['epoch'] = epoch
-                best_seen['model'] = self.feature_extractor
+                #best_seen['model'] = self.feature_extractor
                 best_seen['time_not_improved'] = 0
+                # save model is better
+                if epoch > 30:
+                    self.feature_extractor.save_weights(
+                        self.path_save_model + self.name_model + '.h5', overwrite=True)
             else:
                 best_seen['time_not_improved'] += 1
                 if best_seen['time_not_improved'] >= early_stop and epoch > 20:
@@ -309,8 +337,6 @@ class ModelAuthentication():
                     self.optimizer.learning_rate.assign(new_lr)
                     print(f'reduce learning rate on plateau to {new_lr}')
 
-        self.feature_extractor = best_seen['model']
-
     def save_model(self):
         print('Save model')
         self.feature_extractor.save_weights(
@@ -322,8 +348,8 @@ class ModelAuthentication():
             self.feature_extractor = resnet2D(
                 False, 0, self.num_user_classifier, feature_generator=True)
         else:
-             self.feature_extractor = resnet2D(
-                False, 0, self.num_user_classifier, stride=2, feature_generator=True)           
+            self.feature_extractor = resnet2D(
+                False, 0, self.num_user_classifier, stride=2, feature_generator=False)
         self.feature_extractor.build((None, self.win_len, self.axis, 1))
         self.feature_extractor.load_weights(
             self.path_save_model + self.name_model + '.h5', by_name=True)
@@ -440,6 +466,25 @@ class ModelAuthentication():
                 'probe/user_label_probe.npy', user_label_probe)
         np.save(path_to_save + 'probe/act_label_probe.npy', act_label_probe)
 
+    def normalize_feature_vector(self, features):
+        """
+        Normalize with L2 norm the features vectors
+        """
+
+        features_normalized = features / np.repeat(np.linalg.norm(features, ord=2, axis=1).reshape(
+            (features.shape[0], 1)), features.shape[1], axis=1)
+
+        return features_normalized
+
+    def distance_to_prob(self, distances):
+        """
+        Transform distances into probabilities
+        """
+
+        probs = 1 - (distances/np.max(distances))
+
+        return probs
+
     def compute_distance_gallery_probe(self, split_gallery_probe, action_dependent=True, preprocess=False):
 
         path_probe_gallery = os.path.join(
@@ -451,7 +496,8 @@ class ModelAuthentication():
 
         if split_gallery_probe == 'intra_session':
             for dir_session in os.listdir(path_probe_gallery):
-                path_session = os.path.join(path_probe_gallery, f'{dir_session}/')
+                path_session = os.path.join(
+                    path_probe_gallery, f'{dir_session}/')
                 path_distance_session = path_distance_txt + f'{dir_session}/'
                 if not os.path.exists(path_distance_session):
                     os.makedirs(path_distance_session)
@@ -459,14 +505,14 @@ class ModelAuthentication():
                 user_gallery = np.load(
                     path_session + 'gallery/user_label_gallery.npy')
                 act_gallery = np.load(path_session +
-                                    'gallery/act_label_gallery.npy')
+                                      'gallery/act_label_gallery.npy')
                 probe = np.load(path_session + 'probe/probe.npy')
                 user_probe = np.load(path_session +
-                                    'probe/user_label_probe.npy')
+                                     'probe/user_label_probe.npy')
                 act_probe = np.load(path_session +
                                     'probe/act_label_probe.npy')
                 self.compute_distance(gallery, user_gallery, act_gallery, probe,
-                                    user_probe, act_probe, preprocess, action_dependent, path_distance_session)
+                                      user_probe, act_probe, preprocess, action_dependent, path_distance_session)
         else:
             gallery = np.load(path_probe_gallery + 'gallery/gallery.npy')
             user_gallery = np.load(
@@ -536,12 +582,14 @@ class ModelAuthentication():
         if split_gallery_probe == 'intra_session':
             for dir_session in os.listdir(path_distance_txt):
                 print(f'Session {dir_session.split("_")[1]}')
-                eer, thresh = self.eer(path_distance_txt + f'{dir_session}/', action_dependent)
+                eer, thresh = self.eer(
+                    path_distance_txt + f'{dir_session}/', action_dependent)
         else:
             eer, thresh = self.eer(path_distance_txt, action_dependent)
 
     def eer(self, path_score_txt, action_dependent):
-        path_save_eer = path_score_txt.split('distance')[0] + 'eer' + path_score_txt.split('distance')[1]
+        path_save_eer = path_score_txt.split(
+            'distance')[0] + 'eer' + path_score_txt.split('distance')[1]
         if action_dependent:
             path_save_eer = path_save_eer + 'action_dependent/'
         else:
@@ -560,11 +608,13 @@ class ModelAuthentication():
                 label = score_txt[:, 1]
                 eer, threshold = calculate_eer(label, score, pos=0)
                 eers.append([act, eer*100])
-                print('Act {} EER: {:.3f} Trhesh: {:.3f}'.format(act, eer*100, threshold))
+                print('Act {} EER: {:.3f} Trhesh: {:.3f}'.format(
+                    act, eer*100, threshold))
             # save result
             with open(f"{path_save_eer}eer.txt", "w") as f:
                 for el in eers:
-                    f.write('{} EER: {:.3f}%\n'.format(mapping_act_label(self.name_dataset.lower())[el[0]], el[1]))
+                    f.write('{} EER: {:.3f}%\n'.format(mapping_act_label(
+                        self.name_dataset.lower())[el[0]], el[1]))
         else:
             score_txt = np.loadtxt(
                 path_score_txt + 'action_independent/distance.txt')
@@ -575,7 +625,7 @@ class ModelAuthentication():
             # save result
             with open(f"{path_save_eer}eer.txt", "w") as f:
                 f.write('EER: {:.3f}%'.format(eer*100))
-        
+
         return eer, threshold
 
     def balance_gallery_probe(self, data, users, activities):
@@ -613,12 +663,12 @@ class ModelAuthentication():
     def process_feature(self, gallery, user_gallery, act_gallery, probe, user_probe, act_probe):
 
         # mean 0 variance 1
+
         _mean = np.mean(gallery, axis=0)
         _std = np.std(gallery, axis=0)
-        gallery = (gallery - _mean) / _std 
+        gallery = (gallery - _mean) / _std
         probe = (probe - _mean) / _std
 
-        '''
         # PCA for dimension reduction ?
         #pca = PCA()
         pca = KernelPCA(kernel='rbf', gamma=0.0001)
@@ -640,7 +690,7 @@ class ModelAuthentication():
 
         gallery = gallery_pca[:, :20]
         probe = probe_pca[:, :20]
-        '''
+
         return gallery, user_gallery, act_gallery, probe, user_probe, act_probe
 
     def split_train_val_classifier(self, data, users, activities, id_window, train_size=0.8):
