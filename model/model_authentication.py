@@ -133,11 +133,7 @@ class ModelAuthentication():
         """
         From numpy to tensorflow data to train. Divide data for train classifier in 80-20
         """
-        # shuffle data
-        '''
-        data, label_user, label_activities, id_window = skutils.shuffle(
-            self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'])
-        '''
+        
         # split data balance based on user and act
         data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
             self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], train_size=0.8)
@@ -649,8 +645,7 @@ class ModelAuthentication():
         for user in np.unique(users):
             for act in np.unique(activities):
                 idx = np.where((users == user) & (activities == act))
-                data_user_act = skutils.shuffle(data[idx])
-                data_temp = np.array_split(data_user_act, 2)
+                data_temp = np.array_split(data[idx], 2)
                 gallery.append(data_temp[0])
                 probe.append(data_temp[1])
                 users_gallery.extend(
