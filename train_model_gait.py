@@ -134,7 +134,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '-augment_data',
         '--augment_data',
-        type=str2bool
+        type=str2bool,
+        default=False
     )
     args = parser.parse_args()
 
