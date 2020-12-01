@@ -363,7 +363,7 @@ def split_data_train_val_test_gait(data,
         # 70% train, 20% val, 10% test
         for cycles, labels, ID in zip(data_for_user, label_for_user, id_for_user):
 
-            cycles = skutils.shuffle(cycles)
+            cycles, ID = skutils.shuffle(cycles, ID)
             samples = cycles.shape[0]
 
             # take 90% of data for train
