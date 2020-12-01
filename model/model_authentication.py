@@ -353,10 +353,8 @@ class ModelAuthentication():
             self.feature_extractor = resnet2D(
                 False, 0, self.num_user_classifier, stride=2, feature_generator=False)
         self.feature_extractor.build((None, self.win_len, self.axis, 1))
-        '''
         self.feature_extractor.load_weights(
             self.path_save_model + self.name_model + '.h5', by_name=True)
-        '''
 
     def generate_features(self, split_probe_gallery=''):
 
