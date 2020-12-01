@@ -70,8 +70,7 @@ class ModelAuthentication():
         self.auth = dict.fromkeys(list(self.data_dict.keys()))
 
         # divide based on gender if given
-        # if 'gender' in list(self.data_dict.keys()):
-        if False:
+        if 'gender' in list(self.data_dict.keys()):
             male = np.unique(
                 self.data_dict['user_label'][np.where(self.data_dict['gender'] == 0)])
             female = np.unique(
