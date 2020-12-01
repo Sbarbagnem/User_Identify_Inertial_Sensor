@@ -111,7 +111,6 @@ if train_classifier:
     model.create_dataset_classifier()
     model.build_model()
     model.loss_opt_metric()
-    sys.exit()
     model.train_model(log=True)
     model.save_model()
 else:
