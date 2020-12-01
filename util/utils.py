@@ -106,25 +106,18 @@ def split_balanced_data(lu, la, folders, di=None, log=True):
     return indexes
 
 
-def normalize_data(train, val, test=None, return_mean_std=False):
+def delete_overlap(train_id, val_id, distances_to_delete):
+    overlap_ID = np.empty([0], dtype=np.int32)
 
-    mean = np.mean(np.reshape(train, [-1, train.shape[2]]), axis=0)
-    std = np.std(np.reshape(train, [-1, train.shape[2]]), axis=0)
+    for distance in distances_to_delete:
+        overlap_ID = np.concatenate(
+            (overlap_ID, val_id+distance, val_id-distance))
 
-    train = (train - mean)/std
-    val = (val - mean)/std
+    overlap_ID = np.unique(overlap_ID)
+    invalid_idx = np.array([i for i in np.arange(
+        len(train_id)) if train_id[i] in overlap_ID])
 
-    train = np.expand_dims(train, 3)
-    val = np.expand_dims(val,  3)
-
-    if test is not None:
-        test = (test - mean)/std
-        test = np.expand_dims(test, 3)
-        
-    if return_mean_std:
-        return train, val, test, mean, std
-    else:
-        return train, val, test
+    return invalid_idx
 
 
 def to_delete(overlapping):
@@ -419,7 +412,7 @@ def split_data_train_val_test_gait(data,
 
     return train_data, val_data, test_data, train_label, val_label, test_label
 
-def normalize_data(train, val, test=None):
+def normalize_data(train, val, test=None, return_mean_std=False):
 
     mean = np.mean(np.reshape(train, [-1, train.shape[2]]), axis=0)
     std = np.std(np.reshape(train, [-1, train.shape[2]]), axis=0)
@@ -434,7 +427,10 @@ def normalize_data(train, val, test=None):
         test = (test - mean)/std
         test = np.expand_dims(test, 3)
         
-    return train, val, test
+    if not return_mean_std:
+        return train, val, test
+    else:
+        return train, val, test, mean, std
 
 ############################################
 ### From paper Data Augmentation for gait ##
