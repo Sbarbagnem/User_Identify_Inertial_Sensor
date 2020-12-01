@@ -78,6 +78,11 @@ parser.add_argument(
     '--augment_data',
     type=str2bool
 )
+parser.add_argument(
+    '-load_model',
+    '--load_model',
+    type=str2bool
+)
 
 args = parser.parse_args()
 
@@ -99,6 +104,7 @@ split_gallery_probe = args.split_gallery_probe
 preprocess_features = args.preprocess_features
 colab_path = args.colab_path
 augment_data = args.augment_data
+load_model = args.load_model
 
 model = ModelAuthentication(path_data,name_dataset, name_model, colab_path)
 model.load_data()
@@ -113,7 +119,7 @@ if train_classifier:
     model.loss_opt_metric()
     model.train_model(log=True)
     model.save_model()
-else:
+if load_model:
     model.load_model()
 if generate_features:
     model.generate_features(split_gallery_probe)

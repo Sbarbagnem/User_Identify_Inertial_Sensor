@@ -146,7 +146,11 @@ class ModelAuthentication():
             f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
         # delete overlap sequence
-        invalid_idx = delete_overlap(id_window_train, id_window_val, [1])
+        if self.name_dataset.lower() == 'ouisir':
+            distance_to_delete = [1,2,3]
+        else:
+            distance_to_delete = [1]
+        invalid_idx = delete_overlap(id_window_train, id_window_val, distance_to_delete)
         data_train = np.delete(data_train, invalid_idx, axis=0)
         label_user_train = np.delete(label_user_train, invalid_idx, axis=0)
 
@@ -267,7 +271,7 @@ class ModelAuthentication():
         best_seen = {
             'epoch': 0,
             'loss': 10,
-            #'model': None,
+            'model': None,
             'time_not_improved': 0
         }
 
@@ -318,12 +322,8 @@ class ModelAuthentication():
             if self.metric_loss.result().numpy() < best_seen['loss']:
                 best_seen['loss'] = self.metric_loss.result().numpy()
                 best_seen['epoch'] = epoch
-                #best_seen['model'] = self.feature_extractor
+                best_seen['model'] = self.feature_extractor
                 best_seen['time_not_improved'] = 0
-                # save model is better
-                if epoch > 30:
-                    self.feature_extractor.save_weights(
-                        self.path_save_model + self.name_model + '.h5', overwrite=True)
             else:
                 best_seen['time_not_improved'] += 1
                 if best_seen['time_not_improved'] >= early_stop and epoch > 20:
@@ -336,6 +336,8 @@ class ModelAuthentication():
                         break
                     self.optimizer.learning_rate.assign(new_lr)
                     print(f'reduce learning rate on plateau to {new_lr}')
+
+        self.feature_extractor = best_seen['model']
 
     def save_model(self):
         print('Save model')
@@ -362,11 +364,18 @@ class ModelAuthentication():
         path_probe_gallery = self.path_data + 'gallery_probe/'
 
         # remove overlap between sequences ?
-        self.auth['data'] = self.auth['data'][::2, :]
-        self.auth['user_label'] = self.auth['user_label'][::2]
-        self.auth['act_label'] = self.auth['act_label'][::2]
-        if 'sessions' in list(self.auth.keys()):
-            self.auth['sessions'] = self.auth['sessions'][::2]
+        if self.name_dataset.lower() != 'ouisir':
+            self.auth['data'] = self.auth['data'][::2, :]
+            self.auth['user_label'] = self.auth['user_label'][::2]
+            self.auth['act_label'] = self.auth['act_label'][::2]
+            if 'sessions' in list(self.auth.keys()):
+                self.auth['sessions'] = self.auth['sessions'][::2]
+        else:
+            self.auth['data'] = self.auth['data'][::3, :]
+            self.auth['user_label'] = self.auth['user_label'][::3]
+            self.auth['act_label'] = self.auth['act_label'][::3]
+            if 'sessions' in list(self.auth.keys()):
+                self.auth['sessions'] = self.auth['sessions'][::3]           
 
         # case1: probe-gallery for every session
         if split_probe_gallery == 'intra_session':
