@@ -452,8 +452,8 @@ class ModelAuthentication():
     def generate_save_feaures(self, gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe, path_to_save):
 
         # add normalization gallery and probe
-        gallery = (gallery - self.mean)/self.std
-        probe = (probe - self.mean)/self.std
+        gallery = np.expand_dims(((gallery[:,:,:,0] - self.mean)/self.std), 3)
+        probe = np.expand_dims(((probe[:,:,:,0] - self.mean)/self.std), 3)
 
         # extracts features
         print('Generate features')
