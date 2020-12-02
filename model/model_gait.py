@@ -55,6 +55,9 @@ class ModelGait():
             self.data = self.data[idx]
             self.label = self.label[idx]
             self.num_user = np.unique(self.label).shape[0]
+            if method == 'window_based':
+                self.id = self.id[idx]
+                self.sessions = self.sessions[idx]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
     def split_train_test(self, method='cycle_based', overlap=None, split=None):
