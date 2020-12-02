@@ -290,23 +290,10 @@ def segment2GaitCycle(peaks, segment):
 def split_data_train_val_test_gait(data,
                                    label_user,
                                    id_window,
-                                   train_gait=8,
-                                   val_test=0.5,
-                                   gait_2_cycles=False,
-                                   method='cycle_based',
-                                   plot=False,
-                                   overlap=None,
-                                   split='standard'):
-
-    data_for_user = []
-    label_for_user = []
-    id_for_user = []
-
-    for user in np.unique(label_user):
-        data_for_user.append(data[np.where(label_user == user)])
-        label_for_user.append(label_user[np.where(label_user == user)])
-        if method == 'window_based':
-            id_for_user.append(id_window[np.where(label_user == user)])
+                                   sessions,
+                                   method,
+                                   overlap,
+                                   split):
 
     train_data = []
     val_data = []
@@ -316,92 +303,113 @@ def split_data_train_val_test_gait(data,
     test_label = []
 
     if method == 'cycle_based':
+        for user in np.unique(label_user):
+            # 8 gait cycles for train for every user
+            train_gait = 8
 
-        for cycles, label in zip(data_for_user, label_for_user):
-            
-            # to take random gait cycle from user
-            #cycles = skutils.shuffle(cycles)
-            samples = cycles.shape[0]
+            # filter for user
+            idx = np.where(label_user == user)
+            data_temp = data[idx]
+            user_temp = label_user[idx]
 
-            if samples <= 4:
-                print(f'There only {samples} cycles for user {label[0]}')
+            # shuffle cycles to take random between first and second session
+            data_temp, user_temp = skutils.shuffle(data_temp, user_temp)
 
-            if gait_2_cycles:
-                train_gait = int(samples*0.7)
+            samples = data_temp.shape[0]
 
-            if split == 'standard':
-                train_gait = int(samples*0.7)
-                val_gait = int(samples*0.2)
-                if samples < 10 and samples >= 4:
-                    train_gait = samples - 2    
-                    val_gait = int((samples - train_gait)/2)        
-                   
-
-            elif split == 'paper':
+            # split cycles based on paper, 8 gait for train, 0.5 of remain for val and 0.5 for test
+            if split == 'paper':
+                # to have at least one sample for every user in train, val and test
                 if samples < 10:
                     train_gait = samples - 2
-
-                val_gait = int((samples - train_gait)/2)
+                    val_gait = 1
+                else:
+                    val_gait = round((samples - train_gait)/2)
+            # split cycles in a standard way 70% train, 20% val and 10% test
+            else:
+                if samples <= 5:
+                    train_gait = samples - 2
+                    val_gait = 1
+                else:
+                    train_gait = round(samples*0.7)
+                    val_gait = round(samples*0.2)                
 
             # train
-            train_data.append(cycles[:train_gait])
-            train_label.extend(label[:train_gait])
+            train_data.append(data_temp[:train_gait])
+            train_label.extend(user_temp[:train_gait])
 
             # val
-            val_data.append(
-                cycles[train_gait:val_gait+train_gait])
-            val_label.extend(
-                label[train_gait:val_gait+train_gait])
+            val_data.append(data_temp[train_gait:val_gait+train_gait])
+            val_label.extend(user_temp[train_gait:val_gait+train_gait])
 
             # test
-            test_data.append(cycles[val_gait+train_gait:])
-            test_label.extend(label[val_gait+train_gait:])
+            test_data.append(data_temp[val_gait+train_gait:])
+            test_label.extend(user_temp[val_gait+train_gait:])
 
     elif method == 'window_based':
+
         if overlap == None:
             raise Exception('Overlap must not be empty for window base method')
+
+        if overlap == 50:
+            distances_to_delete = [1]
+        elif overlap == 75:
+            distances_to_delete = [1, 2, 3]
+
         # 70% train, 20% val, 10% test
-        for cycles, labels, ID in zip(data_for_user, label_for_user, id_for_user):
+        for user in np.unique(label_user):
+            for session in np.unique(sessions):
 
-            samples = cycles.shape[0]
+                idx = np.where((label_user == user) & (sessions == session))
+                data_temp = data[idx]
+                user_temp = label_user[idx]
+                id_temp = id_window[idx]
 
-            # take 90% of data for train
-            train_percentage = int(samples*0.9)
-            train = [cycles[:train_percentage],
-                     labels[:train_percentage],
-                     ID[:train_percentage]]
+                # number of window for user and session, in train, val and test
+                samples = data_temp.shape[0]
+                train_val_percentage = round(samples*0.9)
+                if train_val_percentage == samples:
+                    train_val_percentage -= 1
 
-            # take 10% of data for test
-            test_percentage = samples - train_percentage
-            test = [cycles[train_percentage:train_percentage+test_percentage],
-                    labels[train_percentage:train_percentage+test_percentage],
-                    ID[train_percentage:train_percentage+test_percentage]]
+                # train_val
+                train = data_temp[:train_val_percentage]
+                user_train = user_temp[:train_val_percentage]
+                id_train = id_temp[:train_val_percentage]
 
-            # delete overlap between train and test
-            if overlap == 50:
-                distances_to_delete = [1]
-            elif overlap == 75:
-                distances_to_delete = [1, 2, 3]
-            overlap_idx = delete_overlap(
-                train[2], test[2], distances_to_delete)
-            train[0] = np.delete(train[0], overlap_idx, axis=0)
-            train[1] = np.delete(train[1], overlap_idx, axis=0)
+                # test
+                test = data_temp[train_val_percentage:]
+                user_test = user_temp[train_val_percentage:]
+                id_test = id_temp[train_val_percentage:]
 
-            # split train in train and val (78%, 22%)
-            x_train, x_val, y_train, y_val = train_test_split(
-                train[0], train[1], test_size=0.22)
+                # delete overlap sequence between train and test
+                overlap_idx = delete_overlap(
+                    id_train, id_test, distances_to_delete)
+                train_temp = np.delete(train, overlap_idx, axis=0)
+                user_train_temp = np.delete(user_train, overlap_idx, axis=0)
+                #id_train_temp = np.delete(id_train, overlap_idx, axis=0)
+                
+                # split train in train and val
+                train_percentage = round(train_temp.shape[0] * 0.8)
+                if train_percentage == train_temp.shape[0]:
+                    train_percentage -= 1
+                train = train_temp[:train_percentage]
+                user_train = user_train_temp[:train_percentage]
+                #id_train = id_train_temp[:train_percentage]
+                val = train_temp[train_percentage:]
+                user_val = user_train_temp[train_percentage:]
+                #id_val = id_train_temp[train_percentage:]
 
-            # train
-            train_data.append(x_train)
-            train_label.extend(y_train)
+                # train
+                train_data.append(train)
+                train_label.extend(user_train)
 
-            # val
-            val_data.append(x_val)
-            val_label.extend(y_val)
+                # val
+                val_data.append(val)
+                val_label.extend(user_val)
 
-            # test
-            test_data.append(test[0])
-            test_label.extend(test[1])
+                # test
+                test_data.append(test)
+                test_label.extend(user_test)
 
     train_data = np.concatenate(train_data, axis=0)
     val_data = np.concatenate(val_data, axis=0)

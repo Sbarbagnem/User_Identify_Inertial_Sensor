@@ -22,25 +22,24 @@ class ModelGait():
         self.num_user = config['ouisir']['NUM_CLASSES_USER']
         self.best_model = None
 
-    def load_data(self, denoise, filter_num_user=None, gait_2_cycles=False, method='cycle_based', window_len=100, overlap=50, autocorr=False):
+    def load_data(self, denoise, filter_num_user=None, method='cycle_based', window_len=100, overlap=50, autocorr=False):
 
         if method == 'cycle_based':
             if denoise:
                 self.path_data = self.path_data + 'cycle_based/denoise/'
             else:
                 self.path_data = self.path_data + 'cycle_based/no_denoise/'
-            self.id = None
             if autocorr:
                 self.path_data = self.path_data + 'autocorr/'
             else:
                 self.path_data = self.path_data + 'no_autocorr/'
+            self.id = None
+            self.sessions = None
         elif method == 'window_based':
             self.path_data = self.path_data + \
                 f'window_based/{window_len}/{overlap}/'
             self.id = np.load(self.path_data + 'id.npy')
-
-        if gait_2_cycles:
-            self.path_data += 'gait_2_cycles/'
+            self.sessions = np.load(self.path_data + 'sessions.npy')
 
         self.data = np.load(self.path_data + 'data.npy')
         self.label = np.load(self.path_data + 'user_label.npy')
@@ -58,10 +57,14 @@ class ModelGait():
             self.num_user = np.unique(self.label).shape[0]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
-    def split_train_test(self, train_gait=8, val_test=0.5, gait_2_cycles=False, plot=False, method='cycle_based', overlap=None, split=None):
+    def split_train_test(self, method='cycle_based', overlap=None, split=None):
 
-        self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-            self.data, self.label, self.id, train_gait, val_test, gait_2_cycles, method, plot, overlap, split)
+        if method == 'cycle_based':
+            self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
+                data=self.data, label_user=self.label, id_window=None, sessions=None, method=method, overlap=None, split=split)
+        else:
+            self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
+                data=self.data, label_user=self.label, id_window=self.id, sessions=self.sessions, method=method, overlap=overlap, split=None)
 
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')

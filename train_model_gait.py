@@ -86,18 +86,6 @@ if __name__ == '__main__':
         type=str2bool
     )
     parser.add_argument(
-        '-plot_split',
-        '--plot_split',
-        type=str2bool,
-        default=False
-    )
-    parser.add_argument(
-        '-gait_2_cycles',
-        '--gait_2_cycles',
-        type=str2bool,
-        default=False
-    )
-    parser.add_argument(
         '-method',
         '--method',
         type=str,
@@ -146,10 +134,8 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(gpu, True)
 
     model = ModelGait(config, args.colab_path)
-    model.load_data(filter_num_user=args.filter_num_user, gait_2_cycles=args.gait_2_cycles,
-                    method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise, autocorr=args.autocorr)
-    model.split_train_test(
-        plot=args.plot_split, gait_2_cycles=args.gait_2_cycles, method=args.method, overlap=args.overlap, split=args.split)
+    model.load_data(filter_num_user=args.filter_num_user,method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise, autocorr=args.autocorr)
+    model.split_train_test(method=args.method, overlap=args.overlap, split=args.split)
     if args.augment_data:
         model.augment_train_data()
     model.normalize_data()
