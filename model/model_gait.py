@@ -81,19 +81,10 @@ class ModelGait():
         data_noisy = np.empty_like(self.train)
         label_noisy = self.train_label
         for i,cycle in enumerate(data_noisy):
-            data_noisy[i,:,[0,1,2]] = (cycle[:,[0,1,2]] + np.random.normal(loc=0., scale=0.01, size=cycle[:,[0,1,2]].shape)).T
-            data_noisy[i,:,3] = np.sqrt(np.sum(np.power(data_noisy[i,:,[0,1,2]], 2), 0, keepdims=True)).T[:,0]
-        
-        # scaling by a random value in range 0.7 and 1.1
-        print('Scaling data by random value in range 0.7 - 1.1')
-        data_scaling = np.empty_like(self.train)
-        label_scaling = self.train_label
-        for i,cycle in enumerate(data_scaling):
-            data_scaling[i,:,[0,1,2]] = (cycle[:,[0,1,2]] * ((0.4) * np.random.uniform(0, 1) + 0.7)).T
-            data_scaling[i,:,3] = np.sqrt(np.sum(np.power(data_scaling[i,:,[0,1,2]], 2), 0, keepdims=True)).T[:,0]       
+            data_noisy[i,:,:] = cycle + np.random.normal(loc=0., scale=0.01, size=cycle.shape)
 
-        self.train = np.concatenate((self.train, data_noisy, data_scaling), axis=0)
-        self.train_label = np.concatenate((self.train_label, label_noisy, label_scaling))
+        self.train = np.concatenate((self.train, data_noisy), axis=0)
+        self.train_label = np.concatenate((self.train_label, label_noisy))
         print(f'Shape train after augment: {self.train.shape[0]}')
 
     def normalize_data(self):
