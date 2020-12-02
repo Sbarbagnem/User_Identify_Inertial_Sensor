@@ -365,6 +365,9 @@ def split_data_train_val_test_gait(data,
                 user_temp = label_user[idx]
                 id_temp = id_window[idx]
 
+                # shuffle for random pick
+                data_temp, user_temp, id_temp = skutils.shuffle(data_temp, user_temp, id_temp)
+
                 # number of window for user and session, in train, val and test
                 samples = data_temp.shape[0]
                 train_val_percentage = round(samples*0.9)
