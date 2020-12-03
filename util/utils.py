@@ -424,7 +424,9 @@ def split_data_train_val_test_gait(data,
     val_label = np.asarray(val_label)
     test_label = np.asarray(test_label)
 
-    train_data, val_data, test_data, train_label, val_label, test_label = skutils.shuffle(train_data, val_data, test_data, train_label, val_label, test_label)
+    train_data, train_label = skutils.shuffle(train_data, train_label)
+    val_data, val_label = skutils.shuffle(val_data, val_label)
+    test_data, test_label = skutils.shuffle(test_data, test_label)
 
     return train_data, val_data, test_data, train_label, val_label, test_label
 
