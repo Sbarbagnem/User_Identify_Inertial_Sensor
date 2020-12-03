@@ -81,22 +81,22 @@ class ResNet18SingleBranch(tf.keras.Model):
         #print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
         #print('shape res_2: {}'.format(x.shape))
-        out_cnn = self.flatten(x)
-        #print('shape avg_pool: {}'.format(out_cnn.shape))
+        x = self.flatten(x)
+        #print('shape avg_pool: {}'.format(x.shape))
         if self.fc:
-            out_cnn = self.fc1(out_cnn)
-            out_cnn = self.drop(out_cnn, training=training)
-            #print('shape dense: {}'.format(out_cnn.shape))
+            x = self.fc1(x)
+            x = self.drop(x, training=training)
+            #print('shape dense: {}'.format(x.shape))
         if not self.feature_generator:
             if self.multi_task:
-                output_activity = self.fc_activity(out_cnn)
-                output_user = self.fc_user(out_cnn)
+                output_activity = self.fc_activity(x)
+                output_user = self.fc_user(x)
                 return output_activity, output_user
             else:
-                output_user = self.fc_user(out_cnn)
+                output_user = self.fc_user(x)
                 return output_user
         else:
-            return out_cnn
+            return x
 
     def build_graph(self, raw_shape):
         x = tf.keras.layers.Input(shape=raw_shape)
