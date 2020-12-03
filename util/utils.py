@@ -227,11 +227,14 @@ def smooth(coef):
     return y
 
 
-def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, gcLen=None):
+def detectGaitCycle(data, denoised, plot_peak=False, plot_auto_corr_coeff=False, gcLen=None):
 
     selected_data = data[:,2] # z axis
     autocorr = False if gcLen != None else True
-    t = 0.4
+    if not denoised:
+        t = 0.5
+    else:
+        t = 0.2
 
     peaks = find_thresh_peak(selected_data, t)
 
@@ -304,8 +307,6 @@ def split_data_train_val_test_gait(data,
 
     if method == 'cycle_based':
         for user in np.unique(label_user):
-            # 8 gait cycles for train for every user
-            train_gait = 8
 
             # filter for user
             idx = np.where(label_user == user)
@@ -319,6 +320,8 @@ def split_data_train_val_test_gait(data,
 
             # split cycles based on paper, 8 gait for train, 0.5 of remain for val and 0.5 for test
             if split == 'paper':
+                # gait cycle for train
+                train_gait = 8
                 # to have at least one sample for every user in train, val and test
                 if samples < 10:
                     train_gait = samples - 2
@@ -487,6 +490,7 @@ def denoiseData(data, plot=False):
 
 
 def calAutoCorrelation(data):
+    
     n = len(data)
     autocorrelation_coeff = np.zeros(n)
     autocorrelation_coeff[0] = np.sum(data[:]**2)/n
@@ -501,7 +505,48 @@ def calAutoCorrelation(data):
 
 
 def find_peaks(peaks, data, gcLen, autocorr):
+    
+    # find first possible peak to start search
+    first_peak = [peaks[0]]
+    for i,_ in enumerate(peaks[:-1]):
+        if abs(peaks[i] - peaks[i+1]) <= 0.2*gcLen:
+            first_peak.append(peaks[i+1])
+        else:
+            break
+    first_peak = peaks.index(first_peak[np.argmin(data[first_peak])])
 
+    # splice peaks from first possible detected peak
+    peaks = peaks[first_peak:]
+
+    # neighbour search of minimum at given gcLen from the first peak 87 40
+    peak_filtered = [peaks[0]]
+    i = 0
+    while i < len(peaks[:-1])-1:
+        peak_cluster = []
+        j = 1
+        while i + j < len(peaks):
+            if abs(peaks[i] - peaks[i + j]) > 1.1*gcLen:
+                break
+            if abs(peaks[i] - peaks[i + j]) <= 1.1*gcLen and abs(peaks[i] - peaks[i + j]) >= 0.6*gcLen:
+                peak_cluster.append(peaks[i + j])
+            j += 1
+        if i + j >= len(peaks) and peak_cluster == []:
+            break
+        if peak_cluster == []:
+            j = 1
+            while i + j < len(peaks):
+                if abs(peaks[i] - peaks[i + j]) > 1.6*gcLen:
+                    break
+                if abs(peaks[i] - peaks[i + j]) <= 1.6*gcLen and abs(peaks[i] - peaks[i + j]) >= 0.6*gcLen:
+                    peak_cluster.append(peaks[i + j])
+                j += 1
+        if peak_cluster == []:
+            break
+        min_peak = peak_cluster[np.argmin(data[peak_cluster])]
+        peak_filtered.append(min_peak)
+
+        i = peaks.index(min_peak)
+    '''
     alpha = 0.25  # 0.25
     beta = 0.75   # 0.75
     gamma = 0.2  # 0.16
@@ -565,7 +610,8 @@ def find_peaks(peaks, data, gcLen, autocorr):
     
     if peaks[-1]-peaks[-2] < 0.5*gcLen:
         peaks.remove(peaks[-1])
-        
+    
+    '''
     # check if there a minimum next to detected peaks, take it if it's lower
     '''
     thresh = 0.4 if autocorr else 0.2
@@ -576,7 +622,7 @@ def find_peaks(peaks, data, gcLen, autocorr):
         if len(idx) > 0:
             peaks[i] = idx[np.argmin(data[idx])]
     '''
-
+    '''
     # filter last two peaks
     if peaks[-1]-peaks[-2] < 0.3*gcLen:
         if peaks[-1] < peaks[-2]:
@@ -588,8 +634,9 @@ def find_peaks(peaks, data, gcLen, autocorr):
 
     if len(peaks) <= 2 or len(peaks)>30:
         plot_peak = True
-
-    return sorted(peaks), plot_peak
+    '''
+    #return sorted(peaks), False
+    return peak_filtered, False
 
 
 def find_gcLen(data):
@@ -605,17 +652,28 @@ def find_gcLen(data):
     peak_auto_corr = []
     gcLen = 0
     flag = 0
-    #mean_auto_corr = np.mean(auto_corr_coeff)
-    #std_auto_corr = np.std(auto_corr_coeff)
+    mean_auto_corr = np.mean(auto_corr_coeff[:200])
+    std_auto_corr = np.std(auto_corr_coeff[:200])
     for i in range(1, 200):
         if auto_corr_coeff[i] > auto_corr_coeff[i-1] and \
-           auto_corr_coeff[i] > auto_corr_coeff[i+1]: #and \
-           #auto_corr_coeff[i] > (mean_auto_corr + std_auto_corr*0.4):
+           auto_corr_coeff[i] > auto_corr_coeff[i+1] and \
+           auto_corr_coeff[i] > (mean_auto_corr + std_auto_corr*0.4):
             flag += 1
             peak_auto_corr.append(i)
             if flag == 2:
                 gcLen = i - 1
                 break
+    
+    if gcLen == 0:
+        flag = 0
+        for i in range(1, 200):
+            if auto_corr_coeff[i] > auto_corr_coeff[i-1] and \
+            auto_corr_coeff[i] > auto_corr_coeff[i+1]:
+                flag += 1
+                peak_auto_corr.append(i)
+                if flag == 2:
+                    gcLen = i - 1
+                    break        
 
     return gcLen, auto_corr_coeff, peak_auto_corr
 

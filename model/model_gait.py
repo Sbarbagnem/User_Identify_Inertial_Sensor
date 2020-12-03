@@ -92,6 +92,7 @@ class ModelGait():
             self.train, self.val, self.test)
 
     def create_tf_dataset(self, batch_size=128):
+
         # train
         train_tf = tf.data.Dataset.from_tensor_slices((self.train, self.train_label))
         train_tf = train_tf.shuffle(buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
@@ -99,11 +100,13 @@ class ModelGait():
 
         # val
         val_tf = tf.data.Dataset.from_tensor_slices((self.val, self.val_label))
-        self.val_tf = val_tf.batch(self.val.shape[0])
+        #self.val_tf = val_tf.batch(self.val.shape[0])
+        self.val_tf = val_tf.shuffle(buffer_size=self.val.shape[0]).batch(batch_size, drop_remainder=True)
 
         # test
         test_tf = tf.data.Dataset.from_tensor_slices((self.test, self.test_label))
-        self.test_tf = test_tf.batch(self.test.shape[0])
+        #self.test_tf = test_tf.batch(self.test.shape[0])
+        self.test_tf = test_tf.shuffle(buffer_size=self.test.shape[0]).batch(batch_size, drop_remainder=True)
 
     def build_model(self, stride, fc, flatten, summary=False, name='our'):
         if name == 'our':
