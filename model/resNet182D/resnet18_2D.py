@@ -53,6 +53,7 @@ class ResNet18SingleBranch(tf.keras.Model):
 
         if self.fc:
             self.fc1 = tf.keras.layers.Dense(int(self.num_user*1.5), activation='relu')
+            self.drop = tf.keras.layers.Dropout(0.3)
 
         if not self.feature_generator:
             if multi_task:
@@ -84,6 +85,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         #print('shape avg_pool: {}'.format(out_cnn.shape))
         if self.fc:
             out_cnn = self.fc1(out_cnn)
+            out_cnn = self.drop(out_cnn, train=training)
             #print('shape dense: {}'.format(out_cnn.shape))
         if not self.feature_generator:
             if self.multi_task:
