@@ -424,6 +424,8 @@ def split_data_train_val_test_gait(data,
     val_label = np.asarray(val_label)
     test_label = np.asarray(test_label)
 
+    train_data, val_data, test_data, train_label, val_label, test_label = skutils.shuffle(train_data, val_data, test_data, train_label, val_label, test_label)
+
     return train_data, val_data, test_data, train_label, val_label, test_label
 
 def normalize_data(train, val, test=None, return_mean_std=False):
