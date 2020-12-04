@@ -40,7 +40,7 @@ def ou_isir_process_cycle_based(
 
         # read only acc data
         df = pd.read_csv(path_data + '/' + f, header=None,
-                         skiprows=2, usecols=[3, 4, 5])
+                         skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python')
 
         # stack data and label user
         data.append(df.values)
@@ -53,7 +53,9 @@ def ou_isir_process_cycle_based(
         # noise remove with Daubechies (db6) wavelet level 2
         print('Denoising data')
         data_denoise = denoiseData(data, plot_denoise)
+        denoised = True
     else:
+        denoised = False
         data_denoise = data
 
     # compute peak gait cycle on data denoise
@@ -61,7 +63,7 @@ def ou_isir_process_cycle_based(
     peaks = []
     for d in tqdm(data_denoise):
         peaks.append(detectGaitCycle(
-            d, plot_peak, plot_auto_corr_coeff, gcLen))
+            d, denoised, plot_peak, plot_auto_corr_coeff, gcLen))
 
     # divide original data in gait cycle based on peak position found
     print('Split segment in gayt cycles')
@@ -138,34 +140,45 @@ def ou_isir_process_window_based(
     # define variables
     data = []
     lu = []
+    sessions = []
     lu_temp = 0
-    ID = []
-    id_temp = 0
+
     # read files
     print('Read csv file')
     for f in tqdm(os.listdir(path_data)):
 
+        if 'seq0' in f:
+            sess_temp = 0
+        else:
+            sess_temp = 1
+
         # read only acc data
         df = pd.read_csv(path_data + '/' + f, header=None,
-                         skiprows=2, usecols=[3, 4, 5])
+                         skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python')
 
         # stack data and label user
         data.append(df.values)
         lu.append(lu_temp)
+        sessions.append(sess_temp)
 
         if 'seq1' in f:
             lu_temp += 1
 
+    # define list to save
     data_windows = []
     label_user = []
+    ID = []
+    sessions_window = []
+    id_temp=  0
 
     print('Sliding window')
-    for signal, user in zip(data, lu):
-        windows = sliding_window(signal, (window_len, 3), (stride, 1))
+    for signal, user, session in zip(data, lu, sessions):
+        windows = sliding_window(signal, (window_len, signal.shape[1]), (stride, 1))
         data_windows.append(windows)
-        label_user.extend([user]*(len(windows)))
+        label_user.extend([user]*len(windows))
         # to del overlap sequence between train and test
         ID.extend(np.arange(id_temp, id_temp + len(windows)))
+        sessions_window.extend([session]*len(windows))
         id_temp = id_temp + len(windows) + 10
 
     data_windows = np.concatenate(data_windows, axis=0)
@@ -182,6 +195,7 @@ def ou_isir_process_window_based(
     np.save(path_out + '/data', data_windows)
     np.save(path_out + '/user_label', label_user)
     np.save(path_out + '/id.npy', ID)
+    np.save(path_out + '/sessions.npy', sessions_window)
 
 
 def realdisp_process(
@@ -843,7 +857,8 @@ if __name__ == '__main__':
         '-authentication',
         '--authentication',
         type=str2bool,
-        help='read data for authentication, it doesn\'t split data in 10 fold'
+        help='read data for authentication, it doesn\'t split data in 10 fold',
+        default=False
     )
 
     # for realdisp dataset
@@ -979,6 +994,10 @@ if __name__ == '__main__':
                         gcLen=args.gcLen
                     )
                 elif args.method == 'window_based':
+                    if args.authentication:
+                        path_out=f'../data/authentication/OUISIR_window_based/{args.window_len}/{int(args.overlap[0]*100)}/'
+                    else:
+                        path_out=f'../data/datasets/OUISIR_processed/window_based/{args.window_len}/{int(args.overlap[0]*100)}/'
                     ou_isir_process_window_based(
                         path_data='../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
                         path_out=f'../data/datasets/OUISIR_processed/window_based/{args.window_len}/{int(args.overlap[0]*100)}/',
