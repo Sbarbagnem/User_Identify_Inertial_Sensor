@@ -7,8 +7,6 @@ from pprint import pprint
 from sklearn import utils as skutils
 from sklearn.model_selection import train_test_split
 import math
-
-from scipy.signal import find_peaks as find_peaks_scipy
 from sklearn.preprocessing import scale as scale_sklearn
 
 
@@ -232,55 +230,47 @@ def detectGaitCycle(data, denoised, plot_peak=False, plot_auto_corr_coeff=False,
     selected_data = data[:,2] # z axis
     autocorr = False if gcLen != None else True
     if not denoised:
-        t = 0.5
+        t = 0.0
     else:
-        t = 0.2
+        t = 0.0
 
     peaks = find_thresh_peak(selected_data, t)
 
     # compute gcLen based on autocorrelation of signal if not given by default
-    if autocorr:
-        gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(selected_data)
-        if plot_auto_corr_coeff:
-            plt.figure(figsize=(12, 3))
-            plt.style.use('seaborn-darkgrid')
-            plt.plot(np.arange(len(auto_corr_coeff)), auto_corr_coeff, 'b-')
-            plt.scatter(peak_auto_corr, auto_corr_coeff[peak_auto_corr], c='red')
-            plt.tight_layout()
-            plt.show()
+    gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(selected_data)
+    if plot_auto_corr_coeff:
+        plt.figure(figsize=(12, 3))
+        plt.style.use('seaborn-darkgrid')
+        plt.plot(np.arange(len(auto_corr_coeff)), auto_corr_coeff, 'b-')
+        plt.scatter(peak_auto_corr, auto_corr_coeff[peak_auto_corr], c='red')
+        plt.tight_layout()
+        plt.show()
 
-    peaks, to_plot = find_peaks(peaks, selected_data, gcLen, autocorr)
+    peaks, _ = find_peaks(peaks, selected_data, gcLen, autocorr)
 
-    selected_data_scale = scale_sklearn(selected_data, axis=0, with_mean=True, with_std=True)
-    peaks_scipy, _ = find_peaks_scipy(np.negative(selected_data_scale), height=np.mean(np.negative(selected_data)) + 0.5*np.std(np.negative(selected_data)), distance=gcLen*0.7)
+    if not autocorr:
+        peaks = peaks[::2]
 
-    if plot_peak or to_plot: 
+    if plot_peak: 
         plt.figure(figsize=(12, 3))
 
-        plt.subplot(3,1,1)
+        plt.subplot(2,1,1)
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(data.shape[0]), data[:,0], 'g-', label='x')
         plt.plot(np.arange(data.shape[0]), data[:,1], 'r-', label='y')
         plt.plot(np.arange(data.shape[0]), data[:,2], 'b-', label='z')
         plt.legend(loc='upper right')
 
-        plt.subplot(3,1,2)
+        plt.subplot(2,1,2)
         plt.style.use('seaborn-darkgrid')
         plt.plot(np.arange(selected_data.shape[0]), selected_data, 'b-', label='z')
         plt.vlines(peaks, ymin=min(selected_data), ymax=max(selected_data), color='black', ls='dotted')
         plt.legend(loc='upper right')
 
-        plt.subplot(3,1,3)
-        plt.style.use('seaborn-darkgrid')
-        plt.plot(np.arange(selected_data_scale.shape[0]), selected_data_scale, 'b-', label='z')
-        plt.vlines(peaks_scipy, ymin=min(selected_data_scale), ymax=max(selected_data_scale), color='red', ls='--')
-        plt.legend(loc='upper right')
-
         plt.tight_layout()
         plt.show()
 
-    return peaks_scipy
-    #return peaks
+    return peaks
 
 def segment2GaitCycle(peaks, segment):
     cycles = []
@@ -361,61 +351,62 @@ def split_data_train_val_test_gait(data,
 
         # 70% train, 20% val, 10% test
         for user in np.unique(label_user):
-            for session in np.unique(sessions):
+            #for session in np.unique(sessions):
 
-                idx = np.where((label_user == user) & (sessions == session))
-                data_temp = data[idx]
-                user_temp = label_user[idx]
-                id_temp = id_window[idx]
+            #idx = np.where((label_user == user) & (sessions == session))
+            idx = np.where(label_user == user)
+            data_temp = data[idx]
+            user_temp = label_user[idx]
+            id_temp = id_window[idx]
 
-                # shuffle for random pick
-                data_temp, user_temp, id_temp = skutils.shuffle(data_temp, user_temp, id_temp)
+            # shuffle for random pick
+            data_temp, user_temp, id_temp = skutils.shuffle(data_temp, user_temp, id_temp)
 
-                # number of window for user and session, in train, val and test
-                samples = data_temp.shape[0]
-                train_val_percentage = round(samples*0.9)
-                if train_val_percentage == samples:
-                    train_val_percentage -= 1
+            # number of window for user and session, in train, val and test
+            samples = data_temp.shape[0]
+            train_val_percentage = round(samples*0.9)
+            if train_val_percentage == samples:
+                train_val_percentage -= 1
 
-                # train_val
-                train = data_temp[:train_val_percentage]
-                user_train = user_temp[:train_val_percentage]
-                id_train = id_temp[:train_val_percentage]
+            # train_val
+            train = data_temp[:train_val_percentage]
+            user_train = user_temp[:train_val_percentage]
+            id_train = id_temp[:train_val_percentage]
 
-                # test
-                test = data_temp[train_val_percentage:]
-                user_test = user_temp[train_val_percentage:]
-                id_test = id_temp[train_val_percentage:]
+            # test
+            test = data_temp[train_val_percentage:]
+            user_test = user_temp[train_val_percentage:]
+            id_test = id_temp[train_val_percentage:]
 
-                # delete overlap sequence between train and test
-                overlap_idx = delete_overlap(
-                    id_train, id_test, distances_to_delete)
-                train_temp = np.delete(train, overlap_idx, axis=0)
-                user_train_temp = np.delete(user_train, overlap_idx, axis=0)
-                #id_train_temp = np.delete(id_train, overlap_idx, axis=0)
-                
-                # split train in train and val
-                train_percentage = round(train_temp.shape[0] * 0.8)
-                if train_percentage == train_temp.shape[0]:
-                    train_percentage -= 1
-                train = train_temp[:train_percentage]
-                user_train = user_train_temp[:train_percentage]
-                #id_train = id_train_temp[:train_percentage]
-                val = train_temp[train_percentage:]
-                user_val = user_train_temp[train_percentage:]
-                #id_val = id_train_temp[train_percentage:]
+            # delete overlap sequence between train and test
+            overlap_idx = delete_overlap(
+                id_train, id_test, distances_to_delete)
+            train_temp = np.delete(train, overlap_idx, axis=0)
+            user_train_temp = np.delete(user_train, overlap_idx, axis=0)
+            #id_train_temp = np.delete(id_train, overlap_idx, axis=0)
+            
+            # split train in train and val
+            train_percentage = int(train_temp.shape[0] * 0.8)
+            if train_percentage == train_temp.shape[0]:
+                train_percentage -= 1
+            train = train_temp[:train_percentage]
+            user_train = user_train_temp[:train_percentage]
+            #id_train = id_train_temp[:train_percentage]
+            val = train_temp[train_percentage:]
+            user_val = user_train_temp[train_percentage:]
+            #id_val = id_train_temp[train_percentage:]
 
-                # train
-                train_data.append(train)
-                train_label.extend(user_train)
+            # train
+            train_data.append(train)
+            train_label.extend(user_train)
 
-                # val
-                val_data.append(val)
-                val_label.extend(user_val)
+            # val
+            val_data.append(val)
+            val_label.extend(user_val)
 
-                # test
-                test_data.append(test)
-                test_label.extend(user_test)
+            # test
+            test_data.append(test)
+            test_label.extend(user_test)
 
     train_data = np.concatenate(train_data, axis=0)
     val_data = np.concatenate(val_data, axis=0)
@@ -525,7 +516,7 @@ def find_peaks(peaks, data, gcLen, autocorr):
     # neighbour search of minimum at given gcLen from the first peak 87 40
     peak_filtered = [peaks[0]]
     i = 0
-    while i < len(peaks[:-1])-1:
+    while i < len(peaks[:-1]):
         peak_cluster = []
         j = 1
         while i + j < len(peaks):
@@ -545,11 +536,27 @@ def find_peaks(peaks, data, gcLen, autocorr):
                     peak_cluster.append(peaks[i + j])
                 j += 1
         if peak_cluster == []:
+            j = 1
+            while i + j < len(peaks):
+                if abs(peaks[i] - peaks[i + j]) > 2.5*gcLen:
+                    break
+                if abs(peaks[i] - peaks[i + j]) <= 2.5*gcLen and abs(peaks[i] - peaks[i + j]) >= 0.6*gcLen:
+                    peak_cluster.append(peaks[i + j])
+                j += 1
+        if peak_cluster == []:
             break
         min_peak = peak_cluster[np.argmin(data[peak_cluster])]
         peak_filtered.append(min_peak)
 
         i = peaks.index(min_peak)
+
+    # check on first-second peak distance, and least two peaks distance
+    if abs(peak_filtered[0] - peak_filtered[1]) > 1.2*gcLen:
+        peak_filtered = peak_filtered[1:]
+    if abs(peak_filtered[-1] - peak_filtered[-2]) > 1.2*gcLen:
+        peak_filtered = peak_filtered[:-1]
+
+
     '''
     alpha = 0.25  # 0.25
     beta = 0.75   # 0.75
@@ -639,8 +646,13 @@ def find_peaks(peaks, data, gcLen, autocorr):
     if len(peaks) <= 2 or len(peaks)>30:
         plot_peak = True
     '''
+
+    if len(peak_filtered) < 5 or len(peak_filtered) > 15:
+        to_plot = True
+    else:
+        to_plot = False
     #return sorted(peaks), False
-    return peak_filtered, False
+    return peak_filtered, to_plot
 
 
 def find_gcLen(data):
