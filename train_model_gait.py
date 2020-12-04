@@ -125,6 +125,16 @@ if __name__ == '__main__':
         type=str2bool,
         default=False
     )
+    parser.add_argument(
+        '-methods_aug',
+        '--methods_aug',
+        type=str,
+        nargs='+',
+        default=[],
+        help='methods to apply in data augmentation',
+        choices=['gaussian_noise', 'scaling'],
+        required=False)
+        
     args = parser.parse_args()
 
     # GPU settings
@@ -137,7 +147,7 @@ if __name__ == '__main__':
     model.load_data(filter_num_user=args.filter_num_user,method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise, autocorr=args.autocorr)
     model.split_train_test(method=args.method, overlap=args.overlap, split=args.split)
     if args.augment_data:
-        model.augment_train_data()
+        model.augment_train_data(methods=args.methods_aug)
     model.normalize_data()
     model.create_tf_dataset(batch_size=args.batch_size)
     model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten,

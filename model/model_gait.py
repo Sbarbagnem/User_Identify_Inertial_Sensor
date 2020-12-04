@@ -73,18 +73,36 @@ class ModelGait():
         print(f'{self.val.shape[0]} gait cycles for val')
         print(f'{self.test.shape[0]} gait cycles for test')
 
-    def augment_train_data(self):
-
+    def augment_train_data(self, methods):
+ 
         print(f'Shape train before augment: {self.train.shape[0]}')
+        data_aug = []
+        label_aug = []
 
-        print('Add gaussian noise')
-        data_noisy = np.empty_like(self.train)
-        label_noisy = self.train_label
-        for i,cycle in enumerate(data_noisy):
-            data_noisy[i,:,:] = cycle + np.random.normal(loc=0., scale=0.01, size=cycle.shape)
+        if 'gaussian_noise' in methods:
+            print('Add gaussian noise')
+            data_noisy = np.empty_like(self.train)
+            label_noisy = self.train_label
+            for i,cycle in enumerate(self.train):
+                data_noisy[i,:,[0,1,2]] = (cycle[:,[0,1,2]] + np.random.normal(loc=0., scale=0.01, size=cycle[:,[0,1,2]].shape)).T
+                data_noisy[i,:,-1] = np.sqrt(np.sum(np.power(data_noisy[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
+            data_aug.extend(data_noisy)
+            label_aug.extend(label_noisy)
 
-        self.train = np.concatenate((self.train, data_noisy), axis=0)
-        self.train_label = np.concatenate((self.train_label, label_noisy))
+        if 'scaling' in methods:
+            print('Scaling data by random value in range 0.7 - 1.1')
+            data_scaling = np.empty_like(self.train)
+            label_scaling = self.train_label
+            for i,cycle in enumerate(self.train):
+                data_scaling[i,:,[0,1,2]] = (cycle[:,[0,1,2]] * ((0.4) * np.random.uniform(0, 1) + 0.7)).T
+                data_scaling[i,:,-1] = np.sqrt(np.sum(np.power(data_scaling[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
+            data_aug.extend(data_scaling)
+            label_aug.extend(label_scaling)
+
+        data_aug = np.asarray(data_aug)
+
+        self.train = np.concatenate((self.train, data_aug), axis=0)
+        self.train_label = np.concatenate((self.train_label, label_aug))
         print(f'Shape train after augment: {self.train.shape[0]}')
 
     def normalize_data(self):
