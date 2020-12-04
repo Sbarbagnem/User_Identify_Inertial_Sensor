@@ -100,13 +100,11 @@ class ModelGait():
 
         # val
         val_tf = tf.data.Dataset.from_tensor_slices((self.val, self.val_label))
-        #self.val_tf = val_tf.batch(self.val.shape[0])
-        self.val_tf = val_tf.shuffle(buffer_size=self.val.shape[0]).batch(batch_size, drop_remainder=True)
+        self.val_tf = val_tf.batch(self.val.shape[0])
 
         # test
         test_tf = tf.data.Dataset.from_tensor_slices((self.test, self.test_label))
-        #self.test_tf = test_tf.batch(self.test.shape[0])
-        self.test_tf = test_tf.shuffle(buffer_size=self.test.shape[0]).batch(batch_size, drop_remainder=True)
+        self.test_tf = test_tf.batch(self.test.shape[0])
 
     def build_model(self, stride, fc, flatten, summary=False, name='our'):
         if name == 'our':
