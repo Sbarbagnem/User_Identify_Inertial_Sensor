@@ -29,15 +29,15 @@ class ModelAuthentication():
         else:
             self.path_save_model = f'{colab_path}saved_model/{name_dataset}/'
             self.path_data = colab_path + path_data
-        self.batch_size = 128
+        if name_dataset.lower() == 'ouisir':
+            self.batch_size = 64
+        else:
+            self.batch_size = 128
         self.init_lr = 0.001
         self.epochs = 100
         self.name_model = name_model
         self.best_model = None
         self.name_dataset = name_dataset
-
-        if name_dataset.lower() == 'ouisir':
-            self.batch_size = 64
 
         if not os.path.exists(self.path_save_model):
             os.makedirs(self.path_save_model)
@@ -148,10 +148,12 @@ class ModelAuthentication():
         print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
         # delete overlap sequence
+        '''
         if self.name_dataset.lower() == 'ouisir':
             distance_to_delete = [1,2,3]
         else:
-            distance_to_delete = [1]
+        '''
+        distance_to_delete = [1]
         invalid_idx = delete_overlap(id_window_train, id_window_val, distance_to_delete)
         data_train = np.delete(data_train, invalid_idx, axis=0)
         label_user_train = np.delete(label_user_train, invalid_idx, axis=0)
@@ -383,10 +385,8 @@ class ModelAuthentication():
         self.auth['sessions'] = self.auth['sessions'][idx_sorted]
         self.auth['id'] = self.auth['id'][idx_sorted]
 
-        if self.name_dataset.lower() == 'ouisir':
-            overlap = 75
-        else:
-            overlap = 50
+
+        overlap = 50
 
         # case1: probe-gallery for every session
         if split_probe_gallery == 'intra_session':
@@ -752,31 +752,17 @@ class ModelAuthentication():
 
         for user in np.unique(users):
             for act in np.unique(activities):
-                if sessions is None:
-                    idx = np.where((users == user) & (activities == act))
-                    data_temp = data[idx]
-                    user_temp = np.array(users)[idx]
-                    id_temp = np.array(id_window)[idx]
-                    train = int(len(data_temp)*train_size)
-                    data_train.append(data_temp[:train])
-                    data_val.append(data_temp[train:])
-                    label_user_train.append(user_temp[:train])
-                    label_user_val.append(user_temp[train:])
-                    id_window_train.append(id_temp[:train])
-                    id_window_val.append(id_temp[train:])
-                else:
-                    for session in np.unique(sessions):
-                        idx = np.where((users == user) & (activities == act) & (sessions == session))
-                        data_temp = data[idx]
-                        user_temp = np.array(users)[idx]
-                        id_temp = np.array(id_window)[idx]
-                        train = int(len(data_temp)*train_size)
-                        data_train.append(data_temp[:train])
-                        data_val.append(data_temp[train:])
-                        label_user_train.append(user_temp[:train])
-                        label_user_val.append(user_temp[train:])
-                        id_window_train.append(id_temp[:train])
-                        id_window_val.append(id_temp[train:])
+                idx = np.where((users == user) & (activities == act))
+                data_temp = data[idx]
+                user_temp = np.array(users)[idx]
+                id_temp = np.array(id_window)[idx]
+                train = int(len(data_temp)*train_size)
+                data_train.append(data_temp[:train])
+                data_val.append(data_temp[train:])
+                label_user_train.append(user_temp[:train])
+                label_user_val.append(user_temp[train:])
+                id_window_train.append(id_temp[:train])
+                id_window_val.append(id_temp[train:])
 
         data_train = np.concatenate(data_train, axis=0)
         data_val = np.concatenate(data_val, axis=0)
