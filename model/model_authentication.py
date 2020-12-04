@@ -49,6 +49,9 @@ class ModelAuthentication():
             if Path(f'{self.path_data}{key}.npy').is_file():
                 data_dict[key] = np.load(f'{self.path_data}{key}.npy')
 
+        if self.name_dataset.lower() in 'ouisir':
+            data_dict['act_label'] = np.zeros_like(data_dict['id']) 
+
         # remove key with None value
         self.data_dict = {k: v for k, v in data_dict.items() if v is not None}
         if 'gender' not in self.data_dict.keys():
@@ -501,6 +504,15 @@ class ModelAuthentication():
             (features.shape[0], 1)), features.shape[1], axis=1)
 
         return features_normalized
+
+    def distance_prob(self, distance):
+        """
+        From distance to prob, after this pos in eer is 1
+        """
+
+        distance = 1 - (distance/np.max(distance))
+
+        return distance
 
     def compute_distance_gallery_probe(self, split_gallery_probe, action_dependent=True, preprocess=False):
 
