@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sn
 import sys
+import random
 from pprint import pprint
 
 from model.resNet182D.resnet18_2D import resnet18
@@ -75,66 +76,36 @@ class ModelGait():
         print(f'{self.test.shape[0]} gait cycles for test')
 
     def augment_train_data(self, methods):
+
+        functions = {
+            'jitter': jitter,
+            'scaling': scaling,
+            'magntiude_warp': magnitude_warp,
+            'time_warp': time_warp,
+            'random_sampling': random_sampling,
+            'permutation': permutation 
+        }
  
         print(f'Shape train before augment: {self.train.shape[0]}')
-        data_aug = []
-        label_aug = []
 
-        if 'gaussian_noise' in methods:
-            print('Add gaussian noise')
-            data_noisy = np.empty_like(self.train)
-            label_noisy = self.train_label
-            for i,cycle in enumerate(self.train):
-                data_noisy[i,:,[0,1,2]] = (cycle[:,[0,1,2]] + np.random.normal(loc=0., scale=0.01, size=cycle[:,[0,1,2]].shape)).T
-                data_noisy[i,:,-1] = np.sqrt(np.sum(np.power(data_noisy[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
-            data_aug.extend(data_noisy)
-            label_aug.extend(label_noisy)
+        data_aug = np.empty_like(self.train)
+        label_aug = self.train_label
+        for i,cycle in enumerate(self.train):
+            random_func = random.sample(list(functions.keys()), 3)
+            data_aug[i,:,[0,1,2]] = self.apply_aug_function(cycle[:,[0,1,2]], random_func, functions).T
+            data_aug[i,:,-1] = np.sqrt(np.sum(np.power(data_aug[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
 
-        if 'scaling' in methods:
-            print('Scaling data by random value in range 0.7 - 1.1')
-            data_scaling = np.empty_like(self.train)
-            label_scaling = self.train_label
-            for i,cycle in enumerate(self.train):
-                data_scaling[i,:,[0,1,2]] = (cycle[:,[0,1,2]] * ((0.4) * np.random.uniform(0, 1) + 0.7)).T
-                data_scaling[i,:,-1] = np.sqrt(np.sum(np.power(data_scaling[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
-            data_aug.extend(data_scaling)
-            label_aug.extend(label_scaling)
-
-        if 'magnitude_warp' in methods:
-            print('Applying magnitude warp')
-            data_magn_warp = np.empty_like(self.train)
-            label_magn_warp = self.train_label
-            for i,cycle in enumerate(self.train):
-                data_magn_warp[i,:,[0,1,2]] = magnitude_warp(cycle[:,[0,1,2]]).T
-                data_magn_warp[i,:,-1] = np.sqrt(np.sum(np.power(data_magn_warp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
-            data_aug.extend(data_magn_warp)
-            label_aug.extend(label_magn_warp)
-
-        if 'time_warp' in methods:
-            print('Applying time warp')
-            data_time_warp = np.empty_like(self.train)
-            label_time_warp = self.train_label
-            for i,cycle in enumerate(self.train):
-                data_time_warp[i,:,[0,1,2]] = time_warp(cycle[:,[0,1,2]]).T
-                data_time_warp[i,:,-1] = np.sqrt(np.sum(np.power(data_time_warp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
-            data_aug.extend(data_time_warp)
-            label_aug.extend(label_time_warp)
-
-        if 'time_magnitude_warp' in methods:
-            print('Applying time and magnitude warp on same sequence')
-            data_magnitude_time_warp = np.empty_like(self.train)
-            label_magnitude_time_warp = self.train_label
-            for i,cycle in enumerate(self.train):
-                data_magnitude_time_warp[i,:,[0,1,2]] = magnitude_warp(time_warp(cycle[:,[0,1,2]])).T
-                data_magnitude_time_warp[i,:,-1] = np.sqrt(np.sum(np.power(data_magnitude_time_warp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
-            data_aug.extend(data_magnitude_time_warp)
-            label_aug.extend(label_magnitude_time_warp)
-
-        data_aug = np.asarray(data_aug)
 
         self.train = np.concatenate((self.train, data_aug), axis=0)
         self.train_label = np.concatenate((self.train_label, label_aug))
         print(f'Shape train after augment: {self.train.shape[0]}')
+
+    def apply_aug_function(self, x, index_f, funcs):
+        f1 = funcs[index_f[0]]
+        f2 = funcs[index_f[1]]
+        f3 = funcs[index_f[2]]
+        x = f3(f2(f1(x)))
+        return x
 
     def normalize_data(self):
         self.train, self.val, self.test = normalize_data(

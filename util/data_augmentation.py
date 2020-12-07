@@ -41,8 +41,12 @@ def jitter(x, sigma=0.1):
     return x + np.random.normal(loc=0., scale=sigma, size=x.shape)
 
 def scaling(x, sigma=0.1): 
-    scalingFactor = np.random.normal(loc=1.0, scale=sigma, size=(1,x.shape[2])) # shape=(1,3)
-    myNoise = np.matmul(np.ones((x.shape[1],1)), scalingFactor)
+    if x.ndim == 3:
+        scalingFactor = np.random.normal(loc=1.0, scale=sigma, size=(1,x.shape[2])) # shape=(1,3)
+        myNoise = np.matmul(np.ones((x.shape[1],1)), scalingFactor)
+    else:
+        scalingFactor = np.random.normal(loc=1.0, scale=sigma, size=(1,x.shape[1]))
+        myNoise = np.matmul(np.ones((x.shape[0],1)), scalingFactor)
     return x*myNoise
 
 def magnitude_warp(x, sigma=0.2):
@@ -68,17 +72,26 @@ def time_warp(x, sigma=0.2):
         return X_new
 
 def rotation(x):
-    x = x[0,:,:]
+    flag = False
+    if x.ndim == 3:
+        x = x[0,:,:]
+        flag = True
     n_sensor = x.shape[1] / 3
     original_sensor = np.split(x, n_sensor, axis=1)
     for axis,sensor in zip(np.arange(0,x.shape[1],3), original_sensor):
         axis_temp = np.random.uniform(low=-1, high=1, size=3)
         angle_temp = np.random.uniform(low=-np.pi, high=np.pi)
         x[:,[axis,axis+1,axis+2]] = np.matmul(sensor , axangle2mat(axis_temp,angle_temp))
-    return x[np.newaxis,:,:]
+    if flag:
+        return x[np.newaxis,:,:]
+    else:
+        return x
 
 def permutation(x, nPerm=4, minSegLength=20):
-    x = x[0,:,:]
+    flag = False
+    if x.ndim == 3:
+        x = x[0,:,:]
+        flag = True
     X_new = np.zeros(x.shape)
     idx = np.random.permutation(nPerm)
     bWhile = True
@@ -93,10 +106,16 @@ def permutation(x, nPerm=4, minSegLength=20):
         x_temp = x[segs[idx[ii]]:segs[idx[ii]+1],:]
         X_new[pp:pp+len(x_temp),:] = x_temp
         pp += len(x_temp)
-    return X_new[np.newaxis,:,:]
+    if flag:
+        return X_new[np.newaxis,:,:]
+    else:
+        return X_new
 
 def random_sampling(x, nSample=90):    
-    x = x[0,:,:]
+    flag = False
+    if x.ndim == 3:
+        x = x[0,:,:]
+        flag = True
 
     # random sampling timesteps
     tt = np.zeros((nSample,x.shape[1]), dtype=int)
@@ -110,7 +129,10 @@ def random_sampling(x, nSample=90):
     for axis in range(x.shape[1]):
         X_new[:,axis] = np.interp(np.arange(x.shape[0]), tt[:,axis], x[tt[:,axis],axis])
 
-    return X_new[np.newaxis, :, :] 
+    if flag:
+        return X_new[np.newaxis,:,:]
+    else:
+        return X_new
 
 # dict of base function from which choose 
 BASE_FUNCTION = {
