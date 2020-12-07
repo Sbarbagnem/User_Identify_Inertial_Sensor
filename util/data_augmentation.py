@@ -46,17 +46,26 @@ def scaling(x, sigma=0.1):
     return x*myNoise
 
 def magnitude_warp(x, sigma=0.2):
-    x = x[0,:,:]
-    return (x * GenerateRandomCurves(x, sigma))[np.newaxis,:,:]
+    if x.ndim == 3:
+        x = x[0,:,:]
+        return (x * GenerateRandomCurves(x, sigma))[np.newaxis,:,:]
+    else:
+        return x * GenerateRandomCurves(x, sigma)
 
 def time_warp(x, sigma=0.2):
-    x = x[0,:,:]
+    flag = False
+    if x.ndim == 3:
+        x = x[0,:,:]
+        flag = True
     tt_new = DistortTimesteps(x, sigma)
     X_new = np.zeros(x.shape)
     x_range = np.arange(x.shape[0])
     for dim in range(x.shape[1]):
         X_new[:,dim] = np.interp(x_range, tt_new[:,dim], x[:,dim])
-    return X_new[np.newaxis,:,:]
+    if flag:
+        return X_new[np.newaxis,:,:]
+    else:
+        return X_new
 
 def rotation(x):
     x = x[0,:,:]

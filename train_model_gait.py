@@ -132,7 +132,7 @@ if __name__ == '__main__':
         nargs='+',
         default=[],
         help='methods to apply in data augmentation',
-        choices=['gaussian_noise', 'scaling'],
+        #choices=['gaussian_noise', 'scaling'],
         required=False)
         
     args = parser.parse_args()
