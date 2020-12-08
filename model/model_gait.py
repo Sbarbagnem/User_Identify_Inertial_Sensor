@@ -83,9 +83,9 @@ class ModelGait():
             'magntiude_warp': magnitude_warp,
             'time_warp': time_warp,
             'random_sampling': random_sampling,
-            'permutation': permutation 
+            #'permutation': permutation 
         }
- 
+
         print(f'Shape train before augment: {self.train.shape[0]}')
 
         data_aug = np.empty_like(self.train)
