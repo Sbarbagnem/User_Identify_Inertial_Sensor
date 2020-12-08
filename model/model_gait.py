@@ -78,23 +78,45 @@ class ModelGait():
     def augment_train_data(self, methods):
 
         functions = {
-            'jitter': jitter,
-            'scaling': scaling,
+            #'jitter': jitter,
+            #'scaling': scaling,
             'magntiude_warp': magnitude_warp,
             'time_warp': time_warp,
             #'random_sampling': random_sampling,
             #'permutation': permutation 
         }
 
+        data_aug = []
+        label_aug = []
+
         print(f'Shape train before augment: {self.train.shape[0]}')
 
-        data_aug = np.empty_like(self.train)
-        label_aug = self.train_label
+        data_aug_temp = np.empty_like(self.train)
+        label_aug_temp = self.train_label
         for i,cycle in enumerate(self.train):
-            random_func = random.sample(list(functions.keys()), 3)
-            data_aug[i,:,[0,1,2]] = self.apply_aug_function(cycle[:,[0,1,2]], random_func, functions).T
-            data_aug[i,:,-1] = np.sqrt(np.sum(np.power(data_aug[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
+            random_func = random.sample(list(functions.keys()), 2)
+            data_aug_temp[i,:,[0,1,2]] = self.apply_aug_function(cycle[:,[0,1,2]], random_func, functions).T
+            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
+        data_aug.extend(data_aug_temp)
+        label_aug.extend(label_aug_temp)
 
+        data_aug_temp = np.empty_like(self.train)
+        label_aug_temp = self.train_label
+        for i,cycle in enumerate(self.train):
+            data_aug_temp[i,:,[0,1,2]] = functions['magnitude_warp'](cycle[:,[0,1,2]]).T
+            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
+        data_aug.extend(data_aug_temp)
+        label_aug.extend(label_aug_temp)
+
+        data_aug_temp = np.empty_like(self.train)
+        label_aug_temp = self.train_label
+        for i,cycle in enumerate(self.train):
+            data_aug_temp[i,:,[0,1,2]] = functions['time_warp'](cycle[:,[0,1,2]]).T
+            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
+        data_aug.extend(data_aug_temp)
+        label_aug.extend(label_aug_temp)
+
+        data_aug = np.asarray(data_aug)
 
         self.train = np.concatenate((self.train, data_aug), axis=0)
         self.train_label = np.concatenate((self.train_label, label_aug))
