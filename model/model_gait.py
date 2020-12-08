@@ -125,8 +125,7 @@ class ModelGait():
     def apply_aug_function(self, x, index_f, funcs):
         f1 = funcs[index_f[0]]
         f2 = funcs[index_f[1]]
-        f3 = funcs[index_f[2]]
-        x = f3(f2(f1(x)))
+        x = f2(f1(x))
         return x
 
     def normalize_data(self):
