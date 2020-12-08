@@ -22,7 +22,7 @@ from util.eer import calculate_eer
 
 
 class ModelAuthentication():
-    def __init__(self, path_data, name_dataset, name_model, overlap, colab_path=''):
+    def __init__(self, path_data, name_dataset, name_model, overlap=None, colab_path=''):
         if colab_path == '':
             self.path_save_model = f'./saved_model/{name_dataset}/'
             self.path_data = path_data
@@ -420,7 +420,7 @@ class ModelAuthentication():
                 ID = self.auth['id'][idx_session]
                 # divide in two balanced subset (user-act)
                 gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe = self.balance_gallery_probe(
-                    data, user_label, act_label, ID, overlap
+                    data, user_label, act_label, ID
                 )
                 print(f'Session {session}')
                 print(f'Gallery shape: {gallery.shape}')
@@ -452,7 +452,7 @@ class ModelAuthentication():
                 if not os.path.exists(path_probe_gallery + 'probe/'):
                     os.makedirs(path_probe_gallery + 'probe/')
                 gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe = self.balance_gallery_probe(
-                    self.auth['data'], self.auth['user_label'], self.auth['act_label'], self.auth['id'], overlap)
+                    self.auth['data'], self.auth['user_label'], self.auth['act_label'], self.auth['id'])
 
             print(f'Gallery shape: {gallery.shape}')
             print(f'Probe shape: {probe.shape}')
