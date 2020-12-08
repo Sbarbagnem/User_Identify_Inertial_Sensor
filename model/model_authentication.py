@@ -22,7 +22,7 @@ from util.eer import calculate_eer
 
 
 class ModelAuthentication():
-    def __init__(self, path_data, name_dataset, name_model, colab_path=''):
+    def __init__(self, path_data, name_dataset, name_model, overlap, colab_path=''):
         if colab_path == '':
             self.path_save_model = f'./saved_model/{name_dataset}/'
             self.path_data = path_data
@@ -38,6 +38,7 @@ class ModelAuthentication():
         self.name_model = name_model
         self.best_model = None
         self.name_dataset = name_dataset
+        self.overlap = overlap
 
         if not os.path.exists(self.path_save_model):
             os.makedirs(self.path_save_model)
@@ -148,12 +149,10 @@ class ModelAuthentication():
         print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
         # delete overlap sequence
-        '''
-        if self.name_dataset.lower() == 'ouisir':
+        if self.overlap == 0.5:
+            distance_to_delete = [1]
+        elif self.overlap == 0.75:
             distance_to_delete = [1,2,3]
-        else:
-        '''
-        distance_to_delete = [1]
         invalid_idx = delete_overlap(id_window_train, id_window_val, distance_to_delete)
         data_train = np.delete(data_train, invalid_idx, axis=0)
         label_user_train = np.delete(label_user_train, invalid_idx, axis=0)
@@ -665,12 +664,12 @@ class ModelAuthentication():
 
         return eer, threshold
 
-    def balance_gallery_probe(self, data, users, activities, id_window, overlap):
+    def balance_gallery_probe(self, data, users, activities, id_window):
 
-        if overlap ==  75:
-            to_del = [1,2,3]
-        if overlap == 50:
+        if self.overlap == 0.5:
             to_del = [1]
+        elif self.overlap == 0.75:
+            to_del = [1,2,3]
 
         gallery = []
         probe = []

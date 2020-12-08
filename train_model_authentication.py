@@ -83,6 +83,11 @@ parser.add_argument(
     '--load_model',
     type=str2bool
 )
+parser.add_argument(
+    '-overlap',
+    '--overlap',
+    type=float
+)
 
 args = parser.parse_args()
 
@@ -105,8 +110,9 @@ preprocess_features = args.preprocess_features
 colab_path = args.colab_path
 augment_data = args.augment_data
 load_model = args.load_model
+overlap = args.overlap
 
-model = ModelAuthentication(path_data,name_dataset, name_model, colab_path)
+model = ModelAuthentication(path_data,name_dataset, name_model, overlap, colab_path)
 model.load_data()
 model.split_user()
 if train_classifier:
