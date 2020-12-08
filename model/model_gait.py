@@ -80,7 +80,7 @@ class ModelGait():
         functions = {
             #'jitter': jitter,
             #'scaling': scaling,
-            'magntiude_warp': magnitude_warp,
+            'magnitude_warp': magnitude_warp,
             'time_warp': time_warp,
             #'random_sampling': random_sampling,
             #'permutation': permutation 
