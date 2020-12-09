@@ -19,6 +19,7 @@ from model.resNet182D.resnet18_2D import resnet18 as resnet2D
 from util.tf_metrics import custom_metrics
 from util.utils import mapping_act_label, plot_pred_based_act, delete_overlap, normalize_data, mapping_act_label
 from util.eer import calculate_eer
+from util.data_augmentation import magnitude_warp, time_warp
 
 
 class ModelAuthentication():
@@ -169,33 +170,57 @@ class ModelAuthentication():
         self.train, self.val, _, self.mean, self.std = normalize_data(self.train, self.val, return_mean_std=True)
 
     def augment_train_data(self):
-        print(f'Shape train before augment: {self.train.shape[0]}')
+
+        functions = {
+            #'jitter': jitter,
+            #'scaling': scaling,
+            'magnitude_warp': magnitude_warp,
+            'time_warp': time_warp,
+            #'random_sampling': random_sampling,
+            #'permutation': permutation 
+        }
+
         data_aug = []
         label_aug = []
 
-        print('Add gaussian noise')
-        data_noisy = np.empty_like(self.train)
-        label_noisy = self.train_user
-        for i,cycle in enumerate(self.train):
-            data_noisy[i,:,[0,1,2]] = (cycle[:,[0,1,2]] + np.random.normal(loc=0., scale=0.01, size=cycle[:,[0,1,2]].shape)).T
-            data_noisy[i,:,-1] = np.sqrt(np.sum(np.power(data_noisy[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
-        data_aug.extend(data_noisy)
-        label_aug.extend(label_noisy)
+        print(f'Shape train before augment: {self.train.shape[0]}')
 
-        print('Scaling data by random value in range 0.7 - 1.1')
-        data_scaling = np.empty_like(self.train)
-        label_scaling = self.train_user
+        data_aug_temp = np.empty_like(self.train)
+        label_aug_temp = self.train_user
         for i,cycle in enumerate(self.train):
-            data_scaling[i,:,[0,1,2]] = (cycle[:,[0,1,2]] * ((0.4) * np.random.uniform(0, 1) + 0.7)).T
-            data_scaling[i,:,-1] = np.sqrt(np.sum(np.power(data_scaling[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
-        data_aug.extend(data_scaling)
-        label_aug.extend(label_scaling)
+            random_func = random.sample(list(functions.keys()), 2)
+            data_aug_temp[i,:,[0,1,2]] = self.apply_aug_function(cycle[:,[0,1,2]], random_func, functions).T
+            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
+        data_aug.extend(data_aug_temp)
+        label_aug.extend(label_aug_temp)
+
+        data_aug_temp = np.empty_like(self.train)
+        label_aug_temp = self.train_user
+        for i,cycle in enumerate(self.train):
+            data_aug_temp[i,:,[0,1,2]] = functions['magnitude_warp'](cycle[:,[0,1,2]]).T
+            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
+        data_aug.extend(data_aug_temp)
+        label_aug.extend(label_aug_temp)
+
+        data_aug_temp = np.empty_like(self.train)
+        label_aug_temp = self.train_user
+        for i,cycle in enumerate(self.train):
+            data_aug_temp[i,:,[0,1,2]] = functions['time_warp'](cycle[:,[0,1,2]]).T
+            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
+        data_aug.extend(data_aug_temp)
+        label_aug.extend(label_aug_temp)
 
         data_aug = np.asarray(data_aug)
 
         self.train = np.concatenate((self.train, data_aug), axis=0)
         self.train_user = np.concatenate((self.train_user, label_aug))
         print(f'Shape train after augment: {self.train.shape[0]}')
+
+    def apply_aug_function(self, x, index_f, funcs):
+        f1 = funcs[index_f[0]]
+        f2 = funcs[index_f[1]]
+        x = f2(f1(x))
+        return x
     
     def create_dataset_classifier(self):
         # train
@@ -391,9 +416,6 @@ class ModelAuthentication():
         self.auth['act_label'] = self.auth['act_label'][idx_sorted]
         self.auth['sessions'] = self.auth['sessions'][idx_sorted]
         self.auth['id'] = self.auth['id'][idx_sorted]
-
-
-        overlap = 50
 
         # case1: probe-gallery for every session
         if split_probe_gallery == 'intra_session':
