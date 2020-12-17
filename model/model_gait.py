@@ -114,7 +114,7 @@ class ModelGait():
         print(f'Shape train before augment: {self.train.shape[0]}')
 
         if self.train.shape[-1] == 4:
-            axis = [0,1,2] # acc
+            axis = [[0,1,2]] # acc
             magnitudes = [3] # magn_acc
         elif self.train.shape[-1] == 8:
             axis = [[0,1,2],[4,5,6]] # acc, gyro
@@ -180,6 +180,7 @@ class ModelGait():
         self.train_label = np.concatenate((self.train_label, label_aug))
 
         print(f'Shape train after augment: {self.train.shape[0]}')
+        sys.exit()
 
     def apply_aug_function(self, x, index_f, funcs):
         f1 = funcs[index_f[0]]
