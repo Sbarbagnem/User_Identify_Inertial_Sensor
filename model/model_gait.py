@@ -88,10 +88,10 @@ class ModelGait():
         X = np.concatenate((self.train, self.val), axis=0)
         Y = np.concatenate((self.train_label, self.val_label))
         
-        if only_magnitude and X.ndim == 4:
+        if only_magnitude and X.shape[-1] == 4:
             X = X[:,:,3]
             X_test = self.test[:,:,3]
-        elif only_magnitude and X.ndim == 8:
+        elif only_magnitude and X.shape[-1] == 8:
             X = X[:,:,[3,7]]
             X_test = self.test[:,:,[3,7]]
 
@@ -113,10 +113,10 @@ class ModelGait():
 
         print(f'Shape train before augment: {self.train.shape[0]}')
 
-        if self.train.ndim == 4:
+        if self.train.shape[-1] == 4:
             axis = [0,1,2] # acc
             magnitudes = [3] # magn_acc
-        elif self.train.ndim == 8:
+        elif self.train.shape[-1] == 8:
             axis = [[0,1,2],[4,5,6]] # acc, gyro
             magnitudes = [3,7] # magn_acc, magn_gyro
 
