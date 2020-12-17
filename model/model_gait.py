@@ -180,7 +180,6 @@ class ModelGait():
         self.train_label = np.concatenate((self.train_label, label_aug))
 
         print(f'Shape train after augment: {self.train.shape[0]}')
-        sys.exit()
 
     def apply_aug_function(self, x, index_f, funcs):
         f1 = funcs[index_f[0]]
