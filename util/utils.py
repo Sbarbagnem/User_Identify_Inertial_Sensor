@@ -410,10 +410,14 @@ def split_data_train_val_test_gait(data,
             id_test = id_temp[train_val_percentage:]
 
             # delete overlap sequence between train and test
-            overlap_idx = delete_overlap(
-                id_train, id_test, distances_to_delete)
-            train_temp = np.delete(train, overlap_idx, axis=0)
-            user_train_temp = np.delete(user_train, overlap_idx, axis=0)
+            if overlap != 0:
+                overlap_idx = delete_overlap(
+                    id_train, id_test, distances_to_delete)
+                train_temp = np.delete(train, overlap_idx, axis=0)
+                user_train_temp = np.delete(user_train, overlap_idx, axis=0)
+            else:
+                train_temp = train
+                user_train_temp = user_train
             
             # split train in train and val
             train_percentage = int(train_temp.shape[0] * 0.8)

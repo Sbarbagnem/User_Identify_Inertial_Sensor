@@ -67,14 +67,14 @@ class ModelGait():
                 self.sessions = self.sessions[idx]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
-    def split_train_test(self, method='cycle_based', overlap=None, split=None, plot_split=False):
+    def split_train_test(self, method='cycle_based', split=None, plot_split=False):
 
         if method == 'cycle_based':
             self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
                 data=self.data, label_user=self.label, id_window=None, sessions=None, method=method, overlap=None, split=split, plot_split=plot_split)
         else:
             self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-                data=self.data, label_user=self.label, id_window=self.id, sessions=self.sessions, method=method, overlap=overlap, split=None, plot_split=plot_split)
+                data=self.data, label_user=self.label, id_window=self.id, sessions=self.sessions, method=method, overlap=self.overlap, split=None, plot_split=plot_split)
 
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
