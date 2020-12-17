@@ -8,6 +8,10 @@ from sklearn import utils as skutils
 from sklearn.model_selection import train_test_split
 import math
 from sklearn.preprocessing import scale as scale_sklearn
+from scipy import signal, fftpack
+from scipy.signal import find_peaks as find_peaks_scipy
+from scipy.interpolate import CubicSpline
+from scipy.interpolate import interp1d  
 
 
 def plot_performance(ActivityAccuracy, UserAccuracy, fold, path_to_save, save=False):
@@ -225,19 +229,18 @@ def smooth(coef):
     return y
 
 
-def detectGaitCycle(data, denoised, plot_peak=False, plot_auto_corr_coeff=False, gcLen=None):
+def detectGaitCycle(data, plot_peak=False, plot_auto_corr_coeff=False, gcLen=None):
 
     selected_data = data[:,2] # z axis
-    autocorr = False if gcLen != None else True
-    if not denoised:
-        t = 0.0
-    else:
-        t = 0.0
+    samples = data.shape[0]
 
-    peaks = find_thresh_peak(selected_data, t)
+    autocorr = False if gcLen != None else True
+
+    peaks = find_thresh_peak(selected_data)
 
     # compute gcLen based on autocorrelation of signal if not given by default
-    gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(selected_data)
+    gcLen, auto_corr_coeff, peak_auto_corr = find_gcLen(data)
+
     if plot_auto_corr_coeff:
         plt.figure(figsize=(12, 3))
         plt.style.use('seaborn-darkgrid')
@@ -246,37 +249,44 @@ def detectGaitCycle(data, denoised, plot_peak=False, plot_auto_corr_coeff=False,
         plt.tight_layout()
         plt.show()
 
-    peaks, _ = find_peaks(peaks, selected_data, gcLen, autocorr)
+    peaks, to_plot = find_peaks(peaks, selected_data, gcLen, autocorr)
 
-    if not autocorr:
-        peaks = peaks[::2]
-
-    if plot_peak: 
+    if plot_peak or False: 
         plt.figure(figsize=(12, 3))
-
-        plt.subplot(2,1,1)
         plt.style.use('seaborn-darkgrid')
-        plt.plot(np.arange(data.shape[0]), data[:,0], 'g-', label='x')
-        plt.plot(np.arange(data.shape[0]), data[:,1], 'r-', label='y')
-        plt.plot(np.arange(data.shape[0]), data[:,2], 'b-', label='z')
+        plt.subplot(3,1,1)
+        plt.plot(np.arange(samples), data[:,0], 'b-', label='x')
+        plt.vlines(peaks, ymin=min(data[:,0]), ymax=max(data[:,0]), color='black', ls='dotted')
         plt.legend(loc='upper right')
-
-        plt.subplot(2,1,2)
-        plt.style.use('seaborn-darkgrid')
-        plt.plot(np.arange(selected_data.shape[0]), selected_data, 'b-', label='z')
-        plt.vlines(peaks, ymin=min(selected_data), ymax=max(selected_data), color='black', ls='dotted')
+        plt.subplot(3,1,2)
+        plt.plot(np.arange(samples), data[:,1], 'g-', label='y')
+        plt.vlines(peaks, ymin=min(data[:,1]), ymax=max(data[:,1]), color='black', ls='dotted')
         plt.legend(loc='upper right')
-
+        plt.subplot(3,1,3)
+        plt.plot(np.arange(samples), data[:,2], 'r-', label='z')
+        plt.vlines(peaks, ymin=min(data[:,2]), ymax=max(data[:,2]), color='black', ls='dotted')
+        plt.legend(loc='upper right')
         plt.tight_layout()
         plt.show()
 
     return peaks
 
-def segment2GaitCycle(peaks, segment):
+def segment2GaitCycle(peaks, segment, plot_split):
     cycles = []
     for i in range(0, len(peaks)-1):
         cycle = segment[peaks[i]:peaks[i+1],:]
         cycles.append(cycle)
+    if plot_split:
+        for cycle in cycles:
+            if segment2GaitCycle:
+                plt.figure(figsize=(12, 3))
+                plt.style.use('seaborn-darkgrid')
+                plt.plot(np.arange(cycle.shape[0]), cycle[:,0], 'b-', label='x')
+                plt.plot(np.arange(cycle.shape[0]), cycle[:,1], 'g-', label='y')
+                plt.plot(np.arange(cycle.shape[0]), cycle[:,2], 'r-', label='z')
+                plt.legend(loc='upper right')
+                plt.tight_layout()
+                plt.show()
     return cycles
 
 
@@ -286,7 +296,8 @@ def split_data_train_val_test_gait(data,
                                    sessions,
                                    method,
                                    overlap,
-                                   split):
+                                   split,
+                                   plot_split):
 
     train_data = []
     val_data = []
@@ -339,6 +350,28 @@ def split_data_train_val_test_gait(data,
             test_data.append(data_temp[val_gait+train_gait:])
             test_label.extend(user_temp[val_gait+train_gait:])
 
+            # plot train val and test cycle for user
+            if plot_split:
+                plt.figure(figsize=(12, 3))
+                plt.style.use('seaborn-darkgrid')
+                for i,c in enumerate(train_data[-1][:5]):
+                    plt.subplot(3, 5, i+1)
+                    plt.plot(np.arange(c.shape[0]), c[:, 0], 'g-', label='x') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 1], 'r-', label='y') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 2], 'b-', label='z') 
+                for i,c in enumerate(val_data[-1][:5]):
+                    plt.subplot(3, 5, i+1+5)
+                    plt.plot(np.arange(c.shape[0]), c[:, 0], 'g-', label='x') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 1], 'r-', label='y') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 2], 'b-', label='z') 
+                for i,c in enumerate(test_data[-1][:5]):
+                    plt.subplot(3, 5, i+1+10)
+                    plt.plot(np.arange(c.shape[0]), c[:, 0], 'g-', label='x') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 1], 'r-', label='y') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 2], 'b-', label='z') 
+                plt.tight_layout()
+                plt.show()            
+
     elif method == 'window_based':
 
         if overlap == None:
@@ -351,9 +384,7 @@ def split_data_train_val_test_gait(data,
 
         # 70% train, 20% val, 10% test
         for user in np.unique(label_user):
-            #for session in np.unique(sessions):
 
-            #idx = np.where((label_user == user) & (sessions == session))
             idx = np.where(label_user == user)
             data_temp = data[idx]
             user_temp = label_user[idx]
@@ -383,7 +414,6 @@ def split_data_train_val_test_gait(data,
                 id_train, id_test, distances_to_delete)
             train_temp = np.delete(train, overlap_idx, axis=0)
             user_train_temp = np.delete(user_train, overlap_idx, axis=0)
-            #id_train_temp = np.delete(id_train, overlap_idx, axis=0)
             
             # split train in train and val
             train_percentage = int(train_temp.shape[0] * 0.8)
@@ -391,10 +421,8 @@ def split_data_train_val_test_gait(data,
                 train_percentage -= 1
             train = train_temp[:train_percentage]
             user_train = user_train_temp[:train_percentage]
-            #id_train = id_train_temp[:train_percentage]
             val = train_temp[train_percentage:]
             user_val = user_train_temp[train_percentage:]
-            #id_val = id_train_temp[train_percentage:]
 
             # train
             train_data.append(train)
@@ -407,6 +435,27 @@ def split_data_train_val_test_gait(data,
             # test
             test_data.append(test)
             test_label.extend(user_test)
+
+            if plot_split:
+                plt.figure(figsize=(12, 3))
+                plt.style.use('seaborn-darkgrid')
+                for i,c in enumerate(train_data[-1][:5]):
+                    plt.subplot(3, 5, i+1)
+                    plt.plot(np.arange(c.shape[0]), c[:, 0], 'g-', label='x') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 1], 'r-', label='y') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 2], 'b-', label='z') 
+                for i,c in enumerate(val_data[-1][:5]):
+                    plt.subplot(3, 5, i+1+5)
+                    plt.plot(np.arange(c.shape[0]), c[:, 0], 'g-', label='x') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 1], 'r-', label='y') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 2], 'b-', label='z') 
+                for i,c in enumerate(test_data[-1][:5]):
+                    plt.subplot(3, 5, i+1+10)
+                    plt.plot(np.arange(c.shape[0]), c[:, 0], 'g-', label='x') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 1], 'r-', label='y') 
+                    plt.plot(np.arange(c.shape[0]), c[:, 2], 'b-', label='z') 
+                plt.tight_layout()
+                plt.show() 
 
     train_data = np.concatenate(train_data, axis=0)
     val_data = np.concatenate(val_data, axis=0)
@@ -451,69 +500,78 @@ def scale(x, out_range):
     y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
     return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
 
-def denoiseData(data, plot=False):
-    for i, x in enumerate(data):
-        for dim in np.arange(x.shape[1]):
-            # decompostion
-            d1 = pywt.downcoef('d', x[:, dim], 'db6', level=1)
-            a1 = pywt.downcoef('a', x[:, dim], 'db6', level=1)
-            d2 = pywt.downcoef('d', x[:, dim], 'db6', level=2)
-            a2 = pywt.downcoef('a', x[:, dim], 'db6', level=2)
-            # set deatails coef to 0
-            d1 = np.zeros_like(d1)
-            d2 = np.zeros_like(d2)
-            # recostruction
-            temp = pywt.upcoef('a', a1, 'db6', level=1, take=x.shape[0]) + \
-                pywt.upcoef('d', d1, 'db6', level=1, take=x.shape[0]) + \
-                pywt.upcoef('a', a2, 'db6', level=2, take=x.shape[0]) + \
-                pywt.upcoef('d', d2, 'db6', level=2, take=x.shape[0])
-            # rescale in initial range
-            temp = scale(temp, out_range=(min(x[:, dim]), max(x[:, dim])))
-            if plot:
-                plt.figure(figsize=(12, 3))
-                plt.style.use('seaborn-darkgrid')
-                plt.subplot(1, 2, 1)
-                plt.title(f'noise')
-                plt.plot(np.arange(x.shape[0]), x[:, dim], 'b-', label='noise')
-                plt.subplot(1, 2, 2)
-                plt.title(f'denoise')
-                plt.plot(np.arange(temp.shape[0]), temp, 'b-', label='denoise')
-                plt.tight_layout()
-                plt.show()
-            data[i][:, dim] = temp[:x.shape[0]]
-    return data
+def denoiseData(signal, plot=False):
+    denoise = np.empty_like(signal)
+    original_shape = signal.shape[0]
+    for dim in np.arange(signal.shape[1]):
+        original_extent = tuple(slice(s) for s in signal[:,dim].shape)
+        coeffs = pywt.wavedec(signal[:,dim], wavelet='db6', level=2)
+        coeffs[-1] == np.zeros_like(coeffs[-1])
+        coeffs[-2] == np.zeros_like(coeffs[-2])
+        denoise[:,dim] = pywt.waverec(coeffs, 'db6')[original_extent]
+    if plot:
+        plt.figure(figsize=(12, 3))
+        plt.style.use('seaborn-darkgrid')
+        plt.subplot(3, 2, 1)
+        plt.title(f'noise')
+        plt.plot(np.arange(original_shape), signal[:, 0], 'b-', label='x')     
+        plt.legend(loc='upper right')       
+        plt.subplot(3, 2, 3)
+        plt.plot(np.arange(original_shape), signal[:, 1], 'r-', label='y')   
+        plt.legend(loc='upper right')         
+        plt.subplot(3, 2, 5)
+        plt.plot(np.arange(original_shape), signal[:, 2], 'g-', label='z')
+        plt.legend(loc='upper right')
+        plt.subplot(3, 2, 2)
+        plt.title(f'denoise')
+        plt.plot(np.arange(original_shape), denoise[:, 0], 'b-', label='x')         
+        plt.legend(loc='upper right')   
+        plt.subplot(3, 2, 4)
+        plt.plot(np.arange(original_shape), denoise[:, 1], 'r-', label='y')    
+        plt.legend(loc='upper right')       
+        plt.subplot(3, 2, 6)
+        plt.plot(np.arange(original_shape), denoise[:, 2], 'g-', label='z')
+        plt.legend(loc='upper right')
+        plt.tight_layout()
+        plt.show()
+    return denoise
 
 
 def calAutoCorrelation(data):
     
     n = len(data)
-    autocorrelation_coeff = np.zeros(n)
-    autocorrelation_coeff[0] = np.sum(data[:]**2)/n
+    autocorrelation_coeff = np.zeros((n,3))
 
-    for t in range(1, n):
-        for j in range(1, n-t):
-            autocorrelation_coeff[t] = autocorrelation_coeff[t] + \
-                data[j]*data[j+t]
-        autocorrelation_coeff[t] = autocorrelation_coeff[t] / (n-t)
-    autocorrelation_coeff = autocorrelation_coeff/np.max(autocorrelation_coeff)
-    return autocorrelation_coeff
+    for i in range(3):
+        autocorrelation_coeff[0,i] = np.sum(data[:,i]**2)/n
+
+    for i in range(3):
+        for t in range(1, n):
+            for j in range(1, n-t):
+                autocorrelation_coeff[t,i] = autocorrelation_coeff[t,i] + \
+                    data[j,i]*data[j+t,i]
+            autocorrelation_coeff[t,i] = autocorrelation_coeff[t,i] / (n-t)
+        autocorrelation_coeff[:,i] = autocorrelation_coeff[:,i]/autocorrelation_coeff[0,i]
+
+    return np.mean(autocorrelation_coeff, axis=1)
 
 
 def find_peaks(peaks, data, gcLen, autocorr):
     
     # find first possible peak to start search
     first_peak = [peaks[0]]
-    for i,_ in enumerate(peaks[:-1]):
-        if abs(peaks[i] - peaks[i+1]) <= 0.2*gcLen:
-            first_peak.append(peaks[i+1])
+    for i,_ in enumerate(peaks[1:]):
+        if abs(peaks[i] - peaks[0]) <= 0.8*gcLen:
+            first_peak.append(peaks[i])
         else:
             break
+
     first_peak = peaks.index(first_peak[np.argmin(data[first_peak])])
 
     # splice peaks from first possible detected peak
     peaks = peaks[first_peak:]
 
-    # neighbour search of minimum at given gcLen from the first peak 87 40
+    # neighbour search of minimum at given gcLen from the first peak 
     peak_filtered = [peaks[0]]
     i = 0
     while i < len(peaks[:-1]):
@@ -522,7 +580,7 @@ def find_peaks(peaks, data, gcLen, autocorr):
         while i + j < len(peaks):
             if abs(peaks[i] - peaks[i + j]) > 1.1*gcLen:
                 break
-            if abs(peaks[i] - peaks[i + j]) <= 1.1*gcLen and abs(peaks[i] - peaks[i + j]) >= 0.6*gcLen:
+            if abs(peaks[i] - peaks[i + j]) >= 0.5*gcLen and abs(peaks[i] - peaks[i + j]) <= 1.1*gcLen:
                 peak_cluster.append(peaks[i + j])
             j += 1
         if i + j >= len(peaks) and peak_cluster == []:
@@ -532,7 +590,7 @@ def find_peaks(peaks, data, gcLen, autocorr):
             while i + j < len(peaks):
                 if abs(peaks[i] - peaks[i + j]) > 1.6*gcLen:
                     break
-                if abs(peaks[i] - peaks[i + j]) <= 1.6*gcLen and abs(peaks[i] - peaks[i + j]) >= 0.6*gcLen:
+                if abs(peaks[i] - peaks[i + j]) >= 0.5*gcLen and abs(peaks[i] - peaks[i + j]) <= 1.6*gcLen:
                     peak_cluster.append(peaks[i + j])
                 j += 1
         if peak_cluster == []:
@@ -540,14 +598,22 @@ def find_peaks(peaks, data, gcLen, autocorr):
             while i + j < len(peaks):
                 if abs(peaks[i] - peaks[i + j]) > 2.5*gcLen:
                     break
-                if abs(peaks[i] - peaks[i + j]) <= 2.5*gcLen and abs(peaks[i] - peaks[i + j]) >= 0.6*gcLen:
+                if abs(peaks[i] - peaks[i + j]) >= 0.5*gcLen and abs(peaks[i] - peaks[i + j]) <= 2.5*gcLen:
                     peak_cluster.append(peaks[i + j])
                 j += 1
         if peak_cluster == []:
             break
-        min_peak = peak_cluster[np.argmin(data[peak_cluster])]
-        peak_filtered.append(min_peak)
 
+        index_min = np.argmin(data[peak_cluster])
+        min_peak = peak_cluster[index_min]
+
+        # from min peak found peak on the right if they are at max 0.1*gcLen
+        '''
+        for peak in peak_cluster[peak_cluster.index(min_peak):]:
+            if abs(peak - min_peak) <= 0.05*gcLen:
+                min_peak = peak
+        '''
+        peak_filtered.append(min_peak)
         i = peaks.index(min_peak)
 
     # check on first-second peak distance, and least two peaks distance
@@ -556,104 +622,12 @@ def find_peaks(peaks, data, gcLen, autocorr):
     if abs(peak_filtered[-1] - peak_filtered[-2]) > 1.2*gcLen:
         peak_filtered = peak_filtered[:-1]
 
-
-    '''
-    alpha = 0.25  # 0.25
-    beta = 0.75   # 0.75
-    gamma = 0.2  # 0.16
-
-    plot_peak = False
-    peaks_copy = peaks.copy()
-
-    # find first candidate peak
-    i = 1
-    while i < len(peaks)-1:
-        if peaks[i] - peaks[i-1] < 0.2*gcLen and data[peaks[i]] < data[peaks[i-1]]:
-            peaks.remove(peaks[i-1])
-        else:
-            break
-
-    # find all candidate peak
-    i = 1
-    while i < len(peaks)-1:
-        if peaks[i]-peaks[i-1] < alpha*gcLen:
-            if data[peaks[i]] <= data[peaks[i-1]]:
-                peaks.remove(peaks[i-1])
-                continue
-            else:
-                peaks.remove(peaks[i])
-                continue
-        elif peaks[i]-peaks[i-1] < beta*gcLen:
-            if peaks[i+1] - peaks[i] < gamma*gcLen:
-                if data[peaks[i+1]] <= data[peaks[i]]:
-                    peaks.remove(peaks[i])
-                    continue
-                else:
-                    peaks.remove(peaks[i+1])
-                    continue
-            else:
-                peaks.remove(peaks[i])
-                continue
-        else:
-            i += 1
-
-    # if there is a gait grater then gcLen*1.5 must be probabily divided in two gait
-    if autocorr:
-        i = 1
-        j = 0
-        peak_pos_modified = peaks[:]
-        while i < len(peaks):
-            if peaks[i] - peaks[i-1] > 1.2*gcLen:
-                temp = int((peaks[i] - peaks[i-1])/2) + peaks[i-1]
-                most_close = sorted(peaks_copy, key=lambda x: abs(x-temp))
-                try:
-                    most_close_before = list(
-                        filter(lambda x: x <= temp + 0.20*gcLen and x >= temp - 0.20*gcLen, most_close))
-                    if most_close_before != []:
-                        idx = np.argmin(data[most_close_before])
-                        peak_pos_modified[i+j:i+j] = [most_close_before[idx]]
-                        j += 1
-                except:
-                    plot_peak = True
-            i += 1
-
-        peaks = sorted(peak_pos_modified)
-    
-    if peaks[-1]-peaks[-2] < 0.5*gcLen:
-        peaks.remove(peaks[-1])
-    
-    '''
-    # check if there a minimum next to detected peaks, take it if it's lower
-    '''
-    thresh = 0.4 if autocorr else 0.2
-    for i, peak in enumerate(peaks):
-        idx = np.where(data[peak-int(thresh*gcLen):peak +
-                            int(thresh*gcLen)] < data[peak])
-        idx = idx[0] + peak-int(thresh*gcLen)
-        if len(idx) > 0:
-            peaks[i] = idx[np.argmin(data[idx])]
-    '''
-    '''
-    # filter last two peaks
-    if peaks[-1]-peaks[-2] < 0.3*gcLen:
-        if peaks[-1] < peaks[-2]:
-            peaks.remove(peaks[-2])
-        else:
-            peaks.remove(peaks[-1])
-    elif peaks[-1]-peaks[-2] > 1.5*gcLen:
-        peaks.remove(peaks[-1])
-
-    if len(peaks) <= 2 or len(peaks)>30:
-        plot_peak = True
-    '''
-
     if len(peak_filtered) < 5 or len(peak_filtered) > 15:
         to_plot = True
     else:
         to_plot = False
-    #return sorted(peaks), False
+    
     return peak_filtered, to_plot
-
 
 def find_gcLen(data):
 
@@ -661,7 +635,7 @@ def find_gcLen(data):
     auto_corr_coeff = calAutoCorrelation(data)
 
     # smooth the auto_correlation_coefficient
-    for i in range(7):
+    for i in range(10):
         auto_corr_coeff = smooth(auto_corr_coeff)
 
     # approximate the length of a gait cycle by selecting the 2nd peak (positive) in the auto correlation signal
@@ -669,49 +643,50 @@ def find_gcLen(data):
     gcLen = 0
     flag = 0
     mean_auto_corr = np.mean(auto_corr_coeff[:200])
-    std_auto_corr = np.std(auto_corr_coeff[:200])
     for i in range(1, 200):
         if auto_corr_coeff[i] > auto_corr_coeff[i-1] and \
            auto_corr_coeff[i] > auto_corr_coeff[i+1] and \
-           auto_corr_coeff[i] > (mean_auto_corr + std_auto_corr*0.4):
+           auto_corr_coeff[i] > mean_auto_corr:
             flag += 1
             peak_auto_corr.append(i)
             if flag == 2:
                 gcLen = i - 1
                 break
     
-    if gcLen == 0:
+    if gcLen < 10:
+        peak_auto_corr = []
         flag = 0
-        for i in range(1, 200):
+        for i in range(1, len(auto_corr_coeff)-1):
             if auto_corr_coeff[i] > auto_corr_coeff[i-1] and \
             auto_corr_coeff[i] > auto_corr_coeff[i+1]:
-                flag += 1
-                peak_auto_corr.append(i)
-                if flag == 2:
-                    gcLen = i - 1
-                    break        
+                if flag == 0 or (flag == 1 and i > 10):
+                    flag += 1
+                    peak_auto_corr.append(i)
+                    if flag == 2:
+                        gcLen = i - 1
+                        break        
 
     return gcLen, auto_corr_coeff, peak_auto_corr
 
 
-def find_thresh_peak(data, t):
+def find_thresh_peak(data):
 
     plot = False
 
     # all peaks
     all_peak_pos = []
-    for i in range(1, data.shape[0]-1):
-        if(data[i] <= data[i-1] and data[i] <= data[i+1]):
+    for i in range(0, data.shape[0]-1):
+        if i==0 and data[i] <= data[i+1]:
+            all_peak_pos.append(i)
+        if data[i] <= data[i-1] and data[i] <= data[i+1]:
             all_peak_pos.append(i)
 
     # filter list of peaks based on mean and standard deviation of detected peaks
-    _mean = np.mean(data[all_peak_pos])
-    _std = np.std(data[all_peak_pos])
-    threshold = _mean - t*_std
-    #threshold = _mean
+    _mean = np.mean(data)
+    _std = np.std(data)
     filter_peaks_pos = []
     for peak in all_peak_pos:
-        if(data[peak] < threshold):
+        if(data[peak] < _mean - 0.6*_std):
             filter_peaks_pos.append(peak)
 
         
@@ -725,3 +700,75 @@ def find_thresh_peak(data, t):
         plt.show()
 
     return filter_peaks_pos
+
+def remove_g_component(signal, sampling_rate, plot):
+
+    # get gravity component g(t)
+    sos = butter_lowpass(cutoff=0.3, nyq_freq=sampling_rate*0.5, order=3, sampling_rate=sampling_rate)
+    g = butter_lowpass_filter(signal, sos)
+
+    # get linear acceleration s(t) = s(t) - g(t)
+    no_g = signal - g
+
+    if plot:
+        plt.figure(figsize=(12, 3))
+        plt.style.use('seaborn-darkgrid')
+        plt.subplot(2,1,1)
+        plt.title('With gravity component')
+        plt.plot(np.arange(signal.shape[0]), signal[:,0], 'g-', label='x')
+        plt.plot(np.arange(signal.shape[0]), signal[:,1], 'r-', label='y')
+        plt.plot(np.arange(signal.shape[0]), signal[:,2], 'b-', label='z')
+        plt.legend(loc='upper right')
+        plt.subplot(2,1,2)
+        plt.title('No gravity component')
+        plt.plot(np.arange(no_g.shape[0]), no_g[:,0], 'g-', label='x')
+        plt.plot(np.arange(no_g.shape[0]), no_g[:,1], 'r-', label='y')
+        plt.plot(np.arange(no_g.shape[0]), no_g[:,2], 'b-', label='z')
+        plt.legend(loc='upper right')
+        plt.tight_layout()
+        plt.show()       
+
+    return no_g
+
+def butter_lowpass(cutoff, nyq_freq, order, sampling_rate):
+    normal_cutoff = float(cutoff) / nyq_freq
+    sos = signal.butter(order, normal_cutoff, btype='lowpass', output='sos', fs=sampling_rate)
+    return sos
+
+def butter_lowpass_filter(data, sos):
+    y = signal.sosfiltfilt(sos, data, axis=0, padtype=None)
+    return y
+
+def interpolated(cycles, to_interp, plot_interpolated):
+    cycles_interpolated = []
+    for cycle in cycles:
+        interpolated = np.empty((to_interp, cycle.shape[1]))
+        for dim in np.arange(cycle.shape[1]):
+            '''
+            interpolated[:, dim] = CubicSpline(np.arange(0, cycle.shape[0]), cycle[:, dim])(
+                np.linspace(0, cycle.shape[0]-1, to_interp))
+            '''
+            interpolated[:, dim] = interp1d(np.arange(0, cycle.shape[0]), cycle[:, dim])(np.linspace(0, cycle.shape[0]-1, to_interp))
+        if plot_interpolated:
+            plt.figure(figsize=(12, 3))
+            plt.style.use('seaborn-darkgrid')
+            plt.subplot(1, 2, 1)
+            plt.title(f'original')
+            plt.plot(np.arange(cycle.shape[0]),
+                     cycle[:, 0], 'b-', label='noise')
+            plt.plot(np.arange(cycle.shape[0]),
+                     cycle[:, 1], 'r-', label='noise')
+            plt.plot(np.arange(cycle.shape[0]),
+                     cycle[:, 2], 'g-', label='noise')
+            plt.subplot(1, 2, 2)
+            plt.title(f'interpolated')
+            plt.plot(
+                np.arange(interpolated.shape[0]), interpolated[:, 0], 'b-', label='denoise')
+            plt.plot(
+                np.arange(interpolated.shape[0]), interpolated[:, 1], 'r-', label='denoise')
+            plt.plot(
+                np.arange(interpolated.shape[0]), interpolated[:, 2], 'g-', label='denoise')
+            plt.tight_layout()
+            plt.show()
+        cycles_interpolated.append(interpolated)
+    return cycles_interpolated

@@ -84,7 +84,7 @@ class ResNet18SingleBranch(tf.keras.Model):
         x = self.flatten(x)
         #print('shape avg_pool: {}'.format(x.shape))
         if self.fc:
-            x = self.fc1(x)
+            x = self.fc1(x, training=training)
             x = self.drop(x, training=training)
             #print('shape dense: {}'.format(x.shape))
         if not self.feature_generator:

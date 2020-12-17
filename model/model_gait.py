@@ -6,6 +6,7 @@ import seaborn as sn
 import sys
 import random
 from pprint import pprint
+from sklearn import svm
 
 from model.resNet182D.resnet18_2D import resnet18
 from model.model_paper.model import ModelPaper
@@ -24,7 +25,7 @@ class ModelGait():
         self.num_user = config['ouisir']['NUM_CLASSES_USER']
         self.best_model = None
 
-    def load_data(self, denoise, filter_num_user=None, method='cycle_based', window_len=100, overlap=50, autocorr=False):
+    def load_data(self, denoise, filter_num_user=None, method='cycle_based', window_len=100, overlap=50, autocorr=False, gyroscope=False):
 
         if method == 'cycle_based':
             if denoise:
@@ -49,6 +50,10 @@ class ModelGait():
         self.window_sample = self.data.shape[1]
         self.overlap = overlap
 
+        if not gyroscope:
+            self.data = self.data[:,:,[0,1,2,3]]
+            self.axis = self.data.shape[2]
+
         print(
             f'Found {self.data.shape[0]} cycles for {np.unique(self.label).shape[0]} users')
 
@@ -62,64 +67,118 @@ class ModelGait():
                 self.sessions = self.sessions[idx]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
 
-    def split_train_test(self, method='cycle_based', overlap=None, split=None):
+    def split_train_test(self, method='cycle_based', overlap=None, split=None, plot_split=False):
 
         if method == 'cycle_based':
             self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-                data=self.data, label_user=self.label, id_window=None, sessions=None, method=method, overlap=None, split=split)
+                data=self.data, label_user=self.label, id_window=None, sessions=None, method=method, overlap=None, split=split, plot_split=plot_split)
         else:
             self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
-                data=self.data, label_user=self.label, id_window=self.id, sessions=self.sessions, method=method, overlap=overlap, split=None)
+                data=self.data, label_user=self.label, id_window=self.id, sessions=self.sessions, method=method, overlap=overlap, split=None, plot_split=plot_split)
 
         print(f'{self.train.shape[0]} gait cycles for train')
         print(f'{self.val.shape[0]} gait cycles for val')
         print(f'{self.test.shape[0]} gait cycles for test')
 
-    def augment_train_data(self, methods):
+    def train_svm(self, only_magnitude=False):
+        '''
+        Flatten raw acceleremoter data
+        '''
+        clf = svm.SVC()
+        X = np.concatenate((self.train, self.val), axis=0)
+        Y = np.concatenate((self.train_label, self.val_label))
+        
+        if only_magnitude and X.ndim == 4:
+            X = X[:,:,3]
+            X_test = self.test[:,:,3]
+        elif only_magnitude and X.ndim == 8:
+            X = X[:,:,[3,7]]
+            X_test = self.test[:,:,[3,7]]
 
-        functions = {
-            #'jitter': jitter,
-            #'scaling': scaling,
-            'magnitude_warp': magnitude_warp,
-            'time_warp': time_warp,
-            #'random_sampling': random_sampling,
-            #'permutation': permutation 
-        }
+        X = np.reshape(X, (X.shape[0], X.shape[1]*X.shape[2]))
+        X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1]*X_test.shape[2]))
+
+        print('Train SVM')
+        clf.fit(X,Y)
+
+        print('Test SVM')
+        result = clf.score(X_test, self.test_label)
+        
+        print(f'Accuracy: {result}')
+
+    def augment_train_data(self, methods):
 
         data_aug = []
         label_aug = []
 
         print(f'Shape train before augment: {self.train.shape[0]}')
 
-        data_aug_temp = np.empty_like(self.train)
-        label_aug_temp = self.train_label
-        for i,cycle in enumerate(self.train):
-            random_func = random.sample(list(functions.keys()), 2)
-            data_aug_temp[i,:,[0,1,2]] = self.apply_aug_function(cycle[:,[0,1,2]], random_func, functions).T
-            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
-        data_aug.extend(data_aug_temp)
-        label_aug.extend(label_aug_temp)
+        if self.train.ndim == 4:
+            axis = [0,1,2] # acc
+            magnitudes = [3] # magn_acc
+        elif self.train == 8:
+            axis = [[0,1,2],[4,5,6]] # acc, gyro
+            magnitudes = [3,7] # magn_acc, magn_gyro
 
-        data_aug_temp = np.empty_like(self.train)
-        label_aug_temp = self.train_label
-        for i,cycle in enumerate(self.train):
-            data_aug_temp[i,:,[0,1,2]] = functions['magnitude_warp'](cycle[:,[0,1,2]]).T
-            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
-        data_aug.extend(data_aug_temp)
-        label_aug.extend(label_aug_temp)
+        if methods == 'MTW':
+            functions = {
+                'magnitude_warp': magnitude_warp,
+                'time_warp': time_warp,
+            }
 
-        data_aug_temp = np.empty_like(self.train)
-        label_aug_temp = self.train_label
-        for i,cycle in enumerate(self.train):
-            data_aug_temp[i,:,[0,1,2]] = functions['time_warp'](cycle[:,[0,1,2]]).T
-            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
-        data_aug.extend(data_aug_temp)
-        label_aug.extend(label_aug_temp)
+            data_aug_temp = np.empty_like(self.train)
+            label_aug_temp = self.train_label
+            for i,cycle in enumerate(self.train):
+                for ax, mgn in zip(axis,magnitudes):
+                    random_func = random.sample(list(functions.keys()), 2)
+                    data_aug_temp[i,:,ax] = self.apply_aug_function(cycle[:,ax], random_func, functions).T
+                    data_aug_temp[i,:,mgn] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,ax], 2), 0, keepdims=True))[0]       
+            data_aug.extend(data_aug_temp)
+            label_aug.extend(label_aug_temp)
+
+            data_aug_temp = np.empty_like(self.train)
+            label_aug_temp = self.train_label
+            for i,cycle in enumerate(self.train):
+                for ax, mgn in zip(axis,magnitudes):
+                    data_aug_temp[i,:,ax] = functions['magnitude_warp'](cycle[:,ax]).T
+                    data_aug_temp[i,:,mgn] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,ax], 2), 0, keepdims=True))[0]
+            data_aug.extend(data_aug_temp)
+            label_aug.extend(label_aug_temp)
+
+            data_aug_temp = np.empty_like(self.train)
+            label_aug_temp = self.train_label
+            for i,cycle in enumerate(self.train):
+                for ax, mgn in zip(axis,magnitudes):
+                    data_aug_temp[i,:,ax] = functions['time_warp'](cycle[:,ax]).T
+                    data_aug_temp[i,:,mgn] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,ax], 2), 0, keepdims=True))[0]
+            data_aug.extend(data_aug_temp)
+            label_aug.extend(label_aug_temp)
+
+        elif methods == 'ETE':
+            
+            data_aug_temp = np.empty_like(self.train)
+            label_aug_temp = self.train_label
+            for i,cycle in enumerate(self.train):
+                for ax, mgn in zip(axis,magnitudes):
+                    data_aug_temp[i,:,ax] = (cycle[:,ax] + np.random.normal(loc=0., scale=0.01, size=cycle[:,ax].shape)).T
+                    data_aug_temp[i,:,mgn] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,ax], 2), 0, keepdims=True))[0]   
+            data_aug.extend(data_aug_temp)
+            label_aug.extend(label_aug_temp)
+
+            data_aug_temp = np.empty_like(self.train)
+            label_aug_temp = self.train_label
+            for i,cycle in enumerate(self.train):
+                for ax, mgn in zip(axis,magnitudes):
+                    data_aug_temp[i,:,ax] = (cycle[:,ax] * ((0.4) * np.random.uniform(0, 1) + 0.7)).T
+                    data_aug_temp[i,:,mgn] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,ax], 2), 0, keepdims=True))[0]   
+            data_aug.extend(data_aug_temp)
+            label_aug.extend(label_aug_temp)           
 
         data_aug = np.asarray(data_aug)
 
         self.train = np.concatenate((self.train, data_aug), axis=0)
         self.train_label = np.concatenate((self.train_label, label_aug))
+
         print(f'Shape train after augment: {self.train.shape[0]}')
 
     def apply_aug_function(self, x, index_f, funcs):
@@ -138,7 +197,7 @@ class ModelGait():
         train_tf = tf.data.Dataset.from_tensor_slices((self.train, self.train_label))
         train_tf = train_tf.shuffle(buffer_size=self.train.shape[0], reshuffle_each_iteration=True)
         self.train_tf = train_tf.batch(batch_size, drop_remainder=True)
-
+        
         # val
         val_tf = tf.data.Dataset.from_tensor_slices((self.val, self.val_label))
         self.val_tf = val_tf.batch(self.val.shape[0])
@@ -206,7 +265,7 @@ class ModelGait():
             epochs=100,
             drop_factor=0.25,
             drop_patience=5,
-            early_stop=6,
+            early_stop=10,
             log=False):
 
         best_seen = {

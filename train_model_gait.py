@@ -126,13 +126,34 @@ if __name__ == '__main__':
         default=False
     )
     parser.add_argument(
+        '-plot_split',
+        '--plot_split',
+        type=str2bool,
+        default=False
+    )
+    parser.add_argument(
+        '-gyroscope',
+        '--gyroscope',
+        type=str2bool,
+        default=False
+    )
+    parser.add_argument(
+        '-train_svm',
+        '--train_svm',
+        type=str2bool,
+        default=False
+    )
+    parser.add_argument(
+        '-only_magnitude',
+        '--only_magnitude',
+        type=str2bool,
+        default=False
+    )
+    parser.add_argument(
         '-methods_aug',
         '--methods_aug',
         type=str,
-        nargs='+',
-        default=[],
         help='methods to apply in data augmentation',
-        #choices=['gaussian_noise', 'scaling'],
         required=False)
         
     args = parser.parse_args()
@@ -144,15 +165,18 @@ if __name__ == '__main__':
             tf.config.experimental.set_memory_growth(gpu, True)
 
     model = ModelGait(config, args.colab_path)
-    model.load_data(filter_num_user=args.filter_num_user,method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise, autocorr=args.autocorr)
-    model.split_train_test(method=args.method, overlap=args.overlap, split=args.split)
+    model.load_data(filter_num_user=args.filter_num_user,method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise, autocorr=args.autocorr, gyroscope=args.gyroscope)
+    model.split_train_test(method=args.method, overlap=args.overlap, split=args.split, plot_split=args.plot_split)
     if args.augment_data:
         model.augment_train_data(methods=args.methods_aug)
     model.normalize_data()
-    model.create_tf_dataset(batch_size=args.batch_size)
-    model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten,
-                      summary=args.summary_model, name=args.model)
-    if args.train:
-        model.loss_metric(init_lr=args.init_lr)
-        model.train_model(log=args.log_train, epochs=args.epochs)
-        model.test_model()
+    if args.train_svm:
+        model.train_svm(only_magnitude=args.only_magnitude)
+    else:
+        model.create_tf_dataset(batch_size=args.batch_size)
+        model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten,
+                        summary=args.summary_model, name=args.model)
+        if args.train:
+            model.loss_metric(init_lr=args.init_lr)
+            model.train_model(log=args.log_train, epochs=args.epochs)
+            model.test_model()
