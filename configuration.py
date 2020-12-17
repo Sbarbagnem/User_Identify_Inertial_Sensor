@@ -250,7 +250,7 @@ config = {
     'ouisir': {
         'PATH_DATA': './data/datasets/OUISIR_processed/',
         'NUM_CLASSES_ACTIVITY': 1,
-        'NUM_CLASSES_USER': 745,
+        'NUM_CLASSES_USER': 744,
         'WINDOW_SAMPLES': 120,    # number of axes' sensor
         'AXIS': 4,      
     }

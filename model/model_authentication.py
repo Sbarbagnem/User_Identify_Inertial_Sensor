@@ -30,7 +30,7 @@ class ModelAuthentication():
         else:
             self.path_save_model = f'{colab_path}saved_model/{name_dataset}/'
             self.path_data = colab_path + path_data
-        if name_dataset.lower() == 'ouisir':
+        if 'ouisir' in name_dataset.lower():
             self.batch_size = 64
         else:
             self.batch_size = 128
@@ -51,7 +51,7 @@ class ModelAuthentication():
             if Path(f'{self.path_data}{key}.npy').is_file():
                 data_dict[key] = np.load(f'{self.path_data}{key}.npy')
 
-        if self.name_dataset.lower() in 'ouisir':
+        if 'ouisir' in self.name_dataset.lower():
             data_dict['act_label'] = np.zeros_like(data_dict['id']) 
 
         # remove key with None value
@@ -134,32 +134,33 @@ class ModelAuthentication():
         print('{} window for evaluate authentication'.format(
             self.auth['data'].shape))
 
-    def split_train_test_classifier(self):
+    def split_train_test_classifier(self, split_method, method):
         """
-        From numpy to tensorflow data to train. Divide data for train classifier in 80-20
+        From numpy to tensorflow data to train. Divide data for train classifier in 70-30 (train, validation)
         """
         
         # split data balance based on user and act
-        if 'sessions' not in self.classifier.keys():
+        if method == 'window_based':
             data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
-                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], None, train_size=0.8)
-        else:
-            data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
-                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], self.classifier['sessions'], train_size=0.8)            
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], split_method, train_size=0.7)     
+        elif method == 'cycle_based':
+            data_train, data_val, label_user_train, label_user_val = self.split_train_val_classifier(
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], None, split_method, train_size=0.7) 
 
         print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
         # delete overlap sequence
-        if self.overlap == 0.5:
-            distance_to_delete = [1]
-        elif self.overlap == 0.75:
-            distance_to_delete = [1,2,3]
-        invalid_idx = delete_overlap(id_window_train, id_window_val, distance_to_delete)
-        data_train = np.delete(data_train, invalid_idx, axis=0)
-        label_user_train = np.delete(label_user_train, invalid_idx, axis=0)
+        if method == 'window_based':
+            if self.overlap == 0.5:
+                distance_to_delete = [1]
+            elif self.overlap == 0.75:
+                distance_to_delete = [1,2,3]
+            invalid_idx = delete_overlap(id_window_train, id_window_val, distance_to_delete)
+            data_train = np.delete(data_train, invalid_idx, axis=0)
+            label_user_train = np.delete(label_user_train, invalid_idx, axis=0)
 
-        print(f'Train window after delete overlap sequence: {data_train.shape[0]}')
-        print(f'Validation set: {data_val.shape[0]}')
+            print(f'Train window after delete overlap sequence: {data_train.shape[0]}')
+            print(f'Validation set: {data_val.shape[0]}')
 
         self.train = data_train
         self.train_user = label_user_train
@@ -172,41 +173,47 @@ class ModelAuthentication():
     def augment_train_data(self):
 
         functions = {
-            #'jitter': jitter,
-            #'scaling': scaling,
             'magnitude_warp': magnitude_warp,
             'time_warp': time_warp,
-            #'random_sampling': random_sampling,
-            #'permutation': permutation 
         }
 
         data_aug = []
         label_aug = []
+
+        if self.train.shape[-1] == 4:
+            axis = [[0,1,2]] # acc
+            magnitudes = [3] # magn_acc
+        elif self.train.shape[-1] == 8:
+            axis = [[0,1,2],[4,5,6]] # acc, gyro
+            magnitudes = [3,7] # magn_acc, magn_gyro
 
         print(f'Shape train before augment: {self.train.shape[0]}')
 
         data_aug_temp = np.empty_like(self.train)
         label_aug_temp = self.train_user
         for i,cycle in enumerate(self.train):
-            random_func = random.sample(list(functions.keys()), 2)
-            data_aug_temp[i,:,[0,1,2]] = self.apply_aug_function(cycle[:,[0,1,2]], random_func, functions).T
-            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]       
+            for ax, mgn in zip(axis,magnitudes):
+                random_func = random.sample(list(functions.keys()), 2)
+                data_aug_temp[i,:,ax] = self.apply_aug_function(cycle[:,ax], random_func, functions).T
+                data_aug_temp[i,:,mgn] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,ax], 2), 0, keepdims=True))[0]       
         data_aug.extend(data_aug_temp)
         label_aug.extend(label_aug_temp)
 
         data_aug_temp = np.empty_like(self.train)
         label_aug_temp = self.train_user
         for i,cycle in enumerate(self.train):
-            data_aug_temp[i,:,[0,1,2]] = functions['magnitude_warp'](cycle[:,[0,1,2]]).T
-            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
+            for ax, mgn in zip(axis,magnitudes):
+                data_aug_temp[i,:,ax] = functions['magnitude_warp'](cycle[:,ax]).T
+                data_aug_temp[i,:,mgn] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,ax], 2), 0, keepdims=True))[0]
         data_aug.extend(data_aug_temp)
         label_aug.extend(label_aug_temp)
 
         data_aug_temp = np.empty_like(self.train)
         label_aug_temp = self.train_user
         for i,cycle in enumerate(self.train):
-            data_aug_temp[i,:,[0,1,2]] = functions['time_warp'](cycle[:,[0,1,2]]).T
-            data_aug_temp[i,:,-1] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,[0,1,2]], 2), 0, keepdims=True))[0]
+            for ax, mgn in zip(axis,magnitudes):
+                data_aug_temp[i,:,ax] = functions['time_warp'](cycle[:,ax]).T
+                data_aug_temp[i,:,mgn] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,ax], 2), 0, keepdims=True))[0]
         data_aug.extend(data_aug_temp)
         label_aug.extend(label_aug_temp)
 
@@ -235,7 +242,7 @@ class ModelAuthentication():
         self.val_tf = val_tf.batch(self.val.shape[0])
 
     def build_model(self, stride=1, fc=False):
-        if self.name_dataset.lower() != 'ouisir':
+        if 'ouisir' not in self.name_dataset.lower():
             self.feature_extractor = resnet2D(
                 multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=stride, fc=fc, flatten=False)
         else:
@@ -388,7 +395,7 @@ class ModelAuthentication():
     def load_model(self):
 
         print('Load model')
-        if self.name_dataset.lower() != 'ouisir':
+        if 'ouisir' not in self.name_dataset.lower():
             self.feature_extractor = resnet2D(
                 False, 0, self.num_user_classifier, feature_generator=True)
         else:
@@ -533,15 +540,6 @@ class ModelAuthentication():
             (features.shape[0], 1)), features.shape[1], axis=1)
 
         return features_normalized
-
-    def distance_prob(self, distance):
-        """
-        From distance to prob, after this pos in eer is 1
-        """
-
-        distance = 1 - (distance/np.max(distance))
-
-        return distance
 
     def compute_distance_gallery_probe(self, split_gallery_probe, action_dependent=True, preprocess=False):
 
@@ -770,34 +768,58 @@ class ModelAuthentication():
 
         return gallery, user_gallery, act_gallery, probe, user_probe, act_probe
 
-    def split_train_val_classifier(self, data, users, activities, id_window, sessions, train_size=0.8):
+    def split_train_val_classifier(self, data, users, activities, id_window, split_method, train_size):
 
         data_train = []
         data_val = []
         label_user_train = []
         label_user_val = []
-        id_window_train = []
-        id_window_val = []
+        if id_window is not None:
+            id_window_train = []
+            id_window_val = []
 
-        for user in np.unique(users):
-            for act in np.unique(activities):
-                idx = np.where((users == user) & (activities == act))
+        if split_method == 'standard':
+            for user in np.unique(users):
+                for act in np.unique(activities):
+                    idx = np.where((users == user) & (activities == act))
+                    data_temp = data[idx]
+                    user_temp = np.array(users)[idx]
+                    if id_window is not None:
+                        id_temp = np.array(id_window)[idx]
+                    train = int(len(data_temp)*train_size)
+                    data_train.append(data_temp[:train])
+                    data_val.append(data_temp[train:])
+                    label_user_train.append(user_temp[:train])
+                    label_user_val.append(user_temp[train:])
+                    if id_window is not None:
+                        id_window_train.append(id_temp[:train])
+                        id_window_val.append(id_temp[train:])
+            data_train = np.concatenate(data_train, axis=0)
+            data_val = np.concatenate(data_val, axis=0)
+            label_user_train = np.concatenate(label_user_train, axis=0)
+            label_user_val = np.concatenate(label_user_val, axis=0)
+            if id_window is not None:
+                id_window_train = np.concatenate(id_window_train, axis=0)
+                id_window_val = np.concatenate(id_window_val, axis=0)
+                return data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val
+            else:
+                return data_train, data_val, label_user_train, label_user_val
+                
+        elif split_method == 'paper':
+            for user in np.unique(users):
+                idx = np.where(users == user)
                 data_temp = data[idx]
                 user_temp = np.array(users)[idx]
-                id_temp = np.array(id_window)[idx]
-                train = int(len(data_temp)*train_size)
-                data_train.append(data_temp[:train])
-                data_val.append(data_temp[train:])
-                label_user_train.append(user_temp[:train])
-                label_user_val.append(user_temp[train:])
-                id_window_train.append(id_temp[:train])
-                id_window_val.append(id_temp[train:])
-
-        data_train = np.concatenate(data_train, axis=0)
-        data_val = np.concatenate(data_val, axis=0)
-        label_user_train = np.concatenate(label_user_train, axis=0)
-        label_user_val = np.concatenate(label_user_val, axis=0)
-        id_window_train = np.concatenate(id_window_train, axis=0)
-        id_window_val = np.concatenate(id_window_val, axis=0)
-
-        return data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val
+                if data_temp.shape[0] < 10:
+                    train_cycle = data_temp.shape[0] - 2
+                else:
+                    train_cycle = 8
+                data_train.append(data_temp[:train_cycle])
+                data_val.append(data_temp[train_cycle:])
+                label_user_train.append(user_temp[:train_cycle])
+                label_user_val.append(user_temp[train_cycle:])
+            data_train = np.concatenate(data_train, axis=0)
+            data_val = np.concatenate(data_val, axis=0)
+            label_user_train = np.concatenate(label_user_train, axis=0)
+            label_user_val = np.concatenate(label_user_val, axis=0)
+            return data_train, data_val, label_user_train, label_user_val

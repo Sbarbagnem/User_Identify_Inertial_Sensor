@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import pywt
 import random
 from itertools import islice
+import re
 
 from sliding_window import sliding_window
 from utils import str2bool, split_balanced_data, denoiseData, detectGaitCycle, segment2GaitCycle, remove_g_component, interpolated
@@ -34,40 +35,53 @@ def ou_isir_process_cycle_based(
 
     cycles_interpolated = []
     label_user = []
+    genders_user = []
     lu = -1
     to_interp = 80 #120
+
+    # read gender file list to split equal male and female in authentication evaluation
+    path_gender_list = '/'.join(path_data.split('/')[:-1]) + '/'
+    gender_df = pd.read_csv(path_gender_list + 'IDGenderAgelist.csv', delimiter=',')  
+    gender_df.rename(columns={'Gender(0:Female;1:Male)': 'Gender'}, inplace=True)
 
     # read files
     print('Read csv file')
     for f in tqdm(os.listdir(path_data)):
 
-        if 'seq0' in f:
-            lu += 1
+        id_user = re.split('T0_ID|_Center_',f)[1]
 
-        ### READ ACCELETOMETER DATA ###
-        acc = pd.read_csv(path_data + '/' + f, header=None,
-                         skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python') # only acc
-        acc = acc.values
-        acc = remove_g_component(acc, sampling_rate=100, plot=False)
-        if denoise == True:
-            acc = denoiseData(acc, plot_denoise)
-        peaks = detectGaitCycle(acc, plot_peak, plot_auto_corr_coeff, gcLen)
-        cycles_acc = segment2GaitCycle(peaks, acc, plot_split=False)
+        if int(id_user) != 469147:
+            
+            if 'seq0' in f:
+                lu += 1
 
-        ### READ GYROSCOPE DATA ###
-        gyro = pd.read_csv(path_data + '/' + f, header=None,
-                        skiprows=[0,1], skipfooter=1, usecols=[0,1,2], engine='python')
-        gyro = gyro.values
-        if denoise == True:
-            gyro = denoiseData(gyro, plot_denoise)
-        cycles_gyro = segment2GaitCycle(peaks, gyro, plot_split=False)
+            gender = 1 - gender_df.query(f'ID=={int(id_user)}')['Gender'].values[0]
 
-        cycles = [np.hstack((acc,gyro)) for acc,gyro in zip(cycles_acc, cycles_gyro)]
+            ### READ ACCELETOMETER DATA ###
+            acc = pd.read_csv(path_data + '/' + f, header=None,
+                            skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python') # only acc
+            acc = acc.values
+            acc = remove_g_component(acc, sampling_rate=100, plot=False)
+            if denoise == True:
+                acc = denoiseData(acc, plot_denoise)
+            peaks = detectGaitCycle(acc, plot_peak, plot_auto_corr_coeff, gcLen)
+            cycles_acc = segment2GaitCycle(peaks, acc, plot_split=False)
 
-        cycles = interpolated(cycles, to_interp, plot_interpolated)
+            ### READ GYROSCOPE DATA ###
+            gyro = pd.read_csv(path_data + '/' + f, header=None,
+                            skiprows=[0,1], skipfooter=1, usecols=[0,1,2], engine='python')
+            gyro = gyro.values
+            if denoise == True:
+                gyro = denoiseData(gyro, plot_denoise)
+            cycles_gyro = segment2GaitCycle(peaks, gyro, plot_split=False)
 
-        cycles_interpolated.append(cycles)
-        label_user.extend([lu]*len(cycles))
+            cycles = [np.hstack((acc,gyro)) for acc,gyro in zip(cycles_acc, cycles_gyro)]
+
+            cycles = interpolated(cycles, to_interp, plot_interpolated)
+
+            cycles_interpolated.append(cycles)
+            label_user.extend([lu]*len(cycles))
+            genders_user.extend([gender]*len(cycles))
 
     cycles_interpolated = np.concatenate(cycles_interpolated, axis=0)
     
@@ -107,6 +121,7 @@ def ou_isir_process_cycle_based(
 
     np.save(path_out + '/data', cycles_interpolated)
     np.save(path_out + '/user_label', label_user)
+    np.save(path_out + '/gender', genders_user)
 
 
 def ou_isir_process_window_based(
@@ -121,50 +136,66 @@ def ou_isir_process_window_based(
     lu = []
     sessions = []
     lu_temp = 0
+    genders = []
+
+    # read gender file list to split equal male and female in authentication evaluation
+    path_gender_list = '/'.join(path_data.split('/')[:-1]) + '/'
+    gender_df = pd.read_csv(path_gender_list + 'IDGenderAgelist.csv', delimiter=',')  
+    gender_df.rename(columns={'Gender(0:Female;1:Male)': 'Gender'}, inplace=True)
 
     # read files
     print('Read csv file')
     for f in tqdm(os.listdir(path_data)):
 
-        if 'seq0' in f:
-            sess_temp = 0
-        else:
-            sess_temp = 1
+        id_user = re.split('T0_ID|_Center_',f)[1]
 
-        ### READ ACCELETOMETER DATA ###
-        acc = pd.read_csv(path_data + '/' + f, header=None,
-                         skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python')
-        acc = remove_g_component(acc.values, sampling_rate=100, plot=False)
+        if int(id_user) != 469147:
+            if 'seq0' in f:
+                sess_temp = 0
+            else:
+                sess_temp = 1
 
-        ### READ GYROSCOPE DATA ###
-        gyro = pd.read_csv(path_data + '/' + f, header=None,
-                         skiprows=[0,1], skipfooter=1, usecols=[0,1,2], engine='python')
-        gyro = gyro.values
-        acc_gyro = np.hstack((acc,gyro))
-        data.append(acc_gyro)
-        lu.append(lu_temp)
-        sessions.append(sess_temp)
+            ### READ ACCELETOMETER DATA ###
+            acc = pd.read_csv(path_data + '/' + f, header=None,
+                            skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python')
+            acc = remove_g_component(acc.values, sampling_rate=100, plot=False)
 
-        if 'seq1' in f:
-            lu_temp += 1
+            ### READ GYROSCOPE DATA ###
+            gyro = pd.read_csv(path_data + '/' + f, header=None,
+                            skiprows=[0,1], skipfooter=1, usecols=[0,1,2], engine='python')
+            gyro = gyro.values
+            acc_gyro = np.hstack((acc,gyro))
+            data.append(acc_gyro)
+            lu.append(lu_temp)
+            sessions.append(sess_temp)
+            try:
+                genders.append(1 - gender_df.query(f'ID=={int(id_user)}')['Gender'].values[0])
+            except:
+                print(id_user)
+                print(gender_df.query(f'ID=={int(id_user)}')['Gender'])
+                sys.exit()
+
+            if 'seq1' in f:
+                lu_temp += 1
 
     # define list to save
     data_windows = []
     label_user = []
+    genders_user = []
     ID = []
     sessions_window = []
     id_temp=  0
 
     print('Sliding window')
-    for signal, user, session in zip(data, lu, sessions):
+    for signal, user, session, gender in zip(data, lu, sessions, genders):
         windows = sliding_window(signal, (window_len, signal.shape[1]), (stride, 1))
         if windows.ndim == 2:
             windows = np.reshape(windows, (1, windows.shape[0], windows.shape[1]))
         data_windows.append(windows)
         label_user.extend([user]*len(windows))
-        # to del overlap sequence between train and test
         ID.extend(np.arange(id_temp, id_temp + len(windows)))
         sessions_window.extend([session]*len(windows))
+        genders_user.extend([gender]*len(windows))
         id_temp = id_temp + len(windows) + 10
 
     data_windows = np.concatenate(data_windows, axis=0)
@@ -185,6 +216,7 @@ def ou_isir_process_window_based(
     np.save(path_out + '/user_label', label_user)
     np.save(path_out + '/id.npy', ID)
     np.save(path_out + '/sessions.npy', sessions_window)
+    np.save(path_out + '/gender', genders_user)
 
 
 def realdisp_process(
@@ -970,8 +1002,11 @@ if __name__ == '__main__':
                 if args.method == 'cycle_based':
                     denoise = "denoise" if args.denoise else "no_denoise"
                     autocorr = 'autocorr' if args.gcLen == None else "no_autocorr"
-                    path_out = '../data/datasets/OUISIR_processed/cycle_based/{}/{}'.format(
-                        denoise, autocorr)
+                    if args.authentication:
+                        path_out=f'../data/authentication/OUISIR_cycle_based/'
+                    else:
+                        path_out = '../data/datasets/OUISIR_processed/cycle_based/{}/{}'.format(
+                            denoise, autocorr)
                     ou_isir_process_cycle_based(
                         path_data='../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
                         path_out=path_out,
@@ -989,7 +1024,7 @@ if __name__ == '__main__':
                         path_out=f'../data/datasets/OUISIR_processed/window_based/{args.window_len}/{int(args.overlap[0]*100)}/'
                     ou_isir_process_window_based(
                         path_data='../data/datasets/OU-ISIR-gait/AutomaticExtractionData_IMUZCenter',
-                        path_out=f'../data/datasets/OUISIR_processed/window_based/{args.window_len}/{int(args.overlap[0]*100)}/',
+                        path_out=path_out,
                         window_len=args.window_len,
                         overlap=args.overlap[0]
                     )
