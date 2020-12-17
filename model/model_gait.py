@@ -116,7 +116,7 @@ class ModelGait():
         if self.train.ndim == 4:
             axis = [0,1,2] # acc
             magnitudes = [3] # magn_acc
-        elif self.train == 8:
+        elif self.train.ndim == 8:
             axis = [[0,1,2],[4,5,6]] # acc, gyro
             magnitudes = [3,7] # magn_acc, magn_gyro
 
