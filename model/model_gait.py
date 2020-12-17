@@ -94,6 +94,8 @@ class ModelGait():
         elif only_magnitude and X.shape[-1] == 8:
             X = X[:,:,[3,7]]
             X_test = self.test[:,:,[3,7]]
+        else:
+            X_test = self.test
 
         X = np.reshape(X, (X.shape[0], X.shape[1]*X.shape[2]))
         X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1]*X_test.shape[2]))
