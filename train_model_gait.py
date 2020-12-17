@@ -166,7 +166,7 @@ if __name__ == '__main__':
 
     model = ModelGait(config, args.colab_path)
     model.load_data(filter_num_user=args.filter_num_user,method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise, autocorr=args.autocorr, gyroscope=args.gyroscope)
-    model.split_train_test(method=args.method, overlap=args.overlap, split=args.split, plot_split=args.plot_split)
+    model.split_train_test(method=args.method, split=args.split, plot_split=args.plot_split)
     if args.augment_data:
         model.augment_train_data(methods=args.methods_aug)
     model.normalize_data()
