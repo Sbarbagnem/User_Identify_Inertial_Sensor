@@ -85,24 +85,24 @@ class ModelGait():
         Flatten raw acceleremoter data
         '''
         clf = svm.SVC()
-        X = np.concatenate((self.train, self.val), axis=0)
+        X_train = np.concatenate((self.train, self.val), axis=0)
         Y = np.concatenate((self.train_label, self.val_label))
         
         if only_magnitude and X.shape[-1] == 4:
-            X = X[:,:,3]
+            X_train = X_train[:,:,3]
             X_test = self.test[:,:,3]
         elif only_magnitude and X.shape[-1] == 8:
-            X = X[:,:,[3,7]]
+            X_train = X_train[:,:,[3,7]]
             X_test = self.test[:,:,[3,7]]
         else:
             X_test = self.test
 
-        X_train = np.reshape(X, (X.shape[0], X.shape[1]*X.shape[2]))
+        X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1]*X_train.shape[2]))
         X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1]*X_test.shape[2]))
 
         # normalize data
-        mean = np.mean(X, axis=0)
-        std = np.std(X, axis=0)
+        mean = np.mean(X_train, axis=0)
+        std = np.std(X_train, axis=0)
 
         X_train = (X_train - mean) / std
         X_test = (X_test - mean) / std
