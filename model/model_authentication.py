@@ -50,7 +50,7 @@ class ModelAuthentication():
         #print(f'Path save model: {self.path_save_model}')
         #print(f'Path out distance,eer,features: {self.path_out}')
 
-    def load_data(self):
+    def load_data(self, gyroscope=False):
         data_dict = dict.fromkeys(
             ['data', 'user_label', 'act_label', 'id', 'gender', 'sessions'])
         for key in list(data_dict.keys()):
@@ -60,6 +60,9 @@ class ModelAuthentication():
         if 'ouisir' in self.name_dataset.lower():
             data_dict['act_label'] = np.zeros_like(data_dict['user_label']) 
 
+        if not gyroscope:
+            data_dict['data'] = data_dict['data'][:,:,[0,1,2,3]]
+            
         # remove key with None value
         self.data_dict = {k: v for k, v in data_dict.items() if v is not None}
 
@@ -193,6 +196,9 @@ class ModelAuthentication():
         elif self.train.shape[-1] == 8:
             axis = [[0,1,2],[4,5,6]] # acc, gyro
             magnitudes = [3,7] # magn_acc, magn_gyro
+        elif self.train.shape[-1] == 12:
+            axis = [[0,1,2],[4,5,6],[8,9,10]] # acc, gyro, magn
+            magnitudes = [3,7,11] # magn_acc, magn_gyro, magn_magn
 
         print(f'Shape train before augment: {self.train.shape[0]}')
 

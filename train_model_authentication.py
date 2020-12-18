@@ -44,6 +44,13 @@ parser.add_argument(
     help='Train or not feature extractor'
 )
 parser.add_argument(
+    '-gyroscope',
+    '--gyroscope',
+    type=str2bool,
+    default=False,
+    help='Use or not gyroscope data'
+)
+parser.add_argument(
     '-generate_features',
     '--generate_features',
     type=str2bool,
@@ -146,13 +153,14 @@ load_model = args.load_model
 overlap = args.overlap
 method = args.method
 split_method = args.split_method
+gyroscope = args.gyroscope
 
 if train_classifier:
     if method == '' or split_method == '':
         sys.exit('For train classifier method (cycle or window) and split (stanrd or paper) must be defined')
 
 model = ModelAuthentication(path_data, path_out, name_dataset, name_model, overlap, colab_path)
-model.load_data()
+model.load_data(gyroscope)
 model.split_user()
 if train_classifier:
     model.split_train_test_classifier(split_method, method)
