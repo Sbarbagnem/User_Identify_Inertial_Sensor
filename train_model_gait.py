@@ -169,10 +169,10 @@ if __name__ == '__main__':
     model.split_train_test(method=args.method, split=args.split, plot_split=args.plot_split)
     if args.augment_data:
         model.augment_train_data(methods=args.methods_aug)
-    model.normalize_data()
     if args.train_svm:
         model.train_svm(only_magnitude=args.only_magnitude)
     else:
+        model.normalize_data()
         model.create_tf_dataset(batch_size=args.batch_size)
         model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten,
                         summary=args.summary_model, name=args.model)

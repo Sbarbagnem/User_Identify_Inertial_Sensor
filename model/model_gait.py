@@ -97,11 +97,18 @@ class ModelGait():
         else:
             X_test = self.test
 
-        X = np.reshape(X, (X.shape[0], X.shape[1]*X.shape[2]))
+        X_train = np.reshape(X, (X.shape[0], X.shape[1]*X.shape[2]))
         X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1]*X_test.shape[2]))
 
+        # normalize data
+        mean = np.mean(X, axis=0)
+        std = np.std(X, axis=0)
+
+        X_train = (X_train - mean) / std
+        X_test = (X_test - mean) / std
+
         print('Train SVM')
-        clf.fit(X,Y)
+        clf.fit(X_train,Y)
 
         print('Test SVM')
         result = clf.score(X_test, self.test_label)
