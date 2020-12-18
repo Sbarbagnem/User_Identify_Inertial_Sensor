@@ -46,6 +46,10 @@ class ModelAuthentication():
         if not os.path.exists(self.path_save_model):
             os.makedirs(self.path_save_model)
 
+        print(f'Path data: {self.path_data}')
+        print(f'Path save model: {self.path_save_model}')
+        print(f'Path out distance,eer,features: {self.path_out}')
+
     def load_data(self):
         data_dict = dict.fromkeys(
             ['data', 'user_label', 'act_label', 'id', 'gender', 'sessions'])
