@@ -54,10 +54,11 @@ class ModelAuthentication():
                 data_dict[key] = np.load(f'{self.path_data}{key}.npy')
 
         if 'ouisir' in self.name_dataset.lower():
-            data_dict['act_label'] = np.zeros_like(data_dict['id']) 
+            data_dict['act_label'] = np.zeros_like(data_dict['user_label']) 
 
         # remove key with None value
         self.data_dict = {k: v for k, v in data_dict.items() if v is not None}
+
         if 'gender' not in self.data_dict.keys():
             print('There aren\'t gender information for this dataset')
         if 'sessions' not in self.data_dict.keys():
