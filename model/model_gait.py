@@ -88,10 +88,10 @@ class ModelGait():
         X_train = np.concatenate((self.train, self.val), axis=0)
         Y = np.concatenate((self.train_label, self.val_label))
         
-        if only_magnitude and X.shape[-1] == 4:
+        if only_magnitude and X_train.shape[-1] == 4:
             X_train = X_train[:,:,3]
             X_test = self.test[:,:,3]
-        elif only_magnitude and X.shape[-1] == 8:
+        elif only_magnitude and X_train.shape[-1] == 8:
             X_train = X_train[:,:,[3,7]]
             X_test = self.test[:,:,[3,7]]
         else:
