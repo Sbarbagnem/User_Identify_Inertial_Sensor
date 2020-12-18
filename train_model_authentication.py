@@ -13,47 +13,61 @@ parser = argparse.ArgumentParser(description = "Parameter to train and evaluate 
 parser.add_argument(
     '-path_data',
     '--path_data',
-    type=str
+    type=str,
+    help='Path to read data'
+)
+parser.add_argument(
+    '-path_out',
+    '--path_out',
+    type=str,
+    help='Path to store result about authentication: features, distances and eer'
 )
 parser.add_argument(
     '-name_dataset',
     '--name_dataset',
-    type=str
+    type=str,
+    help='Name used for sub-dir in saved model directory'
 )
 parser.add_argument(
     '-name_model',
     '--name_model',
-    type=str
+    type=str,
+    help='Name of the model to save'
 )
 parser.add_argument(
     '-train_classifier',
     '--train_classifier',
     type=str2bool,
-    default=False
+    default=False,
+    help='Train or not feature extractor'
 )
 parser.add_argument(
     '-generate_features',
     '--generate_features',
     type=str2bool,
-    default=False
+    default=False,
+    help='Generate feature from subset user of authentication'
 )
 parser.add_argument(
     '-compute_distance',
     '--compute_distance',
     type=str2bool,
-    default=False
+    default=False,
+    help='Compute distance between features of gallery and probe'
 )
 parser.add_argument(
     '-compute_eer',
     '--compute_eer',
     type=str2bool,
-    default=False
+    default=False,
+    help='Compute eer based on distance files'
 )
 parser.add_argument(
     '-action_dependent',
     '--action_dependent',
     type=str2bool,
-    default=False
+    default=False,
+    help='Comupte eer based on action or not'
 )
 parser.add_argument(
     '-preprocess_features',
@@ -65,7 +79,8 @@ parser.add_argument(
     '-split_gallery_probe',
     '--split_gallery_probe',
     type=str,
-    choices=['random', 'intra_session', 'extra_session']
+    choices=['random', 'intra_session', 'extra_session'],
+    help='intra_session: half of session for gallery and half for probe (time sorted),\nextra_session: session 1 for gallery and session 2 for probe,\nrandom: random between session'
 )
 parser.add_argument(
     '-colab_path',
@@ -87,6 +102,23 @@ parser.add_argument(
     '-overlap',
     '--overlap',
     type=float
+)
+parser.add_argument(
+    '-method',
+    '--method',
+    type=str,
+    choices=['window_based', 'cycle_based'],
+    default='',
+    required=True,
+    help='Based on preprocessing method delete overlapping between train and test (window_based) or not (cycle_based)'
+)
+parser.add_argument(
+    '-split_method',
+    '--split_method',
+    type=str,
+    default='',
+    required=True,
+    help='If paper: 8 sample for train, and rest for val; if standard: 70 percentage for train and rest for val'
 )
 
 args = parser.parse_args()
@@ -111,12 +143,14 @@ colab_path = args.colab_path
 augment_data = args.augment_data
 load_model = args.load_model
 overlap = args.overlap
+method = args.method
+split_method = args.split_method
 
 model = ModelAuthentication(path_data,name_dataset, name_model, overlap, colab_path)
 model.load_data()
 model.split_user()
 if train_classifier:
-    model.split_train_test_classifier()
+    model.split_train_test_classifier(split_method, method)
     if augment_data:
         model.augment_train_data()
     model.normalize_data()

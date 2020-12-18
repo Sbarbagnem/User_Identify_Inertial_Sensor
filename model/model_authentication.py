@@ -23,13 +23,15 @@ from util.data_augmentation import magnitude_warp, time_warp
 
 
 class ModelAuthentication():
-    def __init__(self, path_data, name_dataset, name_model, overlap=None, colab_path=''):
+    def __init__(self, path_data, path_out, name_dataset, name_model, overlap=None, colab_path=''):
         if colab_path == '':
             self.path_save_model = f'./saved_model/{name_dataset}/'
             self.path_data = path_data
+            self.path_out = path_out
         else:
             self.path_save_model = f'{colab_path}saved_model/{name_dataset}/'
             self.path_data = colab_path + path_data
+            self.path_out = colab_path + path_out
         if 'ouisir' in name_dataset.lower():
             self.batch_size = 64
         else:
@@ -309,7 +311,7 @@ class ModelAuthentication():
 
         drop_factor = 0.25
         drop_patience = 5
-        early_stop = 6
+        early_stop = 10
 
         best_seen = {
             'epoch': 0,
@@ -411,10 +413,10 @@ class ModelAuthentication():
 
     def generate_features(self, split_probe_gallery=''):
 
-        if not os.path.exists(self.path_data + 'gallery_probe/'):
-            os.makedirs(self.path_data + 'gallery_probe/')
+        if not os.path.exists(self.path_out + 'gallery_probe/'):
+            os.makedirs(self.path_out + 'gallery_probe/')
 
-        path_probe_gallery = self.path_data + 'gallery_probe/'
+        path_probe_gallery = self.path_out + 'gallery_probe/'
 
         # sort data based on id window (time sorted)
         idx_sorted = np.argsort(self.auth['id'])
@@ -544,9 +546,9 @@ class ModelAuthentication():
     def compute_distance_gallery_probe(self, split_gallery_probe, action_dependent=True, preprocess=False):
 
         path_probe_gallery = os.path.join(
-            self.path_data, f'gallery_probe/{split_gallery_probe}/')
+            self.path_out, f'gallery_probe/{split_gallery_probe}/')
         path_distance_txt = os.path.join(
-            self.path_data, f'distance/{split_gallery_probe}/')
+            self.path_out, f'distance/{split_gallery_probe}/')
         if not os.path.exists(path_distance_txt):
             os.makedirs(path_distance_txt)
 
@@ -633,7 +635,7 @@ class ModelAuthentication():
 
     def compute_eer(self, split_gallery_probe, action_dependent=True):
         path_distance_txt = os.path.join(
-            self.path_data, f'distance/{split_gallery_probe}/')
+            self.path_out, f'distance/{split_gallery_probe}/')
 
         if split_gallery_probe == 'intra_session':
             for dir_session in os.listdir(path_distance_txt):
@@ -783,6 +785,7 @@ class ModelAuthentication():
                 for act in np.unique(activities):
                     idx = np.where((users == user) & (activities == act))
                     data_temp = data[idx]
+                    data_temp = skutils.shuffle(data_temp)
                     user_temp = np.array(users)[idx]
                     if id_window is not None:
                         id_temp = np.array(id_window)[idx]
@@ -809,6 +812,7 @@ class ModelAuthentication():
             for user in np.unique(users):
                 idx = np.where(users == user)
                 data_temp = data[idx]
+                data_temp = skutils.shuffle(data_temp)
                 user_temp = np.array(users)[idx]
                 if data_temp.shape[0] < 10:
                     train_cycle = data_temp.shape[0] - 2
