@@ -24,7 +24,6 @@ from util.data_augmentation import magnitude_warp, time_warp
 
 class ModelAuthentication():
     def __init__(self, path_data, path_out, name_dataset, name_model, overlap=None, colab_path=''):
-        print(f'Colab path: {colab_path}')
         if colab_path == '':
             self.path_save_model = f'./saved_model/{name_dataset}/'
             self.path_data = path_data

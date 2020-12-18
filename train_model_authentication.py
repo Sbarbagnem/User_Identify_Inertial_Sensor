@@ -14,19 +14,21 @@ parser.add_argument(
     '-path_data',
     '--path_data',
     type=str,
-    help='Path to read data'
+    help='Path to read data',
+    required=True
 )
 parser.add_argument(
     '-path_out',
     '--path_out',
     type=str,
-    help='Path to store result about authentication: features, distances and eer'
+    help='Path to store result about authentication: features, distances and eer',
+    required=True
 )
 parser.add_argument(
     '-name_dataset',
     '--name_dataset',
     type=str,
-    help='Name used for sub-dir in saved model directory'
+    help='Name used for sub-dir in saved model directory',
 )
 parser.add_argument(
     '-name_model',
@@ -109,7 +111,6 @@ parser.add_argument(
     type=str,
     choices=['window_based', 'cycle_based'],
     default='',
-    required=True,
     help='Based on preprocessing method delete overlapping between train and test (window_based) or not (cycle_based)'
 )
 parser.add_argument(
@@ -117,7 +118,6 @@ parser.add_argument(
     '--split_method',
     type=str,
     default='',
-    required=True,
     help='If paper: 8 sample for train, and rest for val; if standard: 70 percentage for train and rest for val'
 )
 
@@ -130,6 +130,7 @@ if gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
 
 path_data = args.path_data
+path_out = args.path_out
 name_dataset = args.name_dataset
 name_model = args.name_model
 train_classifier = args.train_classifier
@@ -146,7 +147,11 @@ overlap = args.overlap
 method = args.method
 split_method = args.split_method
 
-model = ModelAuthentication(path_data,name_dataset, name_model, overlap, colab_path)
+if train_classifier:
+    if method == '' or split_method == '':
+        sys.exit('For train classifier method (cycle or window) and split (stanrd or paper) must be defined')
+
+model = ModelAuthentication(path_data, path_out, name_dataset, name_model, overlap, colab_path)
 model.load_data()
 model.split_user()
 if train_classifier:
