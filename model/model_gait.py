@@ -97,8 +97,8 @@ class ModelGait():
         else:
             X_test = self.test
 
-        X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1]*X_train.shape[2]))
-        X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1]*X_test.shape[2]))
+        X_train = np.reshape(X_train, (X_train.shape[0], -1))
+        X_test = np.reshape(X_test, (X_test.shape[0], -1))
 
         # normalize data
         mean = np.mean(X_train, axis=0)
