@@ -49,39 +49,40 @@ def ou_isir_process_cycle_based(
     for f in tqdm(os.listdir(path_data)):
 
         id_user = re.split('T0_ID|_Center_',f)[1]
-
-        if int(id_user) != 469147:
             
-            if 'seq0' in f:
-                lu += 1
+        if 'seq0' in f:
+            lu += 1
 
+        if int(id_user) == 469147:
+            gender = 0
+        else:
             gender = 1 - gender_df.query(f'ID=={int(id_user)}')['Gender'].values[0]
 
-            ### READ ACCELETOMETER DATA ###
-            acc = pd.read_csv(path_data + '/' + f, header=None,
-                            skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python') # only acc
-            acc = acc.values
-            acc = remove_g_component(acc, sampling_rate=100, plot=False)
-            if denoise == True:
-                acc = denoiseData(acc, plot_denoise)
-            peaks = detectGaitCycle(acc, plot_peak, plot_auto_corr_coeff, gcLen)
-            cycles_acc = segment2GaitCycle(peaks, acc, plot_split=False)
+        ### READ ACCELETOMETER DATA ###
+        acc = pd.read_csv(path_data + '/' + f, header=None,
+                        skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python') # only acc
+        acc = acc.values
+        acc = remove_g_component(acc, sampling_rate=100, plot=False)
+        if denoise == True:
+            acc = denoiseData(acc, plot_denoise)
+        peaks = detectGaitCycle(acc, plot_peak, plot_auto_corr_coeff, gcLen)
+        cycles_acc = segment2GaitCycle(peaks, acc, plot_split=False)
 
-            ### READ GYROSCOPE DATA ###
-            gyro = pd.read_csv(path_data + '/' + f, header=None,
-                            skiprows=[0,1], skipfooter=1, usecols=[0,1,2], engine='python')
-            gyro = gyro.values
-            if denoise == True:
-                gyro = denoiseData(gyro, plot_denoise)
-            cycles_gyro = segment2GaitCycle(peaks, gyro, plot_split=False)
+        ### READ GYROSCOPE DATA ###
+        gyro = pd.read_csv(path_data + '/' + f, header=None,
+                        skiprows=[0,1], skipfooter=1, usecols=[0,1,2], engine='python')
+        gyro = gyro.values
+        if denoise == True:
+            gyro = denoiseData(gyro, plot_denoise)
+        cycles_gyro = segment2GaitCycle(peaks, gyro, plot_split=False)
 
-            cycles = [np.hstack((acc,gyro)) for acc,gyro in zip(cycles_acc, cycles_gyro)]
+        cycles = [np.hstack((acc,gyro)) for acc,gyro in zip(cycles_acc, cycles_gyro)]
 
-            cycles = interpolated(cycles, to_interp, plot_interpolated)
+        cycles = interpolated(cycles, to_interp, plot_interpolated)
 
-            cycles_interpolated.append(cycles)
-            label_user.extend([lu]*len(cycles))
-            genders_user.extend([gender]*len(cycles))
+        cycles_interpolated.append(cycles)
+        label_user.extend([lu]*len(cycles))
+        genders_user.extend([gender]*len(cycles))
 
     cycles_interpolated = np.concatenate(cycles_interpolated, axis=0)
     
@@ -149,34 +150,32 @@ def ou_isir_process_window_based(
 
         id_user = re.split('T0_ID|_Center_',f)[1]
 
-        if int(id_user) != 469147:
-            if 'seq0' in f:
-                sess_temp = 0
-            else:
-                sess_temp = 1
+        if 'seq0' in f:
+            sess_temp = 0
+        else:
+            sess_temp = 1
 
-            ### READ ACCELETOMETER DATA ###
-            acc = pd.read_csv(path_data + '/' + f, header=None,
-                            skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python')
-            acc = remove_g_component(acc.values, sampling_rate=100, plot=False)
+        ### READ ACCELETOMETER DATA ###
+        acc = pd.read_csv(path_data + '/' + f, header=None,
+                        skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python')
+        acc = remove_g_component(acc.values, sampling_rate=100, plot=False)
 
-            ### READ GYROSCOPE DATA ###
-            gyro = pd.read_csv(path_data + '/' + f, header=None,
-                            skiprows=[0,1], skipfooter=1, usecols=[0,1,2], engine='python')
-            gyro = gyro.values
-            acc_gyro = np.hstack((acc,gyro))
-            data.append(acc_gyro)
-            lu.append(lu_temp)
-            sessions.append(sess_temp)
-            try:
-                genders.append(1 - gender_df.query(f'ID=={int(id_user)}')['Gender'].values[0])
-            except:
-                print(id_user)
-                print(gender_df.query(f'ID=={int(id_user)}')['Gender'])
-                sys.exit()
+        ### READ GYROSCOPE DATA ###
+        gyro = pd.read_csv(path_data + '/' + f, header=None,
+                        skiprows=[0,1], skipfooter=1, usecols=[0,1,2], engine='python')
+        gyro = gyro.values
+        acc_gyro = np.hstack((acc,gyro))
+        data.append(acc_gyro)
+        lu.append(lu_temp)
+        sessions.append(sess_temp)
+        
+        if int(id_user) == 469147:
+            genders.append(0)
+        else:
+            genders.append(1 - gender_df.query(f'ID=={int(id_user)}')['Gender'].values[0])
 
-            if 'seq1' in f:
-                lu_temp += 1
+        if 'seq1' in f:
+            lu_temp += 1
 
     # define list to save
     data_windows = []
