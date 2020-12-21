@@ -411,16 +411,16 @@ class ModelAuthentication():
         np.save(self.path_save_model + 'mean.npy', self.mean)
         np.save(self.path_save_model + 'std.npy', self.std)
 
-    def load_model(self):
+    def load_model(self, win_len, axis):
 
         print('Load model')
         if 'ouisir' not in self.name_dataset.lower():
             self.feature_extractor = resnet2D(
-                False, 0, self.num_user_classifier, feature_generator=True)
+                False, 0, 0, feature_generator=True)
         else:
             self.feature_extractor = resnet2D(
-                False, 0, self.num_user_classifier, stride=2, feature_generator=False)
-        self.feature_extractor.build((None, self.win_len, self.axis, 1))
+                False, 0, 0, stride=2, feature_generator=True)
+        self.feature_extractor.build((None, win_len, axis, 1))
         self.feature_extractor.load_weights(
             self.path_save_model + self.name_model + '.h5', by_name=True)
 
@@ -448,6 +448,10 @@ class ModelAuthentication():
         if 'id' in os.listdir(self.path_out + 'data/'):
             ID = np.load(self.path_out + 'data/id')
             _id = True
+
+        win_len = data.shape[1]
+        axis = data.shape[2]
+        self.load_model(win_len, axis)
 
         # sort data based on id window (time sorted), only for dataset divided with sliding window
         if _id:

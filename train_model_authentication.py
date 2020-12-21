@@ -181,8 +181,6 @@ if train_classifier:
     model.loss_opt_metric()
     model.train_model(log)
     model.save_model()
-if load_model:
-    model.load_model()
 if generate_features:
     model.generate_features(split_gallery_probe)
 if compute_distance:
