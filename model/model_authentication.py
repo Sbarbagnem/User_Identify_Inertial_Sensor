@@ -42,6 +42,11 @@ class ModelAuthentication():
         if not os.path.exists(self.path_save_model):
             os.makedirs(self.path_save_model)
 
+        print(self.path_data)
+        print(self.path_out)
+        print(self.path_save_model)
+        sys.exit()
+
     def load_data(self, gyroscope=False):
         data_dict = dict.fromkeys(
             ['data', 'user_label', 'act_label', 'id', 'gender', 'sessions'])
@@ -271,6 +276,8 @@ class ModelAuthentication():
             input_shape=(None, self.win_len, self.axis, 1))
         self.feature_extractor.build_graph(
             (self.win_len, self.axis, 1)).summary()
+        print([weight.name for weight in self.feature_extractor.weights])
+        sys.exit()
 
     def loss_opt_metric(self):
         """

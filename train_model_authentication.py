@@ -106,12 +106,14 @@ parser.add_argument(
 parser.add_argument(
     '-augment_data',
     '--augment_data',
-    type=str2bool
+    type=str2bool,
+    default=False
 )
 parser.add_argument(
     '-load_model',
     '--load_model',
-    type=str2bool
+    type=str2bool,
+    default=False
 )
 parser.add_argument(
     '-overlap',
