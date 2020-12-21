@@ -122,7 +122,7 @@ class BasicBlock(tf.keras.layers.Layer):
                                             )
         self.bn2 = tf.keras.layers.BatchNormalization(name='bn2')
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
-        if stride != 1 or kernel[0]!=1:
+        if stride != 1:
             self.downsample = tf.keras.Sequential()
             self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
                                                        kernel_size=(1, 1),
