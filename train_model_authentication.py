@@ -85,6 +85,12 @@ parser.add_argument(
     default=False
 )
 parser.add_argument(
+    '-log_train',
+    '--log_train',
+    type=str2bool,
+    default=False
+)
+parser.add_argument(
     '-split_gallery_probe',
     '--split_gallery_probe',
     type=str,
@@ -154,6 +160,7 @@ overlap = args.overlap
 method = args.method
 split_method = args.split_method
 gyroscope = args.gyroscope
+log = args.log_train
 
 if train_classifier:
     if method == '' or split_method == '':
@@ -170,7 +177,7 @@ if train_classifier:
     model.create_dataset_classifier()
     model.build_model()
     model.loss_opt_metric()
-    model.train_model(log=True)
+    model.train_model(log)
     model.save_model()
 if load_model:
     model.load_model()
