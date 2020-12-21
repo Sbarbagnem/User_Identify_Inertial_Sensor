@@ -271,8 +271,6 @@ class ModelAuthentication():
             input_shape=(None, self.win_len, self.axis, 1))
         self.feature_extractor.build_graph(
             (self.win_len, self.axis, 1)).summary()
-        print([weight.name for weight in self.feature_extractor.weights])
-        sys.exit()
 
     def loss_opt_metric(self):
         """
