@@ -105,14 +105,14 @@ class ResNet18SingleBranch(tf.keras.Model):
 
 class BasicBlock(tf.keras.layers.Layer):
 
-    def __init__(self, filter_num, kernel, stride=1):
+    def __init__(self, filter_num, kernel, name, stride=1):
         super(BasicBlock, self).__init__()
         self.conv1 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=stride,
                                             padding='same',
                                             kernel_regularizer=tf.keras.regularizers.l2,
-                                            name='conv1'
+                                            name=f'{name}/conv1'
                                             )
         self.bn1 = tf.keras.layers.BatchNormalization(name='bn1')
         self.conv2 = tf.keras.layers.Conv2D(filters=filter_num,
@@ -120,7 +120,7 @@ class BasicBlock(tf.keras.layers.Layer):
                                             strides=1,
                                             padding="same",
                                             kernel_regularizer=tf.keras.regularizers.l2,
-                                            name='conv2'
+                                            name=f'{name}/conv2'
                                             )
         self.bn2 = tf.keras.layers.BatchNormalization(name='bn2')
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
@@ -129,8 +129,8 @@ class BasicBlock(tf.keras.layers.Layer):
             self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
                                                        kernel_size=(1, 1),
                                                        strides=stride,
-                                                       name='conv_equal'))
-            self.downsample.add(tf.keras.layers.BatchNormalization(name='bn_equal'))
+                                                       name=f'{name}/conv_equal'))
+            self.downsample.add(tf.keras.layers.BatchNormalization(name=f'{name}/bn_equal'))
         # all'interno del blocco le dimensioni del residuo in input sono le stesse
         else:
             self.downsample = lambda x: x
@@ -152,10 +152,10 @@ class BasicBlock(tf.keras.layers.Layer):
 
 def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1):
     res_block = tf.keras.Sequential(name=name)
-    res_block.add(BasicBlock(filter_num, kernel=kernel, stride=stride))
+    res_block.add(BasicBlock(filter_num, kernel=kernel, stride=stride, name=name))
 
     for _ in range(1, blocks):
-        res_block.add(BasicBlock(filter_num, kernel=kernel, stride=1))
+        res_block.add(BasicBlock(filter_num, kernel=kernel, stride=1, name=name))
 
     return res_block
 
