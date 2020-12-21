@@ -439,14 +439,14 @@ class ModelAuthentication():
         _id = False
 
         # load user data for evalueta quthentication
-        data = np.load(self.path_out + 'data/data')
-        user_label = np.load(self.path_out + 'data/user_label')
-        act_label = np.load(self.path_out + 'data/act_label')
+        data = np.load(self.path_out + 'data/data.npy')
+        user_label = np.load(self.path_out + 'data/user_label.npy')
+        act_label = np.load(self.path_out + 'data/act_label.npy')
         if 'sessions.npy' in os.listdir(self.path_out + 'data/'):
-            sessions = np.load(self.path_out + 'data/sessions')
+            sessions = np.load(self.path_out + 'data/sessions.npy')
             _session = True
         if 'id' in os.listdir(self.path_out + 'data/'):
-            ID = np.load(self.path_out + 'data/id')
+            ID = np.load(self.path_out + 'data/id.npy')
             _id = True
 
         win_len = data.shape[1]
