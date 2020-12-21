@@ -53,7 +53,6 @@ class ResNet18SingleBranch(tf.keras.Model):
 
         if self.fc:
             self.fc1 = tf.keras.layers.Dense(int(self.num_user*1.5), activation='relu')
-            self.drop = tf.keras.layers.Dropout(0.3)
 
         if not self.feature_generator:
             if multi_task:
@@ -81,22 +80,21 @@ class ResNet18SingleBranch(tf.keras.Model):
         #print('shape res_1: {}'.format(x.shape))
         x = self.layer2(x, training=training)
         #print('shape res_2: {}'.format(x.shape))
-        x = self.flatten(x)
-        #print('shape avg_pool: {}'.format(x.shape))
+        out_cnn = self.flatten(x)
+        #print('shape avg_pool: {}'.format(out_cnn.shape))
         if self.fc:
-            x = self.fc1(x, training=training)
-            x = self.drop(x, training=training)
-            #print('shape dense: {}'.format(x.shape))
+            out_cnn = self.fc1(out_cnn)
+            #print('shape dense: {}'.format(out_cnn.shape))
         if not self.feature_generator:
             if self.multi_task:
-                output_activity = self.fc_activity(x)
-                output_user = self.fc_user(x)
+                output_activity = self.fc_activity(out_cnn)
+                output_user = self.fc_user(out_cnn)
                 return output_activity, output_user
             else:
-                output_user = self.fc_user(x)
+                output_user = self.fc_user(out_cnn)
                 return output_user
         else:
-            return x
+            return out_cnn
 
     def build_graph(self, raw_shape):
         x = tf.keras.layers.Input(shape=raw_shape)
@@ -105,14 +103,14 @@ class ResNet18SingleBranch(tf.keras.Model):
 
 class BasicBlock(tf.keras.layers.Layer):
 
-    def __init__(self, filter_num, kernel, name, stride=1):
+    def __init__(self, filter_num, kernel, stride=1):
         super(BasicBlock, self).__init__()
         self.conv1 = tf.keras.layers.Conv2D(filters=filter_num,
                                             kernel_size=kernel,
                                             strides=stride,
                                             padding='same',
                                             kernel_regularizer=tf.keras.regularizers.l2,
-                                            name=f'{name}/conv1'
+                                            name='conv1'
                                             )
         self.bn1 = tf.keras.layers.BatchNormalization(name='bn1')
         self.conv2 = tf.keras.layers.Conv2D(filters=filter_num,
@@ -120,17 +118,17 @@ class BasicBlock(tf.keras.layers.Layer):
                                             strides=1,
                                             padding="same",
                                             kernel_regularizer=tf.keras.regularizers.l2,
-                                            name=f'{name}/conv2'
+                                            name='conv2'
                                             )
         self.bn2 = tf.keras.layers.BatchNormalization(name='bn2')
         # doownsample per ristabilire dimensioni residuo tra un blocco e l'altro
         if stride != 1 or kernel[0]!=1:
-            self.downsample = tf.keras.Sequential(name=name)
+            self.downsample = tf.keras.Sequential()
             self.downsample.add(tf.keras.layers.Conv2D(filters=filter_num,
                                                        kernel_size=(1, 1),
                                                        strides=stride,
-                                                       name=f'{name}/conv_equal'))
-            self.downsample.add(tf.keras.layers.BatchNormalization(name=f'{name}/bn_equal'))
+                                                       name='conv_equal'))
+            self.downsample.add(tf.keras.layers.BatchNormalization(name='bn_equal'))
         # all'interno del blocco le dimensioni del residuo in input sono le stesse
         else:
             self.downsample = lambda x: x
@@ -152,10 +150,10 @@ class BasicBlock(tf.keras.layers.Layer):
 
 def make_basic_block_layer(filter_num, blocks, name, kernel, stride=1):
     res_block = tf.keras.Sequential(name=name)
-    res_block.add(BasicBlock(filter_num, kernel=kernel, stride=stride, name=name))
+    res_block.add(BasicBlock(filter_num, kernel=kernel, stride=stride))
 
     for _ in range(1, blocks):
-        res_block.add(BasicBlock(filter_num, kernel=kernel, stride=1, name=name))
+        res_block.add(BasicBlock(filter_num, kernel=kernel, stride=1))
 
     return res_block
 
