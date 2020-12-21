@@ -15,7 +15,7 @@ parser.add_argument(
     '--path_data',
     type=str,
     help='Path to read data',
-    required=True
+    default=''
 )
 parser.add_argument(
     '-path_out',
@@ -160,9 +160,9 @@ if train_classifier:
         sys.exit('For train classifier method (cycle or window) and split (stanrd or paper) must be defined')
 
 model = ModelAuthentication(path_data, path_out, name_dataset, name_model, overlap, colab_path)
-model.load_data(gyroscope)
-model.split_user()
 if train_classifier:
+    model.load_data(gyroscope)
+    model.split_user()
     model.split_train_test_classifier(split_method, method)
     if augment_data:
         model.augment_train_data()

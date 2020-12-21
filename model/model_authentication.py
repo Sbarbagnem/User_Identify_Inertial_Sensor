@@ -5,19 +5,15 @@ import matplotlib.pyplot as plt
 import sys
 import os
 import math
-import random
-import h5py
 from pprint import pprint
 from pathlib import Path
 from sklearn import utils as skutils
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA, KernelPCA
-from sklearn.preprocessing import StandardScaler
-from scipy.spatial.distance import cosine
 
 from model.resNet182D.resnet18_2D import resnet18 as resnet2D
 from util.tf_metrics import custom_metrics
-from util.utils import mapping_act_label, plot_pred_based_act, delete_overlap, normalize_data, mapping_act_label
+from util.utils import mapping_act_label, delete_overlap, normalize_data
 from util.eer import calculate_eer
 from util.data_augmentation import magnitude_warp, time_warp
 
@@ -66,6 +62,8 @@ class ModelAuthentication():
             print('There aren\'t gender information for this dataset')
         if 'sessions' not in self.data_dict.keys():
             print('There aren\'t sessions information for this dataset')
+        if 'id' not in self.data_dict.keys():
+            print('This dataset is based on gait cycle segmentation, there isn\'t id array for windows')
         self.win_len = self.data_dict['data'].shape[1]
         self.axis = self.data_dict['data'].shape[2]
 
@@ -75,7 +73,7 @@ class ModelAuthentication():
     def split_user(self):
         """
         Split user in two subset: 70% are used to train CNN for feature extraction,
-        30% of users are used for authentication evaluation.
+        30% of users are used for authentication evaluation. Save authentication user in self.path_out
         """
         self.classifier = dict.fromkeys(list(self.data_dict.keys()))
         self.auth = dict.fromkeys(list(self.data_dict.keys()))
@@ -140,6 +138,18 @@ class ModelAuthentication():
         print('{} window for evaluate authentication'.format(
             self.auth['data'].shape))
 
+        # save user data for authentication
+        if not os.path.exists(self.path_out + 'data/'):
+            os.makedirs(self.path_out + 'data/')   
+
+        np.save(self.path_out + '/data/data', self.auth['data'])
+        np.save(self.path_out + '/data/user_label', self.auth['user_label'])
+        np.save(self.path_out + '/data/act_label', self.auth['act_label'])
+        if 'id' in self.auth.keys():
+            np.save(self.path_out + '/data/id', self.auth['id'])
+        if 'sessions' in self.auth.keys():
+            np.save(self.path_out + '/data/sessions', self.auth['sessions'])     
+
     def split_train_test_classifier(self, split_method, method):
         """
         From numpy to tensorflow data to train. Divide data for train classifier in 70-30 (train, validation)
@@ -148,15 +158,11 @@ class ModelAuthentication():
         # split data balance based on user and act
         if method == 'window_based':
             data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
-                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], split_method, train_size=0.7)     
-        elif method == 'cycle_based':
-            data_train, data_val, label_user_train, label_user_val = self.split_train_val_classifier(
-                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], None, split_method, train_size=0.7) 
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], split_method, train_size=0.7)  
 
-        print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
+            print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
-        # delete overlap sequence
-        if method == 'window_based':
+            # delete overlap sequence
             if self.overlap == 0.5:
                 distance_to_delete = [1]
             elif self.overlap == 0.75:
@@ -167,6 +173,10 @@ class ModelAuthentication():
 
             print(f'Train window after delete overlap sequence: {data_train.shape[0]}')
             print(f'Validation set: {data_val.shape[0]}')
+
+        elif method == 'cycle_based':
+            data_train, data_val, label_user_train, label_user_val = self.split_train_val_classifier(
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], None, split_method, train_size=0.7) 
 
         self.train = data_train
         self.train_user = label_user_train
@@ -202,7 +212,7 @@ class ModelAuthentication():
         label_aug_temp = self.train_user
         for i,cycle in enumerate(self.train):
             for ax, mgn in zip(axis,magnitudes):
-                random_func = random.sample(list(functions.keys()), 2)
+                random_func = ['magnitude_warp', 'time_warp']
                 data_aug_temp[i,:,ax] = self.apply_aug_function(cycle[:,ax], random_func, functions).T
                 data_aug_temp[i,:,mgn] = np.sqrt(np.sum(np.power(data_aug_temp[i,:,ax], 2), 0, keepdims=True))[0]       
         data_aug.extend(data_aug_temp)
@@ -425,13 +435,29 @@ class ModelAuthentication():
 
         path_probe_gallery = self.path_out + 'gallery_probe/'
 
-        # sort data based on id window (time sorted)
-        idx_sorted = np.argsort(self.auth['id'])
-        self.auth['data'] = self.auth['data'][idx_sorted]
-        self.auth['user_label'] = self.auth['user_label'][idx_sorted]
-        self.auth['act_label'] = self.auth['act_label'][idx_sorted]
-        self.auth['sessions'] = self.auth['sessions'][idx_sorted]
-        self.auth['id'] = self.auth['id'][idx_sorted]
+        _session = False
+        _id = False
+
+        # load user data for evalueta quthentication
+        data = np.load(self.path_out + 'data/data')
+        user_label = np.load(self.path_out + 'data/user_label')
+        act_label = np.load(self.path_out + 'data/act_label')
+        if 'sessions.npy' in os.listdir(self.path_out + 'data/'):
+            sessions = np.load(self.path_out + 'data/sessions')
+            _session = True
+        if 'id' in os.listdir(self.path_out + 'data/'):
+            ID = np.load(self.path_out + 'data/id')
+            _id = True
+
+        # sort data based on id window (time sorted), only for dataset divided with sliding window
+        if _id:
+            idx_sorted = np.argsort(ID)
+            data = data[idx_sorted]
+            user_label = self.auth['user_label'][idx_sorted]
+            act_label = self.auth['act_label'][idx_sorted]
+            if _session:
+                sessions = sessions[idx_sorted]
+            ID = ID[idx_sorted]
 
         # case1: probe-gallery for every session
         if split_probe_gallery == 'intra_session':
@@ -441,7 +467,7 @@ class ModelAuthentication():
             if not os.path.exists(path_probe_gallery):
                 os.makedirs(path_probe_gallery)
             # make_dir for every session session_dependent/session_{n_session}
-            for session in np.unique(self.auth['sessions']):
+            for session in np.unique(sessions):
                 path_session = os.path.join(
                     path_probe_gallery, f'session_{session}/')
                 if not os.path.exists(path_session):
@@ -451,14 +477,14 @@ class ModelAuthentication():
                 if not os.path.exists(os.path.join(path_session, 'probe/')):
                     os.makedirs(os.path.join(path_session, 'probe/'))
                 # take data from n_session
-                idx_session = np.where(self.auth['sessions'] == session)
-                data = self.auth['data'][idx_session]
-                user_label = self.auth['user_label'][idx_session]
-                act_label = self.auth['act_label'][idx_session]
-                ID = self.auth['id'][idx_session]
+                idx_session = np.where(sessions == session)
+                data_temp = data[idx_session]
+                user_label_temp = user_label[idx_session]
+                act_label_temp = act_label[idx_session]
+                ID_temp = ID[idx_session]
                 # divide in two balanced subset (user-act)
                 gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe = self.balance_gallery_probe(
-                    data, user_label, act_label, ID
+                    data_temp, user_label_temp, act_label_temp, ID_temp
                 )
                 print(f'Session {session}')
                 print(f'Gallery shape: {gallery.shape}')
@@ -474,15 +500,15 @@ class ModelAuthentication():
                     os.makedirs(path_probe_gallery + 'gallery/')
                 if not os.path.exists(path_probe_gallery + 'probe/'):
                     os.makedirs(path_probe_gallery + 'probe/')
-                idx_gallery = np.where(self.auth['sessions'] == 0)
-                idx_probe = np.where(self.auth['sessions'] == 1)
-                gallery = np.expand_dims(self.auth['data'][idx_gallery], 3)
-                user_label_gallery = self.auth['user_label'][idx_gallery]
-                act_label_gallery = self.auth['act_label'][idx_gallery]
-                probe = np.expand_dims(self.auth['data'][idx_probe], 3)
-                user_label_probe = self.auth['user_label'][idx_probe]
-                act_label_probe = self.auth['act_label'][idx_probe]
-            # case3: random split between sessions
+                idx_gallery = np.where(sessions == 0)
+                idx_probe = np.where(sessions == 1)
+                gallery = np.expand_dims(data[idx_gallery], 3)
+                user_label_gallery = user_label[idx_gallery]
+                act_label_gallery = act_label[idx_gallery]
+                probe = np.expand_dims(data[idx_probe], 3)
+                user_label_probe = user_label[idx_probe]
+                act_label_probe = act_label[idx_probe]
+            # case3: random split, following time sorting
             elif split_probe_gallery == 'random':
                 path_probe_gallery = path_probe_gallery + 'random/'
                 if not os.path.exists(path_probe_gallery + 'gallery/'):
@@ -490,7 +516,7 @@ class ModelAuthentication():
                 if not os.path.exists(path_probe_gallery + 'probe/'):
                     os.makedirs(path_probe_gallery + 'probe/')
                 gallery, user_label_gallery, act_label_gallery, probe, user_label_probe, act_label_probe = self.balance_gallery_probe(
-                    self.auth['data'], self.auth['user_label'], self.auth['act_label'], self.auth['id'])
+                    data, user_label, act_label, ID)
 
             print(f'Gallery shape: {gallery.shape}')
             print(f'Probe shape: {probe.shape}')

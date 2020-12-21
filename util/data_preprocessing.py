@@ -36,8 +36,9 @@ def ou_isir_process_cycle_based(
     cycles_interpolated = []
     label_user = []
     genders_user = []
+    sessions = []
     lu = -1
-    to_interp = 80 #120
+    to_interp = 120
 
     # read gender file list to split equal male and female in authentication evaluation
     path_gender_list = '/'.join(path_data.split('/')[:-1]) + '/'
@@ -52,6 +53,9 @@ def ou_isir_process_cycle_based(
             
         if 'seq0' in f:
             lu += 1
+            sess = 0
+        else:
+            sess = 1
 
         if int(id_user) == 469147:
             gender = 0
@@ -83,6 +87,7 @@ def ou_isir_process_cycle_based(
         cycles_interpolated.append(cycles)
         label_user.extend([lu]*len(cycles))
         genders_user.extend([gender]*len(cycles))
+        sessions.extend([sess]*len(cycles))
 
     cycles_interpolated = np.concatenate(cycles_interpolated, axis=0)
     
@@ -123,6 +128,7 @@ def ou_isir_process_cycle_based(
     np.save(path_out + '/data', cycles_interpolated)
     np.save(path_out + '/user_label', label_user)
     np.save(path_out + '/gender', genders_user)
+    np.save(path_out + '/sessions.npy', sessions)
 
 
 def ou_isir_process_window_based(
