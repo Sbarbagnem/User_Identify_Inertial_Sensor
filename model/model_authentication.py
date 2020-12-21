@@ -158,7 +158,7 @@ class ModelAuthentication():
         # split data balance based on user and act
         if method == 'window_based':
             data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
-                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], split_method, train_size=0.7)  
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], split_method, train_size=0.8)  
 
             print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
@@ -176,7 +176,7 @@ class ModelAuthentication():
 
         elif method == 'cycle_based':
             data_train, data_val, label_user_train, label_user_val = self.split_train_val_classifier(
-                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], None, split_method, train_size=0.7) 
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], None, split_method, train_size=0.8) 
 
         self.train = data_train
         self.train_user = label_user_train
