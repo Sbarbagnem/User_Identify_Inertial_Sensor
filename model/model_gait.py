@@ -6,7 +6,8 @@ import seaborn as sn
 import sys
 import random
 from pprint import pprint
-from sklearn import svm
+from sklearn.svm import SVC
+from sklearn.model_selection import cross_val_predict, GridSearchCV
 
 from model.resNet182D.resnet18_2D import resnet18
 from model.model_paper.model import ModelPaper
@@ -38,7 +39,7 @@ class ModelGait():
                 self.path_data = self.path_data + 'no_autocorr/'
             self.id = None
             self.sessions = None
-        elif method == 'window_based':
+        else:
             self.path_data = self.path_data + \
                 f'window_based/{window_len}/{overlap}/'
             self.id = np.load(self.path_data + 'id.npy')
@@ -62,7 +63,7 @@ class ModelGait():
             self.data = self.data[idx]
             self.label = self.label[idx]
             self.num_user = np.unique(self.label).shape[0]
-            if method == 'window_based':
+            if method == 'window_based' or method == 'window_based_svm':
                 self.id = self.id[idx]
                 self.sessions = self.sessions[idx]
             print(f'Filter for first {np.unique(self.label).shape[0]} user')
@@ -72,21 +73,28 @@ class ModelGait():
         if method == 'cycle_based':
             self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
                 data=self.data, label_user=self.label, id_window=None, sessions=None, method=method, overlap=None, split=split, plot_split=plot_split)
-        else:
+        elif method == 'window_based' or method == 'window_based_svm':
             self.train, self.val, self.test, self.train_label, self.val_label, self.test_label = split_data_train_val_test_gait(
                 data=self.data, label_user=self.label, id_window=self.id, sessions=self.sessions, method=method, overlap=self.overlap, split=None, plot_split=plot_split)
-
+        
         print(f'{self.train.shape[0]} gait cycles for train')
-        print(f'{self.val.shape[0]} gait cycles for val')
+        try:
+            print(f'{self.val.shape[0]} gait cycles for val')
+        except:
+            print('There isn\'t a val set')
         print(f'{self.test.shape[0]} gait cycles for test')
 
     def train_svm(self, only_magnitude=False):
         '''
-        Flatten raw acceleremoter data
+        Flatten raw acceleremoter data and train SVM
         '''
-        clf = svm.SVC()
-        X_train = np.concatenate((self.train, self.val), axis=0)
-        Y = np.concatenate((self.train_label, self.val_label))
+
+        if self.val == []:
+            X_train = self.train
+            Y_train = self.train_label
+        else:
+            X_train = np.concatenate((self.train, self.val), axis=0)
+            Y_train = np.concatenate((self.train_label, self.val_label))
         
         if only_magnitude and X_train.shape[-1] == 4:
             X_train = X_train[:,:,3]
@@ -97,21 +105,29 @@ class ModelGait():
         else:
             X_test = self.test
 
+        Y_test = self.test_label
+
+        print(f'Train sample for SVM: {X_train.shape[0]}')
+        print(f'Test sample for SVM: {X_test.shape[0]}')
+
+        # flat data
         X_train = np.reshape(X_train, (X_train.shape[0], -1))
         X_test = np.reshape(X_test, (X_test.shape[0], -1))
 
         # normalize data
         mean = np.mean(X_train, axis=0)
         std = np.std(X_train, axis=0)
-
         X_train = (X_train - mean) / std
         X_test = (X_test - mean) / std
 
+        # random grid search on svm
         print('Train SVM')
-        clf.fit(X_train,Y)
+        svm_model = SVC()
+        svm_model.fit(X_train, Y_train)
 
+        # best model
         print('Test SVM')
-        result = clf.score(X_test, self.test_label)
+        result = svm_model.score(X_test, Y_test)
         
         print(f'Accuracy: {result}')
 

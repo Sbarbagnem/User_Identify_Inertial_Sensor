@@ -461,15 +461,52 @@ def split_data_train_val_test_gait(data,
                 plt.tight_layout()
                 plt.show() 
 
+    elif method == 'window_based_svm':
+
+        # 70% train, 30% test
+        for user in np.unique(label_user):
+
+            idx = np.where(label_user == user)
+            data_temp = data[idx]
+            user_temp = label_user[idx]
+            id_temp = id_window[idx]
+
+            # number of window for user and session, in train, val and test
+            samples = data_temp.shape[0]
+            train_percentage = int(samples*0.7)
+            if train_percentage == samples:
+                train_percentage -= 1
+
+            # shuffle for random pick
+            data_temp, user_temp, id_temp = skutils.shuffle(data_temp, user_temp, id_temp)
+
+            # train
+            train = data_temp[:train_percentage]
+            user_train = user_temp[:train_percentage]
+            id_train = id_temp[:train_percentage]
+
+            # test
+            test = data_temp[train_percentage:]
+            user_test = user_temp[train_percentage:]
+            id_test = id_temp[train_percentage:]
+
+            train_data.append(train)
+            train_label.extend(user_train)
+            test_data.append(test)
+            test_label.extend(user_test)
+
     train_data = np.concatenate(train_data, axis=0)
-    val_data = np.concatenate(val_data, axis=0)
+    if val_data != []:
+        val_data = np.concatenate(val_data, axis=0)
     test_data = np.concatenate(test_data, axis=0)
     train_label = np.asarray(train_label)
-    val_label = np.asarray(val_label)
+    if val_data != []:
+        val_label = np.asarray(val_label)
     test_label = np.asarray(test_label)
 
     train_data, train_label = skutils.shuffle(train_data, train_label)
-    val_data, val_label = skutils.shuffle(val_data, val_label)
+    if val_data != []:
+        val_data, val_label = skutils.shuffle(val_data, val_label)
     test_data, test_label = skutils.shuffle(test_data, test_label)
 
     return train_data, val_data, test_data, train_label, val_label, test_label

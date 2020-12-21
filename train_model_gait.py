@@ -90,7 +90,7 @@ if __name__ == '__main__':
         '--method',
         type=str,
         default='cycle_based',
-        choices=['cycle_based', 'window_based']
+        choices=['cycle_based', 'window_based', 'window_based_svm']
     )
     parser.add_argument(
         '-window_len',
@@ -167,11 +167,11 @@ if __name__ == '__main__':
     model = ModelGait(config, args.colab_path)
     model.load_data(filter_num_user=args.filter_num_user,method=args.method, window_len=args.window_len, overlap=args.overlap, denoise=args.denoise, autocorr=args.autocorr, gyroscope=args.gyroscope)
     model.split_train_test(method=args.method, split=args.split, plot_split=args.plot_split)
-    if args.augment_data:
-        model.augment_train_data(methods=args.methods_aug)
     if args.train_svm:
         model.train_svm(only_magnitude=args.only_magnitude)
     else:
+        if args.augment_data:
+            model.augment_train_data(methods=args.methods_aug)
         model.normalize_data()
         model.create_tf_dataset(batch_size=args.batch_size)
         model.build_model(stride=args.stride, fc=args.fc, flatten=args.flatten,
