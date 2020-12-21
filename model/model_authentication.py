@@ -269,8 +269,10 @@ class ModelAuthentication():
                 multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=2, fc=fc, flatten=False)
         self.feature_extractor.build(
             input_shape=(None, self.win_len, self.axis, 1))
+        '''
         self.feature_extractor.build_graph(
             (self.win_len, self.axis, 1)).summary()
+        '''
         print([weight.name for weight in self.feature_extractor.weights])
         sys.exit()
 
