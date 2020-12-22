@@ -453,16 +453,6 @@ class ModelAuthentication():
         axis = data.shape[2]
         self.load_model(win_len, axis)
 
-        # sort data based on id window (time sorted), only for dataset divided with sliding window
-        if _id:
-            idx_sorted = np.argsort(ID)
-            data = data[idx_sorted]
-            user_label = self.auth['user_label'][idx_sorted]
-            act_label = self.auth['act_label'][idx_sorted]
-            if _session:
-                sessions = sessions[idx_sorted]
-            ID = ID[idx_sorted]
-
         # case1: probe-gallery for every session
         if split_probe_gallery == 'intra_session':
             # make_dir session_dependent
@@ -514,6 +504,14 @@ class ModelAuthentication():
                 act_label_probe = act_label[idx_probe]
             # case3: random split, following time sorting
             elif split_probe_gallery == 'random':
+                # sort data based on id window (time sorted), only for dataset divided with sliding window
+                idx_sorted = np.argsort(ID)
+                data = data[idx_sorted]
+                user_label = self.auth['user_label'][idx_sorted]
+                act_label = self.auth['act_label'][idx_sorted]
+                if _session:
+                    sessions = sessions[idx_sorted]
+                ID = ID[idx_sorted]
                 path_probe_gallery = path_probe_gallery + 'random/'
                 if not os.path.exists(path_probe_gallery + 'gallery/'):
                     os.makedirs(path_probe_gallery + 'gallery/')
@@ -607,7 +605,7 @@ class ModelAuthentication():
                 act_probe = np.load(path_session +
                                     'probe/act_label_probe.npy')
                 self.compute_distance(gallery, user_gallery, act_gallery, probe,
-                                      user_probe, act_probe, preprocess, action_dependent, path_distance_session)
+                                      user_probe, act_probe, action_dependent, path_distance_session)
         else:
             gallery = np.load(path_probe_gallery + 'gallery/gallery.npy')
             user_gallery = np.load(
@@ -621,16 +619,9 @@ class ModelAuthentication():
                                 'probe/act_label_probe.npy')
             path_to_save = path_distance_txt
             self.compute_distance(gallery, user_gallery, act_gallery, probe,
-                                  user_probe, act_probe, preprocess, action_dependent, path_to_save)
+                                  user_probe, act_probe, action_dependent, path_to_save)
 
-    def compute_distance(self, gallery, user_gallery, act_gallery, probe, user_probe, act_probe, preprocess, action_dependent, path_to_save):
-
-        # preprocess features
-        if preprocess:
-            print(f'Shape gallery before processing {gallery.shape}')
-            gallery, user_gallery, act_gallery, probe, user_probe, act_probe = self.process_feature(
-                gallery, user_gallery, act_gallery, probe, user_probe, act_probe)
-            print(f'Shape gallery before processing {gallery.shape}')
+    def compute_distance(self, gallery, user_gallery, act_gallery, probe, user_probe, act_probe, action_dependent, path_to_save):
 
         # compute distances 
         if action_dependent:
@@ -774,58 +765,27 @@ class ModelAuthentication():
 
         return gallery, users_gallery, act_gallery, probe, users_probe, act_probe
 
-    def process_feature(self, gallery, user_gallery, act_gallery, probe, user_probe, act_probe):
-
-        # mean 0 variance 1
-
-        _mean = np.mean(gallery, axis=0)
-        _std = np.std(gallery, axis=0)
-        gallery = (gallery - _mean) / _std
-        probe = (probe - _mean) / _std
-
-        # PCA for dimension reduction ?
-        #pca = PCA()
-        pca = KernelPCA(kernel='rbf', gamma=0.0001)
-        pca.fit(gallery)
-        gallery_pca = pca.transform(gallery)
-        probe_pca = pca.transform(probe)
-
-        explained_variance = np.var(gallery_pca, axis=0)
-        explained_variance_ratio = explained_variance / \
-            np.sum(explained_variance)
-        print('Cumsum explained variance of gallery PCA (of first 20 component)')
-        print(np.cumsum(explained_variance_ratio)[20])
-
-        explained_variance = np.var(probe_pca, axis=0)
-        explained_variance_ratio = explained_variance / \
-            np.sum(explained_variance)
-        print('Cumsum explained variance of probe PCA (of first 20 component)')
-        print(np.cumsum(explained_variance_ratio)[20])
-
-        gallery = gallery_pca[:, :20]
-        probe = probe_pca[:, :20]
-
-        return gallery, user_gallery, act_gallery, probe, user_probe, act_probe
-
     def split_train_val_classifier(self, data, users, activities, id_window, split_method, train_size):
 
         data_train = []
         data_val = []
         label_user_train = []
         label_user_val = []
-        if id_window is not None:
-            id_window_train = []
-            id_window_val = []
 
         if split_method == 'standard':
+            if id_window is not None:
+                id_window_train = []
+                id_window_val = []
             for user in np.unique(users):
                 for act in np.unique(activities):
                     idx = np.where((users == user) & (activities == act))
                     data_temp = data[idx]
-                    data_temp = skutils.shuffle(data_temp)
-                    user_temp = np.array(users)[idx]
                     if id_window is not None:
                         id_temp = np.array(id_window)[idx]
+                        data_temp, id_temp = skutils.shuffle(data_temp, id_temp) 
+                    else:
+                        data_temp = skutils.shuffle(data_temp)
+                    user_temp = np.array(users)[idx]
                     train = int(len(data_temp)*train_size)
                     data_train.append(data_temp[:train])
                     data_val.append(data_temp[train:])

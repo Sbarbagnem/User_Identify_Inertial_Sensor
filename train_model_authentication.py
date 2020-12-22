@@ -79,12 +79,6 @@ parser.add_argument(
     help='Comupte eer based on action or not'
 )
 parser.add_argument(
-    '-preprocess_features',
-    '--preprocess_features',
-    type=str2bool,
-    default=False
-)
-parser.add_argument(
     '-log_train',
     '--log_train',
     type=str2bool,
@@ -154,7 +148,6 @@ compute_distance = args.compute_distance
 compute_eer = args.compute_eer
 action_dependent = args.action_dependent
 split_gallery_probe = args.split_gallery_probe
-preprocess_features = args.preprocess_features
 colab_path = args.colab_path
 augment_data = args.augment_data
 load_model = args.load_model
@@ -184,6 +177,6 @@ if train_classifier:
 if generate_features:
     model.generate_features(split_gallery_probe)
 if compute_distance:
-    model.compute_distance_gallery_probe(split_gallery_probe, action_dependent, preprocess_features)
+    model.compute_distance_gallery_probe(split_gallery_probe, action_dependent)
 if compute_eer:
     model.compute_eer(split_gallery_probe, action_dependent)
