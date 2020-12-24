@@ -158,8 +158,8 @@ gyroscope = args.gyroscope
 log = args.log_train
 
 if train_classifier:
-    if method == '' or split_method == '':
-        sys.exit('For train classifier method (cycle or window) and split (stanrd or paper) must be defined')
+    if method == 'cycle_based' and split_method == '':
+        sys.exit('For train classifier method (cycle_based) split (standard or paper) must be defined')
 
 model = ModelAuthentication(path_data, path_out, name_dataset, name_model, overlap, colab_path)
 if train_classifier:

@@ -164,7 +164,7 @@ def ou_isir_process_window_based(
         ### READ ACCELETOMETER DATA ###
         acc = pd.read_csv(path_data + '/' + f, header=None,
                         skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python')
-        acc = remove_g_component(acc.values, sampling_rate=100, plot=False)
+        acc = acc.values
 
         ### READ GYROSCOPE DATA ###
         gyro = pd.read_csv(path_data + '/' + f, header=None,

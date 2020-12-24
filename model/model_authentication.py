@@ -73,7 +73,7 @@ class ModelAuthentication():
     def split_user(self):
         """
         Split user in two subset: 70% are used to train CNN for feature extraction,
-        30% of users are used for authentication evaluation. Save authentication user in self.path_out
+        30% of users are used for authentication evaluation. Save authentication users' data in self.path_out
         """
         self.classifier = dict.fromkeys(list(self.data_dict.keys()))
         self.auth = dict.fromkeys(list(self.data_dict.keys()))
@@ -117,13 +117,11 @@ class ModelAuthentication():
             for key in list(self.data_dict.keys()):
                 self.auth[key] = self.data_dict[key][mask_auth]
 
-        # mapping user label
+        # mapping label user to train classifier
         old_label_user = np.unique(self.classifier['user_label'])
         new_label_user = np.arange(len(old_label_user))
-
         mapping_user_label = {k: v for k, v in zip(
             old_label_user, new_label_user)}
-
         self.classifier['user_label'] = [mapping_user_label[user]
                                          for user in self.classifier['user_label']]
         self.num_user_classifier = len(
@@ -138,7 +136,7 @@ class ModelAuthentication():
         print('{} window for evaluate authentication'.format(
             self.auth['data'].shape))
 
-        # save user data for authentication
+        # save users' data used in authentication evaluation
         if not os.path.exists(self.path_out + 'data/'):
             os.makedirs(self.path_out + 'data/')   
 
@@ -155,10 +153,10 @@ class ModelAuthentication():
         From numpy to tensorflow data to train. Divide data for train classifier in 70-30 (train, validation)
         """
         
-        # split data balance based on user and act
+        # split data balance based on user and act (if provided)
         if method == 'window_based':
             data_train, data_val, label_user_train, label_user_val, id_window_train, id_window_val = self.split_train_val_classifier(
-                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], split_method, train_size=0.8)  
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], self.classifier['id'], 'standard', train_size=0.9)  
 
             print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
@@ -173,10 +171,10 @@ class ModelAuthentication():
 
             print(f'Train window after delete overlap sequence: {data_train.shape[0]}')
             print(f'Validation set: {data_val.shape[0]}')
-
+            
         elif method == 'cycle_based':
             data_train, data_val, label_user_train, label_user_val = self.split_train_val_classifier(
-                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], None, split_method, train_size=0.8) 
+                self.classifier['data'], self.classifier['user_label'], self.classifier['act_label'], None, split_method, train_size=0.9) 
 
         self.train = data_train
         self.train_user = label_user_train
@@ -187,6 +185,8 @@ class ModelAuthentication():
         self.train, self.val, _, self.mean, self.std = normalize_data(self.train, self.val, return_mean_std=True)
 
     def augment_train_data(self):
+
+        # based on paper Data Augmentation for ...., apply only magnotude and time warping
 
         functions = {
             'magnitude_warp': magnitude_warp,
@@ -403,6 +403,10 @@ class ModelAuthentication():
 
     def save_model(self):
 
+        """
+        Saved model to used for feature extraction, mean and std to normalize input users' data in authentication evaluation
+        """
+
         print('Save model')
         self.feature_extractor.save_weights(
             self.path_save_model + self.name_model + '.h5')
@@ -412,6 +416,9 @@ class ModelAuthentication():
         np.save(self.path_save_model + 'std.npy', self.std)
 
     def load_model(self, win_len, axis):
+        """
+        Load model, mean and standard deviation
+        """
 
         print('Load model')
         if 'ouisir' not in self.name_dataset.lower():
@@ -452,6 +459,16 @@ class ModelAuthentication():
         win_len = data.shape[1]
         axis = data.shape[2]
         self.load_model(win_len, axis)
+
+        # sort data based on id window (time sorted), only for dataset divided with sliding window
+        if  _id:
+            idx_sorted = np.argsort(ID)
+            data = data[idx_sorted]
+            user_label = user_label[idx_sorted]
+            act_label = act_label[idx_sorted]
+            if _session:
+                sessions = sessions[idx_sorted]
+            ID = ID[idx_sorted]
 
         # case1: probe-gallery for every session
         if split_probe_gallery == 'intra_session':
@@ -504,14 +521,6 @@ class ModelAuthentication():
                 act_label_probe = act_label[idx_probe]
             # case3: random split, following time sorting
             elif split_probe_gallery == 'random':
-                # sort data based on id window (time sorted), only for dataset divided with sliding window
-                idx_sorted = np.argsort(ID)
-                data = data[idx_sorted]
-                user_label = self.auth['user_label'][idx_sorted]
-                act_label = self.auth['act_label'][idx_sorted]
-                if _session:
-                    sessions = sessions[idx_sorted]
-                ID = ID[idx_sorted]
                 path_probe_gallery = path_probe_gallery + 'random/'
                 if not os.path.exists(path_probe_gallery + 'gallery/'):
                     os.makedirs(path_probe_gallery + 'gallery/')
