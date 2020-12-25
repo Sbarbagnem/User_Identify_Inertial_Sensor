@@ -161,13 +161,14 @@ class ModelAuthentication():
             print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
             # delete overlap sequence
-            if self.overlap == 0.5:
-                distance_to_delete = [1]
-            elif self.overlap == 0.75:
-                distance_to_delete = [1,2,3]
-            invalid_idx = delete_overlap(id_window_train, id_window_val, distance_to_delete)
-            data_train = np.delete(data_train, invalid_idx, axis=0)
-            label_user_train = np.delete(label_user_train, invalid_idx, axis=0)
+            if overlap != 0:
+                if self.overlap == 0.5:
+                    distance_to_delete = [1]
+                elif self.overlap == 0.75:
+                    distance_to_delete = [1,2,3]
+                invalid_idx = delete_overlap(id_window_train, id_window_val, distance_to_delete)
+                data_train = np.delete(data_train, invalid_idx, axis=0)
+                label_user_train = np.delete(label_user_train, invalid_idx, axis=0)
 
             print(f'Train window after delete overlap sequence: {data_train.shape[0]}')
             print(f'Validation set: {data_val.shape[0]}')
@@ -753,8 +754,9 @@ class ModelAuthentication():
                 probe_id = id_temp[int(samples/2):]
 
                 # delete possible overlap between gallery and probe (delete from probe)
-                invalid_idx = delete_overlap(probe_id, gallery_id, to_del)
-                probe_temp = np.delete(probe_temp, invalid_idx, axis=0)             
+                if self.overlap != 0:
+                    invalid_idx = delete_overlap(probe_id, gallery_id, to_del)
+                    probe_temp = np.delete(probe_temp, invalid_idx, axis=0)             
 
                 gallery.append(gallery_temp)
                 probe.append(probe_temp)
