@@ -161,7 +161,7 @@ class ModelAuthentication():
             print(f'Train window before delete overlap sequence: {data_train.shape[0]}')
 
             # delete overlap sequence
-            if overlap != 0:
+            if self.overlap != 0:
                 if self.overlap == 0.5:
                     distance_to_delete = [1]
                 elif self.overlap == 0.75:
