@@ -51,6 +51,13 @@ parser.add_argument(
     help='Use or not gyroscope data'
 )
 parser.add_argument(
+    '-magnetometer',
+    '--magnetometer',
+    type=str2bool,
+    default=False,
+    help='Use or not magnetometer data'
+)
+parser.add_argument(
     '-generate_features',
     '--generate_features',
     type=str2bool,
@@ -155,6 +162,7 @@ overlap = args.overlap
 method = args.method
 split_method = args.split_method
 gyroscope = args.gyroscope
+magnetometer = args.magnetometer
 log = args.log_train
 
 if train_classifier:
@@ -163,7 +171,7 @@ if train_classifier:
 
 model = ModelAuthentication(path_data, path_out, name_dataset, name_model, overlap, colab_path)
 if train_classifier:
-    model.load_data(gyroscope)
+    model.load_data(gyroscope, magnetometer)
     model.split_user()
     model.split_train_test_classifier(split_method, method)
     if augment_data:

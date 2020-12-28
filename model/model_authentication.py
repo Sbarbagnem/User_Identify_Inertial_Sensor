@@ -42,7 +42,7 @@ class ModelAuthentication():
         if not os.path.exists(self.path_save_model):
             os.makedirs(self.path_save_model)
 
-    def load_data(self, gyroscope=False):
+    def load_data(self, gyroscope=False, magnetometer=False):
         data_dict = dict.fromkeys(
             ['data', 'user_label', 'act_label', 'id', 'gender', 'sessions'])
         for key in list(data_dict.keys()):
@@ -52,8 +52,10 @@ class ModelAuthentication():
         if 'ouisir' in self.name_dataset.lower():
             data_dict['act_label'] = np.zeros_like(data_dict['user_label']) 
 
-        if not gyroscope:
+        if not gyroscope and not magnetometer:
             data_dict['data'] = data_dict['data'][:,:,[0,1,2,3]]
+        if not magnetometer:
+            data_dict['data'] = data_dict['data'][:,:,[0,1,2,3,4,5,6,7]]
             
         # remove key with None value
         self.data_dict = {k: v for k, v in data_dict.items() if v is not None}
