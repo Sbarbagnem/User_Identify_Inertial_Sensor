@@ -459,11 +459,6 @@ class ModelAuthentication():
             ID = np.load(self.path_out + 'data/id.npy')
             _id = True
 
-        print(data.shape)
-        print(user_label.shape)
-        print(act_label.shape)
-        print(ID.shape)
-
         win_len = data.shape[1]
         axis = data.shape[2]
         self.load_model(win_len, axis)
@@ -529,7 +524,6 @@ class ModelAuthentication():
                 act_label_probe = act_label[idx_probe]
             # case3: random split, following time sorting
             elif split_probe_gallery == 'random':
-                print('Random split gallery probe')
                 path_probe_gallery = path_probe_gallery + 'random/'
                 if not os.path.exists(path_probe_gallery + 'gallery/'):
                     os.makedirs(path_probe_gallery + 'gallery/')
@@ -739,8 +733,6 @@ class ModelAuthentication():
         elif self.overlap == 0.75:
             to_del = [1,2,3]
 
-        print(f'To del {to_del}')
-
         gallery = []
         probe = []
         users_gallery = []
@@ -753,29 +745,30 @@ class ModelAuthentication():
 
                 # filter for user and activity
                 idx = np.where((users == user) & (activities == act))
-                samples = len(idx[0])
-                data_temp = data[idx]
-                id_temp = id_window[idx]
+                if idx[0].shape != (0,):
+                    samples = len(idx[0])
+                    data_temp = data[idx]
+                    id_temp = id_window[idx]
 
-                # split 50% gallery and 50% probe
-                gallery_temp = data_temp[:int(samples/2)]
-                gallery_id = id_temp[:int(samples/2)]
-                probe_temp = data_temp[int(samples/2):]
-                probe_id = id_temp[int(samples/2):]
+                    # split 50% gallery and 50% probe
+                    gallery_temp = data_temp[:int(samples/2)]
+                    gallery_id = id_temp[:int(samples/2)]
+                    probe_temp = data_temp[int(samples/2):]
+                    probe_id = id_temp[int(samples/2):]
 
-                # delete possible overlap between gallery and probe (delete from probe)
-                if self.overlap != 0:
-                    invalid_idx = delete_overlap(probe_id, gallery_id, to_del)
-                    probe_temp = np.delete(probe_temp, invalid_idx, axis=0)             
+                    # delete possible overlap between gallery and probe (delete from probe)
+                    if self.overlap != 0:
+                        invalid_idx = delete_overlap(probe_id, gallery_id, to_del)
+                        probe_temp = np.delete(probe_temp, invalid_idx, axis=0)             
 
-                gallery.append(gallery_temp)
-                probe.append(probe_temp)
-                users_gallery.extend(
-                    [user for _ in range(gallery_temp.shape[0])])
-                users_probe.extend(
-                    [user for _ in range(probe_temp.shape[0])])
-                act_gallery.extend([act for _ in range(gallery_temp.shape[0])])
-                act_probe.extend([act for _ in range(probe_temp.shape[0])])
+                    gallery.append(gallery_temp)
+                    probe.append(probe_temp)
+                    users_gallery.extend(
+                        [user for _ in range(gallery_temp.shape[0])])
+                    users_probe.extend(
+                        [user for _ in range(probe_temp.shape[0])])
+                    act_gallery.extend([act for _ in range(gallery_temp.shape[0])])
+                    act_probe.extend([act for _ in range(probe_temp.shape[0])])
 
         gallery = np.expand_dims(np.concatenate(gallery, axis=0), 3)
         probe = np.expand_dims(np.concatenate(probe, axis=0), 3)
