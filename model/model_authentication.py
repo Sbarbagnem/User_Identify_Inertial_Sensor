@@ -762,7 +762,8 @@ class ModelAuthentication():
                         try:
                             probe_temp = np.delete(probe_temp, invalid_idx, axis=0)      
                         except:
-                            print(invalid_idx)       
+                            print(invalid_idx)      
+                            sys.exit() 
 
                     gallery.append(gallery_temp)
                     probe.append(probe_temp)
