@@ -455,7 +455,7 @@ class ModelAuthentication():
         if 'sessions.npy' in os.listdir(self.path_out + 'data/'):
             sessions = np.load(self.path_out + 'data/sessions.npy')
             _session = True
-        if 'id' in os.listdir(self.path_out + 'data/'):
+        if 'id.npy' in os.listdir(self.path_out + 'data/'):
             ID = np.load(self.path_out + 'data/id.npy')
             _id = True
 
