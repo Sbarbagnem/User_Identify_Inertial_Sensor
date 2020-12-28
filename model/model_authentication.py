@@ -54,7 +54,7 @@ class ModelAuthentication():
 
         if not gyroscope and not magnetometer:
             data_dict['data'] = data_dict['data'][:,:,[0,1,2,3]]
-        if not magnetometer:
+        elif not magnetometer:
             data_dict['data'] = data_dict['data'][:,:,[0,1,2,3,4,5,6,7]]
             
         # remove key with None value
