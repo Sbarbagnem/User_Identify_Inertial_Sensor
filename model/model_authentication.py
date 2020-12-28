@@ -699,7 +699,9 @@ class ModelAuthentication():
         if action_dependent:
             # read score for every act
             eers = []
-            for act in np.unique(self.data_dict['act_label']):
+            #for act in np.unique(self.data_dict['act_label']):
+            for f in os.listdir(path_score_txt + 'action_dependent/'):
+                act = int(f.split('.txt')[0].split('distance_act_')[1])
                 score_txt = np.loadtxt(
                     path_score_txt + f'action_dependent/distance_act_{act}.txt')
                 score = score_txt[:, 0]
