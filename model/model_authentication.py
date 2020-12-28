@@ -459,6 +459,11 @@ class ModelAuthentication():
             ID = np.load(self.path_out + 'data/id.npy')
             _id = True
 
+        print(data.shape)
+        print(user_label.shape)
+        print(act_label.shape)
+        print(ID.shape)
+
         win_len = data.shape[1]
         axis = data.shape[2]
         self.load_model(win_len, axis)
