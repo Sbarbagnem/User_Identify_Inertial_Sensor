@@ -426,7 +426,7 @@ class ModelAuthentication():
         print('Load model')
         if 'ouisir' not in self.name_dataset.lower():
             self.feature_extractor = resnet2D(
-                False, 0, 0, feature_generator=True)
+                False, 0, 0, stride=2, feature_generator=True)
         else:
             self.feature_extractor = resnet2D(
                 False, 0, 0, stride=2, feature_generator=True)
