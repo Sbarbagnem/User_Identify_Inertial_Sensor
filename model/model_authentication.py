@@ -529,6 +529,7 @@ class ModelAuthentication():
                 act_label_probe = act_label[idx_probe]
             # case3: random split, following time sorting
             elif split_probe_gallery == 'random':
+                print('Random split gallery probe')
                 path_probe_gallery = path_probe_gallery + 'random/'
                 if not os.path.exists(path_probe_gallery + 'gallery/'):
                     os.makedirs(path_probe_gallery + 'gallery/')
@@ -737,6 +738,8 @@ class ModelAuthentication():
             to_del = [1]
         elif self.overlap == 0.75:
             to_del = [1,2,3]
+
+        print(f'To del {to_del}')
 
         gallery = []
         probe = []
