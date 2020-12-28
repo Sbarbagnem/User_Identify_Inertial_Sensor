@@ -464,6 +464,7 @@ class ModelAuthentication():
         self.load_model(win_len, axis)
 
         # sort data based on id window (time sorted), only for dataset divided with sliding window
+        '''
         if  _id:
             idx_sorted = np.argsort(ID)
             data = data[idx_sorted]
@@ -472,7 +473,7 @@ class ModelAuthentication():
             if _session:
                 sessions = sessions[idx_sorted]
             ID = ID[idx_sorted]
-
+        '''
         # case1: probe-gallery for every session
         if split_probe_gallery == 'intra_session':
             # make_dir session_dependent
