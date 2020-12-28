@@ -264,7 +264,7 @@ class ModelAuthentication():
     def build_model(self, stride=1, fc=False):
         if 'ouisir' not in self.name_dataset.lower():
             self.feature_extractor = resnet2D(
-                multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=stride, fc=fc, flatten=False)
+                multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=2, fc=fc, flatten=False)
         else:
             self.feature_extractor = resnet2D(
                 multi_task=False, num_act=0, num_user=self.num_user_classifier, stride=2, fc=fc, flatten=False)
