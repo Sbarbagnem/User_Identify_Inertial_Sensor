@@ -759,7 +759,10 @@ class ModelAuthentication():
                     # delete possible overlap between gallery and probe (delete from probe)
                     if self.overlap != 0:
                         invalid_idx = delete_overlap(probe_id, gallery_id, to_del)
-                        probe_temp = np.delete(probe_temp, invalid_idx, axis=0)             
+                        try:
+                            probe_temp = np.delete(probe_temp, invalid_idx, axis=0)      
+                        except:
+                            print(invalid_idx)       
 
                     gallery.append(gallery_temp)
                     probe.append(probe_temp)
