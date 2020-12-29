@@ -753,6 +753,8 @@ class ModelAuthentication():
                     data_temp = data[idx]
                     id_temp = id_window[idx]
 
+                    data_temp, id_temp = skutils.shuffle(data_temp, id_temp)
+
                     # split 50% gallery and 50% probe
                     gallery_temp = data_temp[:int(samples/2)]
                     gallery_id = id_temp[:int(samples/2)]
