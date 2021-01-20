@@ -124,7 +124,19 @@ class Model():
                 fold_test=self.fold_test, overlapping=self.overlap, realdisp=realdisp)
 
         self.dataset_name_plot = self.dataset_name + f'_magnitude_{str(self.magnitude).lower()}' + f'_overlap_{self.overlap}'
+        self.num_user = len(np.unique(TrainLU))
 
+        # nel caso self di realdisp non ho dati per i soggetti 6 e 13
+        if realdisp:
+            old_user_label = np.unique(TrainLU)
+            new_user_label = np.arange(len(old_user_label))
+            mapping_user_label = {k: v for k, v in zip(
+                old_user_label, new_user_label)}
+            TrainLU = [mapping_user_label[user] for user in TrainLU]
+            ValidLU = [mapping_user_label[user] for user in ValidLU]
+            TestLU = [mapping_user_label[user] for user in TestLU]
+    
+        
         # if true only accelerometer will be used
         if only_acc:
             if self.magnitude:
