@@ -489,15 +489,15 @@ class Model():
         }
 
         for epoch in range(1, self.epochs + 1):
-            cm = tf.zeros(shape=(self.dataset._user_num,
-                                 self.dataset._user_num), dtype=tf.int32)
+            cm = tf.zeros(shape=(self.num_user,
+                                 self.num_user), dtype=tf.int32)
 
             ### PERFORMANCE ON TRAIN AFTER EACH EPOCH ###
 
             for batch, label_act, label_user in self.train_data:
                 # self.distribution_act_on_batch(label_act)
                 cm_batch = self.train_step(
-                    batch, None, label_user, self.dataset._user_num)
+                    batch, None, label_user, self.num_user)
                 cm = cm + cm_batch
             metrics = custom_metrics(cm)
             if self.log:
@@ -524,8 +524,8 @@ class Model():
             self.train_loss_user.reset_states()
             self.train_accuracy_user.reset_states()
 
-            cm = tf.zeros(shape=(self.dataset._user_num,
-                                 self.dataset._user_num), dtype=tf.int32)
+            cm = tf.zeros(shape=(self.num_user,
+                                 self.num_user), dtype=tf.int32)
 
             ### PERFORMANCE ON VALIDATION AFTER EACH EPOCH ###
 
@@ -535,7 +535,7 @@ class Model():
 
             for batch, label_act, label_user in self.val_data:
                 cm_batch, predictions_user = self.valid_step(
-                    batch, label_act, label_user, self.dataset._user_num)
+                    batch, label_act, label_user, self.num_user)
                 cm = cm + cm_batch
                 temp_predictions_user.extend(predictions_user.numpy())
                 temp_label_user.extend(label_user.numpy())
@@ -603,12 +603,12 @@ class Model():
 
     def train_multi_task(self):
         for epoch in range(1, self.epochs + 1):
-            cm = tf.zeros(shape=(self.dataset._user_num,
-                                 self.dataset._user_num), dtype=tf.int32)
+            cm = tf.zeros(shape=(self.num_user,
+                                 self.num_user), dtype=tf.int32)
             if self.multi_task:
                 for batch, label_act, label_user in self.train_data:
                     cm_batch = self.train_step(
-                        batch, label_act, label_user, self.dataset._user_num)
+                        batch, label_act, label_user, self.num_user)
                     cm = cm + cm_batch
                 metrics = custom_metrics(cm)
                 if self.log:
@@ -643,19 +643,19 @@ class Model():
                 self.train_loss_user.reset_states()
                 self.train_accuracy_activity.reset_states()
                 self.train_accuracy_user.reset_states()
-                cm = tf.zeros(shape=(self.dataset._user_num,
-                                     self.dataset._user_num), dtype=tf.int32)
+                cm = tf.zeros(shape=(self.num_user,
+                                     self.num_user), dtype=tf.int32)
 
                 for batch, label_act, label_user in self.test_data:
                     if epoch == self.epochs:
                         cm_batch, predictions_user = self.valid_step(
-                            batch, label_act, label_user, self.dataset._user_num)
+                            batch, label_act, label_user, self.num_user)
                         cm = cm + cm_batch
                         self.update_pred_based_on_act(
                             predictions_user, label_user, label_act)
                     else:
                         cm_batch, _ = self.valid_step(
-                            batch, label_act, label_user, self.dataset._user_num)
+                            batch, label_act, label_user, self.num_user)
                         cm = cm + cm_batch
                 metrics = custom_metrics(cm)
                 with self.val_writer.as_default():
@@ -717,12 +717,12 @@ class Model():
         temp_label_user = []
         temp_label_act = []
 
-        cm = tf.zeros(shape=(self.dataset._user_num,
-                             self.dataset._user_num), dtype=tf.int32)
+        cm = tf.zeros(shape=(self.num_user,
+                             self.num_user), dtype=tf.int32)
 
         for batch, label_act, label_user in self.test_data:
             cm_batch, predictions_user = self.valid_step(
-                batch, label_act, label_user, self.dataset._user_num)
+                batch, label_act, label_user, self.num_user)
             cm = cm + cm_batch
             temp_predictions_user.extend(predictions_user.numpy())
             temp_label_user.extend(label_user.numpy())
@@ -743,8 +743,8 @@ class Model():
 
         # confusion matrix
         if log:
-            df_cm = pd.DataFrame(cm.numpy(), index=[str(i) for i in range(0, self.dataset._user_num)],
-                                columns=[str(i) for i in range(0, self.dataset._user_num)])
+            df_cm = pd.DataFrame(cm.numpy(), index=[str(i) for i in range(0, self.num_user)],
+                                columns=[str(i) for i in range(0, self.num_user)])
             plt.figure(figsize=(30, 21))
             sn.heatmap(df_cm, annot=True)
             plt.show()
