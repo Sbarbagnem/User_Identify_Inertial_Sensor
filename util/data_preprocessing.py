@@ -15,6 +15,7 @@ import pywt
 import random
 from itertools import islice
 import re
+import seaborn as sn
 
 from sliding_window import sliding_window
 from utils import str2bool, split_balanced_data, denoiseData, detectGaitCycle, segment2GaitCycle, remove_g_component, interpolated
@@ -66,7 +67,7 @@ def ou_isir_process_cycle_based(
         acc = pd.read_csv(path_data + '/' + f, header=None,
                         skiprows=[0,1], skipfooter=1, usecols=[3, 4, 5], engine='python') # only acc
         acc = acc.values
-        acc = remove_g_component(acc, sampling_rate=100, plot=False)
+        #acc = remove_g_component(acc, sampling_rate=100, plot=False)
         if denoise == True:
             acc = denoiseData(acc, plot_denoise)
         peaks = detectGaitCycle(acc, plot_peak, plot_auto_corr_coeff, gcLen)
@@ -319,94 +320,100 @@ def realdisp_process(
     for fl in tqdm(os.listdir(raw_data_path)):
         # filter based on displacement choosen
         if fl.startswith('subject') and any(displace in fl for displace in sensors_displacement):
-            log_file = pd.DataFrame(pd.read_table(
-                raw_data_path + fl).values, columns=HEADER)
-            log_file.drop(['sec', 'microsec'], inplace=True, axis=1)
-            log_file = log_file.astype({"act": int})
+            if fl != 'subject6_self.log' and fl != 'subject13_self.log': # no self data for these subjects
+                log_file = pd.DataFrame(pd.read_table(
+                    raw_data_path + fl).values, columns=HEADER)
+                log_file.drop(['sec', 'microsec'], inplace=True, axis=1)
+                log_file = log_file.astype({"act": int})
 
-            id_user = int(fl.split('_')[0].split('subject')[1])
+                id_user = int(fl.split('_')[0].split('subject')[1])
 
-            if 'ideal' in fl.split('_')[1]:
-                disp = 0
-            if 'self' in fl.split('_')[1]:
-                disp = 1
-            if 'mutual' in fl.split('_')[1]:
-                disp = 2
+                if 'ideal' in fl.split('_')[1]:
+                    disp = 0
+                if 'self' in fl.split('_')[1]:
+                    disp = 1
+                if 'mutual' in fl.split('_')[1]:
+                    disp = 2
 
-            zero_act += log_file[log_file['act'] == 0].shape[0]
-            total_data += log_file.shape[0]
+                zero_act += log_file[log_file['act'] == 0].shape[0]
+                total_data += log_file.shape[0]
 
-            # delete sample with act == 0 (unkwnown)
-            log_file = log_file[log_file.act != 0]
-            activities = np.unique(log_file.act)
+                # delete sample with act == 0 (unkwnown)
+                log_file = log_file[log_file.act != 0]
+                activities = np.unique(log_file.act)
 
-            # filter based on position sensor choosen (BACK, RLA, RUA, ...) and sensor tyep (acc, gyro, ...)
-            mask = [(col.split('_')[0] in positions and col.split('_')[
-                     1] in sensors_type) for col in log_file.columns.tolist()[:-1]]
-            mask.append(True)
-            col_filter = log_file.columns[mask]
-            log_file = log_file[col_filter]
+                # filter based on position sensor choosen (BACK, RLA, RUA, ...) and sensor tyep (acc, gyro, ...)
+                mask = [(col.split('_')[0] in positions and col.split('_')[
+                        1] in sensors_type) for col in log_file.columns.tolist()[:-1]]
+                mask.append(True)
+                col_filter = log_file.columns[mask]
+                log_file = log_file[col_filter]
 
-            # cycle on activity
-            for id_act in activities:
+                # cycle on activity
+                for id_act in activities:
 
-                temp = log_file[log_file.act == id_act]
+                    temp = log_file[log_file.act == id_act]
 
-                # sliding window on different position choose
-                for pos in positions:
+                    # sliding window on different position choose
+                    for pos in positions:
 
-                    merge_sensor = []
+                        merge_sensor = []
 
-                    p = positions.index(pos)
+                        p = positions.index(pos)
 
-                    if 'acc' in sensors_type:
-                        acc = temp[[col for col in temp.columns if (
-                            'acc' in col and pos in col)]].to_numpy()
-                        if magnitude:
-                            acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
-                                np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)
-                        merge_sensor.append(acc)
-                    if 'gyro' in sensors_type:
-                        gyro = temp[[col for col in temp.columns if (
-                            'gyro' in col and pos in col)]].to_numpy()
-                        if magnitude:
-                            gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
-                                np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
-                        merge_sensor.append(gyro)
-                    if 'magn' in sensors_type:
-                        magn = temp[[col for col in temp.columns if (
-                            'magn' in col and pos in col)]].to_numpy()
-                        if magnitude:
-                            magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(
-                                np.sum(np.power(x, 2))), axis=1, arr=magn).reshape(-1, 1)), axis=1)
-                        merge_sensor.append(magn)
+                        if 'acc' in sensors_type:
+                            acc = temp[[col for col in temp.columns if (
+                                'acc' in col and pos in col)]].to_numpy()
+                            #plot_signal(acc)
+                            if magnitude:
+                                acc = np.concatenate((acc, np.apply_along_axis(lambda x: np.sqrt(
+                                    np.sum(np.power(x, 2))), axis=1, arr=acc).reshape(-1, 1)), axis=1)
+                            merge_sensor.append(acc)
+                        if 'gyro' in sensors_type:
+                            gyro = temp[[col for col in temp.columns if (
+                                'gyro' in col and pos in col)]].to_numpy()
+                            #plot_signal(gyro)
+                            if magnitude:
+                                gyro = np.concatenate((gyro, np.apply_along_axis(lambda x: np.sqrt(
+                                    np.sum(np.power(x, 2))), axis=1, arr=gyro).reshape(-1, 1)), axis=1)
+                            merge_sensor.append(gyro)
+                        if 'magn' in sensors_type:
+                            magn = temp[[col for col in temp.columns if (
+                                'magn' in col and pos in col)]].to_numpy()
+                            #plot_signal(gyro)
+                            if magnitude:
+                                magn = np.concatenate((magn, np.apply_along_axis(lambda x: np.sqrt(
+                                    np.sum(np.power(x, 2))), axis=1, arr=magn).reshape(-1, 1)), axis=1)
+                            merge_sensor.append(magn)
 
-                    # concat sensor and sliding only one time
-                    merge_sensor = np.hstack(merge_sensor)
-                    _data_windows = sliding_window(
-                        merge_sensor, (win_len, merge_sensor.shape[1]), (int(win_len * (1 - size_overlapping)), 1))
+                        # concat sensor and sliding only one time
+                        merge_sensor = np.hstack(merge_sensor)
+                        _data_windows = sliding_window(
+                            merge_sensor, (win_len, merge_sensor.shape[1]), (int(win_len * (1 - size_overlapping)), 1))
 
-                    # id for every window
-                    _id = np.arange(
-                        ID_generater, ID_generater + len(_data_windows))
-                    ID.extend(_id)
-                    ID_generater = ID_generater + len(_data_windows) + 10
+                        # id for every window
+                        _id = np.arange(
+                            ID_generater, ID_generater + len(_data_windows))
+                        ID.extend(_id)
+                        ID_generater = ID_generater + len(_data_windows) + 10
 
-                    # concat verticaly every window
-                    data.append(_data_windows)
+                        # concat verticaly every window
+                        data.append(_data_windows)
 
-                    # id position
-                    id_pos.extend([p]*(len(_data_windows)))
+                        # id position
+                        id_pos.extend([p]*(len(_data_windows)))
 
-                # update la
-                _la = [int(id_act) - 1] * (len(ID) - len(la))
-                la.extend(_la)
+                    # update la
+                    _la = [int(id_act) - 1] * (len(ID) - len(la))
+                    la.extend(_la)
 
-            # update gloabl variabel lu and di
-            _lu = [int(id_user) - 1] * (len(ID) - len(lu))
-            _di = [disp] * (len(ID) - len(di))
-            lu.extend(_lu)
-            di.extend(_di)
+                # update gloabl variabel lu and di
+                _lu = [int(id_user) - 1] * (len(ID) - len(lu))
+                _di = [disp] * (len(ID) - len(di))
+                lu.extend(_lu)
+                di.extend(_di)
+            else:
+                print('Skip subject 6 or 13 in self displacement')
 
     print('punti con attività sconosciuta ', zero_act, ' su ', total_data)
 
@@ -432,16 +439,16 @@ def realdisp_process(
 
     # shuffle
     if not authentication:
-        data, la, lu, di, id_pos, ID = skutils.shuffle(
-            data, la, lu, di, id_pos, ID)
+        data_array, la_array, lu_array, di_array, id_pos_array, ID_array = skutils.shuffle(
+            data_array, la_array, lu_array, di_array, id_pos_array, ID_array)
 
-        print(f'shape data {data.shape}')
+        print(f'shape data {data_array.shape}')
 
-        indexes = split_balanced_data(lu, la, folders=10, di=di)
+        indexes = split_balanced_data(lu_array, la_array, folders=10, di=di_array)
 
-        #plt_user_distribution(indexes, lu)
-
-        #plt_act_distribution(indexes, la)
+        #plt_user_distribution(indexes, lu_array)
+        #plt_act_distribution(indexes, la_array)
+        
 
         # partition
         for i in range(10):
@@ -453,12 +460,12 @@ def realdisp_process(
 
             #idx = np.arange(int(len(data)*0.1*i), int(len(data)*0.1*(i+1)), 1)
             idx = indexes[str(i)]
-            np.save(processed_path + '/fold{}/data'.format(i), data[idx])
-            np.save(processed_path + '/fold{}/user_label'.format(i), lu[idx])
-            np.save(processed_path + '/fold{}/act_label'.format(i), la[idx])
-            np.save(processed_path + '/fold{}/id'.format(i), ID[idx])
-            np.save(processed_path + '/fold{}/di'.format(i), di[idx])
-            np.save(processed_path + '/fold{}/pos'.format(i), id_pos[idx])
+            np.save(processed_path + '/fold{}/data'.format(i), data_array[idx])
+            np.save(processed_path + '/fold{}/user_label'.format(i), lu_array[idx])
+            np.save(processed_path + '/fold{}/act_label'.format(i), la_array[idx])
+            np.save(processed_path + '/fold{}/id'.format(i), ID_array[idx])
+            np.save(processed_path + '/fold{}/di'.format(i), di_array[idx])
+            np.save(processed_path + '/fold{}/pos'.format(i), id_pos_array[idx])
     else:
         np.save(processed_path + '/data', data_array)
         np.save(processed_path + '/user_label', lu_array)
@@ -575,13 +582,13 @@ def sbhar_process(
                     _data_windows_gyro = sliding_window(
                         gyro, (win_len, channel), (int(win_len * (1 - size_overlapping)), 1))
                 except BaseException:
-                    print("Not enough data for sliding window")
+                    #print("Not enough data for sliding window")
                     print(id_user, id_act)
                 try:
                     acc_gyro = np.concatenate(
                         (_data_windows_acc, _data_windows_gyro), axis=2)
                 except BaseException:
-                    print("There is only one sliding window")
+                    #print("There is only one sliding window")
                     acc_gyro = np.concatenate(
                         (_data_windows_acc, _data_windows_gyro), axis=1)
                     acc_gyro = acc_gyro.reshape(
@@ -638,17 +645,20 @@ def sbhar_process(
         if authentication:
             sessions_array = np.delete(sessions_array, idx_to_del, axis=0)
 
+    plot_matrix_time_subject_activity(lu_array, la_array)
+
     if not os.path.exists(processed_path + '/'):
         os.mkdir(processed_path + '/')
 
     if not authentication:
-        data_array, lu_array, la_array, ID_array, sessions_array = skutils.shuffle(
-            data_array, lu_array, la_array, ID_array, sessions_array)
+        data_array, lu_array, la_array, ID_array = skutils.shuffle(
+            data_array, lu_array, la_array, ID_array)
         indexes = split_balanced_data(lu_array, la_array, folders=10)
 
-        #plt_user_distribution(indexes, lu_array)
+        plt_user_distribution(indexes, lu_array)
+        plt_act_distribution(indexes, la_array)
 
-        #plt_act_distribution(indexes, la_array)
+        sys.exit()
 
         # partition
         for i in range(10):
@@ -733,6 +743,7 @@ def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len, au
                 else:
                     _data = signal[sid, 0][0, 0][act][tid, 0][0:3, :]
                 _data = np.transpose(_data)
+                plot_signal(_data, sid, act)
                 _data_windows = sliding_window(
                     _data, (win_len, channel), (int(win_len * (1 - size_overlapping)), 1))
                 invalid_idx = np.where(np.any(np.isnan(np.reshape(
@@ -759,6 +770,8 @@ def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len, au
         _gender = np.full(len(data) - len(gender), gender_user, dtype=np.int32)
         lu = np.concatenate((lu, _lu), axis=0)
         gender = np.concatenate((gender, _gender), axis=0)
+    
+    plot_matrix_time_subject_activity(lu, la)
 
     if not os.path.exists(processed_path + '/'):
         os.makedirs(processed_path + '/')
@@ -769,8 +782,10 @@ def unimib_process(path_data, path_out, magnitude, size_overlapping, win_len, au
             data, lu, la, ID)
         indexes = split_balanced_data(lu, la, folders=10)
 
-        #plt_user_distribution(indexes, lu)
-        #plt_act_distribution(indexes, la)
+        plt_user_distribution(indexes, lu)
+        plt_act_distribution(indexes, la)
+
+        sys.exit()
 
         # create dir partition
         for i in range(10):
@@ -803,6 +818,8 @@ def plt_user_distribution(dict_indexes, lu):
     for folder in np.arange(len(dict_indexes)):
         plt.subplot(2, 5, folder + 1)
         plt.title('folder {}'.format(folder + 1))
+        plt.xlabel(xlabel="Subjects")
+        plt.ylabel(ylabel="Number of samples")
         folder_index = dict_indexes[str(folder)]
         user_distributions = []
         for user in np.unique(lu):
@@ -810,7 +827,7 @@ def plt_user_distribution(dict_indexes, lu):
                 lu) if i == user and index in folder_index])
             user_distributions.append(number_user)
 
-        plt.bar(x=np.arange(len(user_distributions)),
+        plt.bar(x=np.arange(1,len(user_distributions) + 1),
                 height=user_distributions)
     plt.tight_layout()
     plt.show()
@@ -824,6 +841,8 @@ def plt_act_distribution(dict_indexes, la):
     for folder in np.arange(len(dict_indexes)):
         plt.subplot(2, 5, folder + 1)
         plt.title('folder {}'.format(folder + 1))
+        plt.xlabel(xlabel="Activities")
+        plt.ylabel(ylabel="Number of samples")
         folder_index = dict_indexes[str(folder)]
         act_distributions = []
         for act in np.unique(la):
@@ -831,18 +850,42 @@ def plt_act_distribution(dict_indexes, la):
                 la) if i == act and index in folder_index])
             act_distributions.append(number_act)
 
-        plt.bar(x=np.arange(len(act_distributions)), height=act_distributions)
+        plt.bar(x=np.arange(1, len(act_distributions) + 1), height=act_distributions)
+        plt.xticks(ticks=np.arange(1, len(act_distributions) + 1))
     plt.tight_layout()
     plt.show()
 
 
-def plot_signal(data):
+def plot_signal(data, sid=None, aid=None):
     plt.figure(figsize=(12, 3))
     plt.style.use('seaborn-darkgrid')
-    plt.plot(np.arange(data.shape[0]), data, 'b-')
+    if sid != None and aid != None:
+        plt.title(f'Subject {sid} - Activity {aid}')
+    plt.plot(np.arange(data.shape[0]), data[:,0], 'b-', label='x-axis')
+    plt.plot(np.arange(data.shape[0]), data[:,1], 'g-', label='y-axis')
+    plt.plot(np.arange(data.shape[0]), data[:,2], 'r-', label='z-axis')
+    plt.legend(loc='upper right')
     plt.tight_layout()
     plt.show()
 
+def plot_matrix_time_subject_activity(label_user, label_acitivity):
+    distribution = [] 
+    for user in np.unique(label_user):
+        distribution.append([])
+        for act in np.unique(label_acitivity):
+            samples = len([i for i, (u, a) in enumerate(
+                zip(label_user, label_acitivity)) if a == act and u == user])
+            distribution[user].append(samples)
+
+    plt.figure()
+    plt.title('Distribution of subjects\' samples for activity')
+    plt.xlabel('User id')
+    plt.ylabel('Act id')
+    _ = sn.heatmap(np.transpose(distribution),
+                    linewidths=0.3, cmap='YlGnBu', annot=True, fmt="d")
+    plt.tight_layout()
+    plt.show()
+    sys.exit()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

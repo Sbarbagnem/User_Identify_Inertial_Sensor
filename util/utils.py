@@ -46,7 +46,7 @@ def str2bool(v):
         return False
 
 
-def split_balanced_data(lu, la, folders, di=None, log=True):
+def split_balanced_data(lu, la, folders, di=None, log=False):
 
     if log:
         print('Numero totale di esempi: {}'.format(len(lu)))

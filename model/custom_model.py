@@ -139,6 +139,7 @@ class Model():
         
         # if true only accelerometer will be used
         if only_acc:
+
             if self.magnitude:
                 TrainData = TrainData[:, :, [0, 1, 2, 3]]
                 ValidData = ValidData[:, :, [0, 1, 2, 3]]
